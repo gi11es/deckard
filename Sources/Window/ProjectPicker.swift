@@ -135,6 +135,10 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
                 self.moveSelection(by: -1)
                 return nil
             }
+            if event.keyCode == 48 { // Tab — autocomplete selected path
+                self.autocompleteSelection()
+                return nil
+            }
             return event
         }
 
@@ -172,6 +176,17 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
         let next = max(0, min(filteredProjects.count - 1, current + delta))
         tableView.selectRowIndexes(IndexSet(integer: next), byExtendingSelection: false)
         tableView.scrollRowToVisible(next)
+    }
+
+    private func autocompleteSelection() {
+        let row = tableView.selectedRow
+        guard row >= 0, row < filteredProjects.count else { return }
+        let path = filteredProjects[row].path
+        searchField.stringValue = path
+        // Move cursor to end
+        searchField.currentEditor()?.selectedRange = NSRange(location: path.count, length: 0)
+        // Trigger a re-filter to show subdirectories
+        controlTextDidChange(Notification(name: NSControl.textDidChangeNotification))
     }
 
     @objc private func searchFieldAction() {
