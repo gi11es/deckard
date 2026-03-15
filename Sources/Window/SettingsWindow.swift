@@ -205,11 +205,6 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         descLabel.textColor = .tertiaryLabelColor
         stack.addArrangedSubview(descLabel)
 
-        let creditLabel = NSTextField(labelWithString: "By Trailblaze")
-        creditLabel.font = .systemFont(ofSize: 11)
-        creditLabel.textColor = .tertiaryLabelColor
-        stack.addArrangedSubview(creditLabel)
-
         let linkLabel = NSTextField(labelWithString: "")
         linkLabel.isEditable = false
         linkLabel.isBordered = false

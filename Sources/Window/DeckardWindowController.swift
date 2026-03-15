@@ -82,6 +82,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private let sidebarWidth: CGFloat = 210
     private var sidebarInitialized = false
+    private var startupOverlay: NSView?
     /// Recently closed projects — stored so reopening the same path restores tabs.
     private var recentlyClosedProjects: [ProjectState] = []
     private var isRestoring = false
@@ -113,6 +114,26 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         setupUI()
+
+        // Startup overlay — removed when the shell finishes initializing
+        // (detected by the clear command completing, which triggers a title/pwd change)
+        let startupOverlay = NSView()
+        startupOverlay.wantsLayer = true
+        startupOverlay.layer?.backgroundColor = ghosttyApp.defaultBackgroundColor.cgColor
+        startupOverlay.layer?.zPosition = 9999
+        startupOverlay.translatesAutoresizingMaskIntoConstraints = false
+        terminalContainerView.addSubview(startupOverlay)
+        self.startupOverlay = startupOverlay
+        NSLayoutConstraint.activate([
+            startupOverlay.topAnchor.constraint(equalTo: terminalContainerView.topAnchor),
+            startupOverlay.bottomAnchor.constraint(equalTo: terminalContainerView.bottomAnchor),
+            startupOverlay.leadingAnchor.constraint(equalTo: terminalContainerView.leadingAnchor),
+            startupOverlay.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
+        ])
+        // Safety fallback in case signal never comes
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
+            self?.dismissStartupOverlay()
+        }
 
         restoreOrCreateInitial()
 
@@ -382,15 +403,23 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let initialInput: String?
         if isClaude {
+            let prefix = "stty -echo; export PATH=\"$DECKARD_BIN_DIR:$PATH\"; clear; stty echo; "
             let extraArgs = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
             let extraArgsSuffix = extraArgs.isEmpty ? "" : " \(extraArgs)"
             if let sid = sessionIdToResume {
-                initialInput = "export PATH=\"$DECKARD_BIN_DIR:$PATH\"; exec claude --resume \(sid)\(extraArgsSuffix)\n"
+                initialInput = "\(prefix)claude --resume \(sid)\(extraArgsSuffix)\n"
             } else {
-                initialInput = "export PATH=\"$DECKARD_BIN_DIR:$PATH\"; exec claude\(extraArgsSuffix)\n"
+                initialInput = "\(prefix)claude\(extraArgsSuffix)\n"
             }
         } else {
-            initialInput = nil  // just start the shell normally
+            initialInput = "stty -echo; clear; stty echo\n"
+        }
+
+        // Hide surface until shell is ready (title/pwd signal reveals it)
+        surfaceView.alphaValue = 0
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak surfaceView] in
+            guard let sv = surfaceView, sv.alphaValue < 1 else { return }
+            sv.alphaValue = 1
         }
 
         surfaceView.createSurface(
@@ -496,21 +525,44 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Surface Callbacks
 
+    func dismissStartupOverlay() {
+        guard let overlay = startupOverlay else { return }
+        startupOverlay = nil
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.15
+            overlay.animator().alphaValue = 0
+        }, completionHandler: {
+            overlay.removeFromSuperview()
+        })
+    }
+
+    private func revealSurface(_ view: TerminalNSView) {
+        guard view.alphaValue < 1 else { return }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.15
+            view.animator().alphaValue = 1
+        })
+    }
+
     func setTitle(_ title: String, forSurface surface: ghostty_surface_t?) {
+        dismissStartupOverlay()
         guard let surface = surface else { return }
         for project in projects {
             for tab in project.tabs where tab.surfaceView.surface == surface {
                 tab.surfaceView.title = title
+                revealSurface(tab.surfaceView)
                 return
             }
         }
     }
 
     func setPwd(_ pwd: String, forSurface surface: ghostty_surface_t?) {
+        dismissStartupOverlay()
         guard let surface = surface else { return }
         for project in projects {
             for tab in project.tabs where tab.surfaceView.surface == surface {
                 tab.surfaceView.pwd = pwd
+                revealSurface(tab.surfaceView)
                 return
             }
         }
