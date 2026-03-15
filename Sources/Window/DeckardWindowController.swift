@@ -682,7 +682,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             let title = " \(icon) \(tab.name) "
 
             let tabView = HorizontalTabView(
-                title: title,
+                displayTitle: title,
+                editableName: tab.name,
                 isSelected: isSelected,
                 index: i,
                 target: self,
@@ -903,18 +904,23 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
     var onRename: ((String) -> Void)?
     private var rawName: String  // name without icon prefix
 
-    init(title: String, isSelected: Bool, index: Int, target: AnyObject,
+    private var displayTitle: String
+
+    init(displayTitle: String, editableName: String, isSelected: Bool, index: Int, target: AnyObject,
          clickAction: Selector, closeAction: Selector) {
         self.index = index
         self.isSelected = isSelected
         self.target = target
         self.clickAction = clickAction
-        self.rawName = title
+        self.rawName = editableName
+        self.displayTitle = displayTitle
 
-        label = NSTextField(labelWithString: title)
+        label = NSTextField(labelWithString: displayTitle)
         label.font = .systemFont(ofSize: 12)
         label.textColor = isSelected ? .labelColor : .secondaryLabelColor
         label.lineBreakMode = .byTruncatingTail
+        label.setContentHuggingPriority(.defaultHigh, for: .horizontal)
+        label.setContentCompressionResistancePriority(.defaultHigh, for: .horizontal)
 
         closeButton = NSButton(title: "\u{00D7}", target: nil, action: nil)  // ×
         closeButton.bezelStyle = .recessed
@@ -964,7 +970,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
     private func startEditing() {
         label.isEditable = true
         label.isSelectable = true
-        label.stringValue = rawName  // show raw name without icon prefix
+        label.stringValue = rawName
         label.delegate = self
         label.becomeFirstResponder()
         label.currentEditor()?.selectAll(nil)
@@ -974,11 +980,13 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         label.isEditable = false
         label.isSelectable = false
         let newName = label.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !newName.isEmpty {
+        if !newName.isEmpty && newName != rawName {
             rawName = newName
             onRename?(newName)
+            // rebuild will be triggered by onRename which calls rebuildTabBar
+        } else {
+            label.stringValue = displayTitle
         }
-        // Restore display with icon prefix (rebuild will handle this)
     }
 
     func controlTextDidEndEditing(_ obj: Notification) {
@@ -992,7 +1000,9 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
             return true
         }
         if sel == #selector(cancelOperation(_:)) {
+            label.stringValue = displayTitle
             label.isEditable = false
+            label.isSelectable = false
             window?.makeFirstResponder(nil)
             return true
         }
