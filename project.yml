@@ -1,0 +1,65 @@
+name: Deckard
+options:
+  bundleIdPrefix: com.deckard
+  deploymentTarget:
+    macOS: "14.0"
+  xcodeVersion: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MACOSX_DEPLOYMENT_TARGET: "14.0"
+
+targets:
+  Deckard:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources
+        type: group
+    resources:
+      - path: Resources/bin
+        buildPhase: resources
+    postCompileScripts:
+      - script: |
+          mkdir -p "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin"
+          cp -f "${PROJECT_DIR}/Resources/bin/claude" "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude"
+          chmod +x "${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude"
+        name: Copy Claude Wrapper
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.deckard.app
+        PRODUCT_NAME: Deckard
+        INFOPLIST_GENERATION_MODE: GeneratedFile
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: 1
+        GENERATE_INFOPLIST_FILE: true
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/App/Deckard-Bridging-Header.h
+        FRAMEWORK_SEARCH_PATHS:
+          - "$(PROJECT_DIR)/ghostty/macos/GhosttyKit.xcframework/macos-arm64"
+        HEADER_SEARCH_PATHS:
+          - "$(PROJECT_DIR)/ghostty/macos/GhosttyKit.xcframework/macos-arm64/Headers"
+        OTHER_LDFLAGS:
+          - "-lghostty-fat"
+          - "-framework Metal"
+          - "-framework MetalKit"
+          - "-framework CoreText"
+          - "-framework QuartzCore"
+          - "-framework IOSurface"
+          - "-framework CoreGraphics"
+          - "-framework Foundation"
+          - "-framework AppKit"
+          - "-lz"
+          - "-lc++"
+          - "-framework Carbon"
+        LIBRARY_SEARCH_PATHS:
+          - "$(PROJECT_DIR)/ghostty/macos/GhosttyKit.xcframework/macos-arm64"
+        SWIFT_INCLUDE_PATHS:
+          - "$(PROJECT_DIR)/ghostty/macos/GhosttyKit.xcframework/macos-arm64/Headers"
+        IMPORT_PATHS:
+          - "$(PROJECT_DIR)/ghostty/macos/GhosttyKit.xcframework/macos-arm64/Headers"
+    entitlements:
+      path: Resources/Deckard.entitlements
+      properties:
+        com.apple.security.app-sandbox: false

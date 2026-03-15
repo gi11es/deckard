@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+# Deckard claude wrapper - injects hooks and session tracking
+#
+# When running inside a Deckard terminal (DECKARD_SURFACE_ID is set), this wrapper
+# intercepts `claude` invocations to inject --session-id and --settings flags
+# so that Claude Code hooks fire back into Deckard for notifications/status.
+# Outside Deckard, it passes through to the real claude binary unchanged.
+
+# Find the real claude binary, skipping our own directory.
+find_real_claude() {
+    local self_dir
+    self_dir="$(cd "$(dirname "$0")" && pwd)"
+    local IFS=:
+    for d in $PATH; do
+        [[ "$d" == "$self_dir" ]] && continue
+        [[ -x "$d/claude" ]] && printf '%s' "$d/claude" && return 0
+    done
+    return 1
+}
+
+# Pass through if not in a Deckard terminal or hooks are disabled.
+if [[ -z "$DECKARD_SURFACE_ID" || "$DECKARD_HOOKS_DISABLED" == "1" ]]; then
+    REAL_CLAUDE="$(find_real_claude)" || { echo "Error: claude not found in PATH" >&2; exit 127; }
+    exec "$REAL_CLAUDE" "$@"
+fi
+
+# Find real claude.
+REAL_CLAUDE="$(find_real_claude)" || { echo "Error: claude not found in PATH" >&2; exit 127; }
+
+# Pass through subcommands that don't support session/hook flags.
+case "${1:-}" in
+    mcp|config|api-key) exec "$REAL_CLAUDE" "$@" ;;
+esac
+
+# Unset CLAUDECODE to avoid "nested session" detection — Deckard terminals are
+# independent sessions even when the parent shell was launched from Claude Code.
+unset CLAUDECODE
+
+# Check if the user already specified a session/resume flag.
+SKIP_SESSION_ID=false
+for arg in "$@"; do
+    case "$arg" in
+        --resume|--resume=*|--session-id|--session-id=*|--continue|-c)
+            SKIP_SESSION_ID=true
+            break
+            ;;
+    esac
+done
+
+# Build hooks settings JSON.
+# Claude Code merges --settings additively with the user's own settings.json.
+HOOKS_JSON='{"hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"echo DECKARD_HOOK:session-start:$DECKARD_SURFACE_ID","timeout":10}]}],"Stop":[{"matcher":"","hooks":[{"type":"command","command":"echo DECKARD_HOOK:stop:$DECKARD_SURFACE_ID","timeout":10}]}],"Notification":[{"matcher":"","hooks":[{"type":"command","command":"echo DECKARD_HOOK:notification:$DECKARD_SURFACE_ID","timeout":10}]}],"UserPromptSubmit":[{"matcher":"","hooks":[{"type":"command","command":"echo DECKARD_HOOK:user-prompt-submit:$DECKARD_SURFACE_ID","timeout":10}]}]}}'
+
+if [[ "$SKIP_SESSION_ID" == true ]]; then
+    exec "$REAL_CLAUDE" --settings "$HOOKS_JSON" "$@"
+else
+    SESSION_ID="$(uuidgen | tr '[:upper:]' '[:lower:]')"
+    exec "$REAL_CLAUDE" --session-id "$SESSION_ID" --settings "$HOOKS_JSON" "$@"
+fi
