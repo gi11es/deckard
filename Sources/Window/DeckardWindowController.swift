@@ -882,9 +882,9 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         badgeContainer.setContentHuggingPriority(.required, for: .horizontal)
 
         closeButton = NSButton(title: "\u{00D7}", target: nil, action: nil)
-        closeButton.bezelStyle = .recessed
+        closeButton.bezelStyle = .inline
         closeButton.isBordered = false
-        closeButton.font = .systemFont(ofSize: 13)
+        closeButton.font = .systemFont(ofSize: 11)
         closeButton.contentTintColor = .tertiaryLabelColor
         closeButton.toolTip = "Close Project (\u{21E7}\u{2318}W)"
 
@@ -908,6 +908,7 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
             closeButton.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
             closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: 16),
+            closeButton.heightAnchor.constraint(equalToConstant: 16),
             label.leadingAnchor.constraint(equalTo: closeButton.trailingAnchor, constant: 2),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
             label.trailingAnchor.constraint(lessThanOrEqualTo: badgeContainer.leadingAnchor, constant: -4),
