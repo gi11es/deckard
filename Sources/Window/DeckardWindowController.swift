@@ -75,6 +75,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private var welcomeLabel: NSTextField?
 
     private let sidebarWidth: CGFloat = 210
+    /// Recently closed projects — stored so reopening the same path restores tabs.
+    private var recentlyClosedProjects: [ProjectState] = []
     private var isRestoring = false
 
     init(ghosttyApp: DeckardGhosttyApp) {
@@ -228,7 +230,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     // MARK: - Project Management
 
     func openProject(path: String) {
-        // Check if project already open
+        // Check if project already open — just switch to it
         if let idx = projects.firstIndex(where: { $0.path == path }) {
             selectProject(at: idx)
             return
@@ -236,10 +238,23 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let project = ProjectItem(path: path)
 
-        // Create default tabs
-        let config = DefaultTabConfig.current
-        for entry in config.entries {
-            createTabInProject(project, isClaude: entry.isClaude)
+        // Check if we have a recently closed snapshot — restore tabs from it
+        if let snapshot = recentlyClosedProjects.first(where: { $0.path == path }) {
+            recentlyClosedProjects.removeAll { $0.path == path }
+            project.name = snapshot.name
+            for ts in snapshot.tabs {
+                createTabInProject(project, isClaude: ts.isClaude, name: ts.name,
+                                   sessionIdToResume: ts.isClaude ? ts.sessionId : nil)
+            }
+            project.selectedTabIndex = min(snapshot.selectedTabIndex, project.tabs.count - 1)
+        }
+
+        // If no tabs restored, create defaults
+        if project.tabs.isEmpty {
+            let config = DefaultTabConfig.current
+            for entry in config.entries {
+                createTabInProject(project, isClaude: entry.isClaude)
+            }
         }
 
         projects.append(project)
@@ -248,9 +263,28 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         if !isRestoring { saveState() }
     }
 
+    func closeCurrentProject() {
+        guard selectedProjectIndex >= 0, selectedProjectIndex < projects.count else { return }
+        closeProject(at: selectedProjectIndex)
+    }
+
     func closeProject(at index: Int) {
         guard index >= 0, index < projects.count else { return }
         let project = projects[index]
+
+        // Save project state for potential restoration
+        let snapshot = ProjectState(
+            id: project.id.uuidString,
+            path: project.path,
+            name: project.name,
+            selectedTabIndex: project.selectedTabIndex,
+            tabs: project.tabs.map { tab in
+                ProjectTabState(id: tab.id.uuidString, name: tab.name,
+                                isClaude: tab.isClaude, sessionId: tab.sessionId)
+            }
+        )
+        recentlyClosedProjects.removeAll { $0.path == project.path }
+        recentlyClosedProjects.append(snapshot)
 
         // Destroy all surfaces
         for tab in project.tabs {
@@ -847,6 +881,7 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         addSubview(badgeDot)
         addSubview(label)
         addSubview(closeButton)
+        closeButton.isHidden = true  // only show on hover
 
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: 28),
@@ -861,6 +896,10 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
             closeButton.centerYAnchor.constraint(equalTo: centerYAnchor),
             closeButton.widthAnchor.constraint(equalToConstant: 16),
         ])
+
+        // Track mouse for hover
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -870,6 +909,14 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
             NSColor.selectedContentBackgroundColor.withAlphaComponent(0.3).setFill()
             bounds.fill()
         }
+    }
+
+    override func mouseEntered(with event: NSEvent) {
+        closeButton.isHidden = false
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        closeButton.isHidden = true
     }
 
     @objc private func closeClicked() {
@@ -1002,6 +1049,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         closeButton.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
         addSubview(closeButton)
+        closeButton.isHidden = true
 
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: 28),
@@ -1016,9 +1064,20 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         if isSelected {
             layer?.backgroundColor = NSColor.selectedContentBackgroundColor.withAlphaComponent(0.2).cgColor
         }
+
+        let area = NSTrackingArea(rect: .zero, options: [.mouseEnteredAndExited, .activeInKeyWindow, .inVisibleRect], owner: self)
+        addTrackingArea(area)
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override func mouseEntered(with event: NSEvent) {
+        closeButton.isHidden = false
+    }
+
+    override func mouseExited(with event: NSEvent) {
+        closeButton.isHidden = true
+    }
 
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {

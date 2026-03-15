@@ -116,6 +116,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         fileMenu.addItem(withTitle: "Duplicate Tab", action: #selector(duplicateTab), keyEquivalent: "d")
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: "Close Tab", action: #selector(closeCurrentTab), keyEquivalent: "w")
+        let closeProjectItem = NSMenuItem(title: "Close Project", action: #selector(closeCurrentProject), keyEquivalent: "w")
+        closeProjectItem.keyEquivalentModifierMask = [.command, .shift]
+        fileMenu.addItem(closeProjectItem)
         fileMenu.addItem(.separator())
 
         // Tab navigation — standard macOS shortcuts
@@ -189,6 +192,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func closeCurrentTab() {
         windowController?.closeCurrentTab()
+    }
+
+    @objc private func closeCurrentProject() {
+        windowController?.closeCurrentProject()
     }
 
     @objc private func duplicateTab() {
