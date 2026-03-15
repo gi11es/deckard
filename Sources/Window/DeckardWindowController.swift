@@ -884,7 +884,7 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         closeButton = NSButton(title: "\u{00D7}", target: nil, action: nil)
         closeButton.bezelStyle = .inline
         closeButton.isBordered = false
-        closeButton.font = .systemFont(ofSize: 14)
+        closeButton.font = .systemFont(ofSize: 12)
         closeButton.contentTintColor = .tertiaryLabelColor
         closeButton.toolTip = "Close Project (\u{21E7}\u{2318}W)"
 
@@ -1116,7 +1116,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
         closeButton = NSButton(title: "\u{00D7}", target: nil, action: nil)
         closeButton.bezelStyle = .inline
         closeButton.isBordered = false
-        closeButton.font = .systemFont(ofSize: 14)
+        closeButton.font = .systemFont(ofSize: 12)
         closeButton.contentTintColor = .tertiaryLabelColor
 
         super.init(frame: .zero)
@@ -1266,7 +1266,7 @@ class AddTabButton: NSView {
         self.leftClickAction = leftClickAction
         self.rightClickAction = rightClickAction
         label = NSTextField(labelWithString: "  +")
-        label.font = .systemFont(ofSize: 14, weight: .medium)
+        label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = .secondaryLabelColor
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
