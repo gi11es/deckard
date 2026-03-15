@@ -17,6 +17,7 @@ class ContextMonitor {
         let inputTokens: Int
         let cacheReadTokens: Int
         let contextLimit: Int
+        let turnCount: Int
 
         var contextUsed: Int { inputTokens + cacheReadTokens }
         var percentage: Double {
@@ -24,10 +25,17 @@ class ContextMonitor {
             return Double(contextUsed) / Double(contextLimit) * 100
         }
 
-        var displayString: String {
-            let usedK = contextUsed / 1000
-            let limitK = contextLimit / 1000
-            return "\(usedK)k/\(limitK)k (\(Int(percentage))%)"
+        var shortModel: String {
+            if model.contains("opus") { return "opus" }
+            if model.contains("sonnet") { return "sonnet" }
+            if model.contains("haiku") { return "haiku" }
+            return model
+        }
+
+        var contextString: String {
+            let usedStr = contextUsed >= 1_000_000 ? "\(contextUsed / 1_000_000)M" : "\(contextUsed / 1000)k"
+            let limitStr = contextLimit >= 1_000_000 ? "\(contextLimit / 1_000_000)M" : "\(contextLimit / 1000)k"
+            return "\(usedStr)/\(limitStr) (\(Int(percentage))%)"
         }
     }
 
@@ -41,19 +49,29 @@ class ContextMonitor {
         var lastInput = 0
         var lastCacheRead = 0
         var model = ""
+        var turnCount = 0
 
-        // Read from the end of the file for efficiency (last usage entry)
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: jsonlPath)) else { return nil }
         guard let content = String(data: data, encoding: .utf8) else { return nil }
 
-        // Parse lines from the end to find the last usage
         let lines = content.components(separatedBy: "\n")
+
+        // Forward pass: count user turns
+        for line in lines {
+            guard !line.isEmpty else { continue }
+            guard let lineData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
+
+            let type = json["type"] as? String ?? ""
+            if type == "user" { turnCount += 1 }
+        }
+
+        // Reverse pass: find last usage
         for line in lines.reversed() {
             guard !line.isEmpty else { continue }
             guard let lineData = line.data(using: .utf8),
                   let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any] else { continue }
 
-            // Check message.usage (top-level assistant messages)
             if let msg = json["message"] as? [String: Any], let usage = msg["usage"] as? [String: Any] {
                 lastInput = usage["input_tokens"] as? Int ?? 0
                 lastCacheRead = usage["cache_read_input_tokens"] as? Int ?? 0
@@ -61,7 +79,6 @@ class ContextMonitor {
                 break
             }
 
-            // Check nested message.message.usage (progress messages)
             if let msg = json["message"] as? [String: Any],
                let inner = msg["message"] as? [String: Any],
                let usage = inner["usage"] as? [String: Any] {
@@ -80,7 +97,8 @@ class ContextMonitor {
             model: model,
             inputTokens: lastInput,
             cacheReadTokens: lastCacheRead,
-            contextLimit: limit
+            contextLimit: limit,
+            turnCount: turnCount
         )
     }
 }

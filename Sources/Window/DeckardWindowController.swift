@@ -244,6 +244,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         contextStatusBar.font = .monospacedSystemFont(ofSize: 10, weight: .regular)
         contextStatusBar.textColor = .secondaryLabelColor
         contextStatusBar.alignment = .right
+        contextStatusBar.usesSingleLineMode = true
+        // Replace cell with vertically centering one
+        let cell = VerticallyCenteredTextFieldCell(textCell: "")
+        cell.isEditable = false
+        cell.isBordered = false
+        cell.drawsBackground = false
+        cell.font = contextStatusBar.font
+        cell.textColor = contextStatusBar.textColor
+        cell.alignment = .right
+        contextStatusBar.cell = cell
         contextStatusBar.wantsLayer = true
         contextStatusBar.layer?.backgroundColor = NSColor.windowBackgroundColor.withAlphaComponent(0.9).cgColor
         contextStatusBar.isHidden = true
@@ -261,7 +271,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             contextStatusBar.leadingAnchor.constraint(equalTo: rightPane.leadingAnchor),
             contextStatusBar.trailingAnchor.constraint(equalTo: rightPane.trailingAnchor),
             contextStatusBar.bottomAnchor.constraint(equalTo: rightPane.bottomAnchor),
-            contextStatusBar.heightAnchor.constraint(equalToConstant: 18),
+            contextStatusBar.heightAnchor.constraint(equalToConstant: 22),
             statusDivider.leadingAnchor.constraint(equalTo: rightPane.leadingAnchor),
             statusDivider.trailingAnchor.constraint(equalTo: rightPane.trailingAnchor),
             statusDivider.bottomAnchor.constraint(equalTo: contextStatusBar.topAnchor),
@@ -615,17 +625,21 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let pct = Int(usage.percentage)
         let color: NSColor
         switch pct {
-        case 0..<50: color = .systemGreen
+        case 0..<50: color = NSColor(red: 0.4, green: 0.7, blue: 0.4, alpha: 1.0)
         case 50..<75: color = .systemYellow
         case 75..<90: color = .systemOrange
         default: color = .systemRed
         }
 
-        let text = "  Context: \(usage.displayString)  "
+        let turns = usage.turnCount
+        let text = "\(usage.shortModel) · \(turns) turn\(turns == 1 ? "" : "s") · Context: \(usage.contextString)  "
+        let para = NSMutableParagraphStyle()
+        para.alignment = .right
         let attr = NSMutableAttributedString(string: text)
         let fullRange = NSRange(location: 0, length: attr.length)
         attr.addAttribute(.font, value: NSFont.monospacedSystemFont(ofSize: 10, weight: .regular), range: fullRange)
         attr.addAttribute(.foregroundColor, value: NSColor.secondaryLabelColor, range: fullRange)
+        attr.addAttribute(.paragraphStyle, value: para, range: fullRange)
         if let range = text.range(of: "(\(pct)%)") {
             let nsRange = NSRange(range, in: text)
             attr.addAttribute(.foregroundColor, value: color, range: nsRange)
@@ -1793,6 +1807,20 @@ class SidebarDropZone: NSView {
               let fromIndex = Int(fromStr) else { return false }
         onDrop?(fromIndex)
         return true
+    }
+}
+
+class VerticallyCenteredTextFieldCell: NSTextFieldCell {
+    override func titleRect(forBounds rect: NSRect) -> NSRect {
+        var r = super.titleRect(forBounds: rect)
+        let textHeight = attributedStringValue.size().height
+        r.origin.y = rect.origin.y + (rect.height - textHeight) / 2
+        r.size.height = textHeight
+        return r
+    }
+
+    override func drawInterior(withFrame cellFrame: NSRect, in controlView: NSView) {
+        super.drawInterior(withFrame: titleRect(forBounds: cellFrame), in: controlView)
     }
 }
 
