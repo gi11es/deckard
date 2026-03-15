@@ -248,25 +248,21 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
         guard let entries = try? fm.contentsOfDirectory(atPath: projectsDir) else { return [] }
 
-        var results: [(path: String, lastUsed: Date)] = []
+        var results: [(path: String, lastUsed: Date, sessionCount: Int)] = []
 
         for entry in entries {
-            // Decode the encoded path. Claude Code encodes "/" as "-" in directory names.
-            // But folder names themselves can contain hyphens (e.g., "ai-trend-finder").
-            // Strategy: try progressively replacing "-" with "/" from left to right,
-            // keeping the longest valid directory path.
             guard let decoded = Self.decodeCloudeProjectPath(entry) else { continue }
 
-            // Skip if directory doesn't exist
             var isDir: ObjCBool = false
             guard fm.fileExists(atPath: decoded, isDirectory: &isDir), isDir.boolValue else { continue }
 
-            // Find the most recent session file for recency sorting
             let entryPath = projectsDir + "/" + entry
             var newestDate = Date.distantPast
+            var sessionCount = 0
 
             if let files = try? fm.contentsOfDirectory(atPath: entryPath) {
                 for file in files where file.hasSuffix(".jsonl") {
+                    sessionCount += 1
                     let filePath = entryPath + "/" + file
                     if let attrs = try? fm.attributesOfItem(atPath: filePath),
                        let mod = attrs[.modificationDate] as? Date,
@@ -276,15 +272,14 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
                 }
             }
 
-            // Only include if it has session history
-            if newestDate != .distantPast {
-                results.append((path: decoded, lastUsed: newestDate))
+            if sessionCount > 0 {
+                results.append((path: decoded, lastUsed: newestDate, sessionCount: sessionCount))
             }
         }
 
-        // Sort by most recently used
-        results.sort { $0.lastUsed > $1.lastUsed }
-        return results
+        // Sort by number of sessions (most first), then by recency as tiebreaker
+        results.sort { $0.sessionCount != $1.sessionCount ? $0.sessionCount > $1.sessionCount : $0.lastUsed > $1.lastUsed }
+        return results.map { (path: $0.path, lastUsed: $0.lastUsed) }
     }
 
     /// Decode a Claude Code project directory name back to a filesystem path.
