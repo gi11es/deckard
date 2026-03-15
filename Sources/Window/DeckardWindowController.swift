@@ -178,10 +178,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         if let name = name {
             tabName = name
         } else if claude {
-            claudeTabCounter += 1
+            if !isRestoring { claudeTabCounter += 1 }
             tabName = "Claude Code #\(claudeTabCounter)"
         } else {
-            terminalTabCounter += 1
+            if !isRestoring { terminalTabCounter += 1 }
             tabName = "Terminal #\(terminalTabCounter)"
         }
         let tab = TabItem(surfaceView: surfaceView, name: tabName, isClaude: claude)
@@ -222,7 +222,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         tabs.append(tab)
         rebuildSidebar()
         selectTab(at: tabs.count - 1)
-        saveState()
+        if !isRestoring { saveState() }
     }
 
     func closeCurrentTab() {
@@ -411,14 +411,17 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         SessionManager.shared.save(captureState())
     }
 
+    private var isRestoring = false
+
     private func restoreOrCreateInitialTab() {
         guard let state = SessionManager.shared.load(), !state.tabs.isEmpty else {
-            // No saved state — create first Claude tab
             createTab(claude: true)
             return
         }
 
-        // Restore counters
+        isRestoring = true
+
+        // Restore counters and settings
         claudeTabCounter = state.claudeTabCounter
         terminalTabCounter = state.terminalTabCounter
         if let dir = state.defaultWorkingDirectory {
@@ -427,32 +430,27 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Restore each tab
         for tabState in state.tabs {
-            if tabState.isClaude {
-                createTab(
-                    claude: true,
-                    workingDirectory: tabState.workingDirectory,
-                    name: tabState.name,
-                    sessionIdToResume: tabState.sessionId
-                )
-            } else {
-                createTab(
-                    claude: false,
-                    workingDirectory: tabState.workingDirectory,
-                    name: tabState.name
-                )
+            createTab(
+                claude: tabState.isClaude,
+                workingDirectory: tabState.workingDirectory,
+                name: tabState.name,
+                sessionIdToResume: tabState.isClaude ? tabState.sessionId : nil
+            )
+            // Restore override flag on the just-created tab
+            if let last = tabs.last {
+                last.nameOverride = tabState.nameOverride
             }
         }
 
-        // Restore tab names that were overridden
-        for (i, tabState) in state.tabs.enumerated() where i < tabs.count {
-            tabs[i].nameOverride = tabState.nameOverride
-        }
+        isRestoring = false
 
         // Restore selected tab
         let idx = min(state.selectedTabIndex, tabs.count - 1)
         if idx >= 0 {
             selectTab(at: idx)
         }
+
+        saveState()
     }
 
     // MARK: - Sidebar Rendering
