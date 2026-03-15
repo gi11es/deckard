@@ -32,7 +32,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
         // Search field
         searchField = NSTextField()
-        searchField.placeholderString = "Open Project..."
+        searchField.placeholderString = "Open Folder..."
         searchField.font = .systemFont(ofSize: 16)
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.focusRingType = .none
@@ -88,12 +88,10 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
     /// Show the picker centered on the given window.
     /// `excludePaths` are already-open projects that should be hidden from the list.
-    func show(relativeTo window: NSWindow?, excludePaths: Set<String> = [], completion: @escaping Completion) {
+    func show(relativeTo window: NSWindow?, completion: @escaping Completion) {
         self.completion = completion
-        self.excludePaths = excludePaths
 
-        // Load projects, excluding already-open ones
-        allProjects = Self.loadRecentProjects().filter { !excludePaths.contains($0.path) }
+        allProjects = Self.loadRecentProjects()
         filteredProjects = allProjects
         tableView.reloadData()
 

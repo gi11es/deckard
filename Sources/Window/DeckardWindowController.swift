@@ -185,11 +185,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         sidebarView.addSubview(sidebarStackView)
 
         // Open project button in the top-left area (next to traffic lights)
-        let openButton = NSButton(image: NSImage(systemSymbolName: "folder.badge.plus", accessibilityDescription: "Open Project")!, target: self, action: #selector(openProjectClicked))
+        let openButton = NSButton(image: NSImage(systemSymbolName: "folder.badge.plus", accessibilityDescription: "Open Folder")!, target: self, action: #selector(openProjectClicked))
         openButton.bezelStyle = .recessed
         openButton.isBordered = false
         openButton.contentTintColor = .secondaryLabelColor
-        openButton.toolTip = "Open Project (\u{2318}O)"
+        openButton.toolTip = "Open Folder (\u{2318}O)"
         openButton.translatesAutoresizingMaskIntoConstraints = false
         sidebarView.addSubview(openButton)
 
@@ -289,12 +289,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     func openProject(path: String) {
-        // Check if project already open — just switch to it
-        if let idx = projects.firstIndex(where: { $0.path == path }) {
-            selectProject(at: idx)
-            return
-        }
-
         let project = ProjectItem(path: path)
 
         // Check if we have a recently closed snapshot — restore tabs from it
@@ -1012,7 +1006,7 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         closeButton.isBordered = false
         closeButton.font = .systemFont(ofSize: 12)
         closeButton.contentTintColor = .tertiaryLabelColor
-        closeButton.toolTip = "Close Project (\u{21E7}\u{2318}W)"
+        closeButton.toolTip = "Close Folder (\u{21E7}\u{2318}W)"
 
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
@@ -1470,20 +1464,23 @@ class ReorderableStackView: NSStackView {
     }
 
     private func showIndicator(at index: Int) {
-        guard index != currentDropIndex else { return }
+        guard index != currentDropIndex, let sv = superview else { return }
         currentDropIndex = index
         dropIndicator.isHidden = false
 
         dropIndicatorConstraint?.isActive = false
-        let y: CGFloat
+
+        // Position indicator at the insertion point between rows
         if index < arrangedSubviews.count {
-            y = arrangedSubviews[index].frame.maxY
+            let targetView = arrangedSubviews[index]
+            let topY = convert(NSPoint(x: 0, y: targetView.frame.maxY), to: sv).y
+            dropIndicatorConstraint = dropIndicator.bottomAnchor.constraint(equalTo: sv.topAnchor, constant: topY)
         } else if let last = arrangedSubviews.last {
-            y = last.frame.minY - 2
+            let bottomY = convert(NSPoint(x: 0, y: last.frame.minY), to: sv).y
+            dropIndicatorConstraint = dropIndicator.bottomAnchor.constraint(equalTo: sv.topAnchor, constant: bottomY)
         } else {
-            y = bounds.maxY
+            dropIndicatorConstraint = dropIndicator.topAnchor.constraint(equalTo: sv.topAnchor)
         }
-        dropIndicatorConstraint = dropIndicator.topAnchor.constraint(equalTo: superview!.topAnchor, constant: convert(NSPoint(x: 0, y: y), to: superview!).y - 1)
         dropIndicatorConstraint?.isActive = true
     }
 

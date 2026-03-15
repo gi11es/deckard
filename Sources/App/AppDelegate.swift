@@ -107,7 +107,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // File menu
         let fileMenuItem = NSMenuItem()
         let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(withTitle: "Open Project...", action: #selector(openProject), keyEquivalent: "o")
+        fileMenu.addItem(withTitle: "Open Folder...", action: #selector(openProject), keyEquivalent: "o")
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: "New Claude Tab", action: #selector(newClaudeTab), keyEquivalent: "t")
         let termItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalTab), keyEquivalent: "t")
@@ -116,7 +116,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         fileMenu.addItem(withTitle: "Duplicate Tab", action: #selector(duplicateTab), keyEquivalent: "d")
         fileMenu.addItem(.separator())
         fileMenu.addItem(withTitle: "Close Tab", action: #selector(closeCurrentTab), keyEquivalent: "w")
-        let closeProjectItem = NSMenuItem(title: "Close Project", action: #selector(closeCurrentProject), keyEquivalent: "w")
+        let closeProjectItem = NSMenuItem(title: "Close Folder", action: #selector(closeCurrentProject), keyEquivalent: "w")
         closeProjectItem.keyEquivalentModifierMask = [.command, .shift]
         fileMenu.addItem(closeProjectItem)
         fileMenu.addItem(.separator())
@@ -176,8 +176,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func openProject() {
-        let openPaths = Set(windowController?.openProjectPaths() ?? [])
-        projectPicker.show(relativeTo: windowController?.window, excludePaths: openPaths) { [weak self] path in
+        projectPicker.show(relativeTo: windowController?.window) { [weak self] path in
             guard let path = path else { return }
             self?.windowController?.openProject(path: path)
         }
