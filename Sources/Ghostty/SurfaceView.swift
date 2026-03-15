@@ -60,7 +60,7 @@ class TerminalNSView: NSView {
 
     // MARK: - Surface Lifecycle
 
-    func createSurface(app: ghostty_app_t, tabId: UUID, workingDirectory: String? = nil, command: String? = nil, envVars: [String: String] = [:]) {
+    func createSurface(app: ghostty_app_t, tabId: UUID, workingDirectory: String? = nil, command: String? = nil, envVars: [String: String] = [:], initialInput: String? = nil) {
         self.tabId = tabId
 
         var surfaceConfig = ghostty_surface_config_new()
@@ -114,27 +114,29 @@ class TerminalNSView: NSView {
             }
         }
 
-        // Set working directory and command if provided
-        if let workingDirectory, !workingDirectory.isEmpty {
-            workingDirectory.withCString { cwd in
-                surfaceConfig.working_directory = cwd
-                if let command, !command.isEmpty {
-                    command.withCString { cmd in
-                        surfaceConfig.command = cmd
-                        createSurfaceCall()
-                    }
-                } else {
-                    createSurfaceCall()
-                }
-            }
-        } else if let command, !command.isEmpty {
-            command.withCString { cmd in
+        // Helper to set optional C strings on the config and then create
+        func configureAndCreate() {
+            let setAndCreate = { [self] (wd: UnsafePointer<CChar>?, cmd: UnsafePointer<CChar>?, input: UnsafePointer<CChar>?) in
+                surfaceConfig.working_directory = wd
                 surfaceConfig.command = cmd
+                surfaceConfig.initial_input = input
                 createSurfaceCall()
             }
-        } else {
-            createSurfaceCall()
+
+            // Nest withCString calls so all pointers remain valid
+            (workingDirectory ?? "").withCString { cwd in
+                (command ?? "").withCString { cmd in
+                    (initialInput ?? "").withCString { input in
+                        setAndCreate(
+                            workingDirectory?.isEmpty == false ? cwd : nil,
+                            command?.isEmpty == false ? cmd : nil,
+                            initialInput?.isEmpty == false ? input : nil
+                        )
+                    }
+                }
+            }
         }
+        configureAndCreate()
 
         // Clean up C strings
         for (key, value) in cEnvStorage {

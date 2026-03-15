@@ -70,7 +70,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         setupUI()
-        createTab(claude: false)
+        createTab(claude: true)
     }
 
     required init?(coder: NSCoder) {
@@ -103,12 +103,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Stack view for tab buttons (vertical list)
         sidebarStackView.orientation = .vertical
-        sidebarStackView.alignment = .leading
+        sidebarStackView.alignment = .width
         sidebarStackView.spacing = 2
+        sidebarStackView.edgeInsets = NSEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
         sidebarStackView.translatesAutoresizingMaskIntoConstraints = false
 
         sidebarScrollView.documentView = sidebarStackView
         sidebarScrollView.hasVerticalScroller = true
+        sidebarScrollView.autohidesScrollers = true
+        sidebarScrollView.scrollerStyle = .overlay
         sidebarScrollView.drawsBackground = false
         sidebarScrollView.translatesAutoresizingMaskIntoConstraints = false
         sidebarView.addSubview(sidebarScrollView)
@@ -158,17 +161,21 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let tab = TabItem(surfaceView: surfaceView, name: tabName, isClaude: claude)
         tab.workingDirectory = workingDirectory
 
-        // For Claude tabs, launch `claude` as the command.
-        // Our claude wrapper in Resources/bin/ (prepended to PATH) intercepts
-        // this and injects --session-id and hooks.
-        let command: String? = claude ? "claude" : nil
+        // For Claude tabs, start a normal shell and use initial_input
+        // to launch claude. This way the shell is fully set up (PATH, etc.)
+        // before claude runs, and our wrapper in Resources/bin/ intercepts it.
+        var extraEnvVars: [String: String] = [:]
+        if claude {
+            extraEnvVars["DECKARD_SESSION_TYPE"] = "claude"
+        }
 
         surfaceView.createSurface(
             app: app,
             tabId: tab.id,
             workingDirectory: workingDirectory,
-            command: command,
-            envVars: [:]
+            command: nil,
+            envVars: extraEnvVars,
+            initialInput: claude ? "claude\n" : nil
         )
 
         tabs.append(tab)
@@ -290,53 +297,25 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     private func makeTabButton(for tab: TabItem, at index: Int) -> NSView {
-        let container = NSView()
-        container.translatesAutoresizingMaskIntoConstraints = false
-        container.wantsLayer = true
-        container.layer?.cornerRadius = 4
+        let title = tab.isMaster ? "  \u{2605} \(tab.name)" : "  \(tab.name)"
+        let button = NSButton(title: title, target: self, action: #selector(tabButtonClicked(_:)))
+        button.translatesAutoresizingMaskIntoConstraints = false
+        button.bezelStyle = .recessed
+        button.setButtonType(.momentaryPushIn)
+        button.isBordered = false
+        button.alignment = .left
+        button.font = tab.isMaster ? .boldSystemFont(ofSize: 12) : .systemFont(ofSize: 12)
+        button.contentTintColor = .labelColor
+        button.tag = index
 
-        // Badge dot
-        let badge = NSView()
-        badge.translatesAutoresizingMaskIntoConstraints = false
-        badge.wantsLayer = true
-        badge.layer?.cornerRadius = 4
-        badge.layer?.backgroundColor = badgeColor(for: tab.badgeState).cgColor
-        container.addSubview(badge)
-
-        // Tab name label
-        let label = NSTextField(labelWithString: tab.isMaster ? "\u{2605} \(tab.name)" : tab.name)
-        label.translatesAutoresizingMaskIntoConstraints = false
-        label.font = tab.isMaster ? .boldSystemFont(ofSize: 12) : .systemFont(ofSize: 12)
-        label.textColor = .labelColor
-        label.lineBreakMode = .byTruncatingTail
-        label.maximumNumberOfLines = 1
-        container.addSubview(label)
+        button.wantsLayer = true
+        button.layer?.cornerRadius = 4
 
         NSLayoutConstraint.activate([
-            container.heightAnchor.constraint(equalToConstant: 28),
-
-            badge.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 8),
-            badge.centerYAnchor.constraint(equalTo: container.centerYAnchor),
-            badge.widthAnchor.constraint(equalToConstant: 8),
-            badge.heightAnchor.constraint(equalToConstant: 8),
-
-            label.leadingAnchor.constraint(equalTo: badge.trailingAnchor, constant: 6),
-            label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -8),
-            label.centerYAnchor.constraint(equalTo: container.centerYAnchor),
+            button.heightAnchor.constraint(equalToConstant: 28),
         ])
 
-        // Click handler via gesture recognizer
-        let click = NSClickGestureRecognizer(target: self, action: #selector(tabClicked(_:)))
-        container.addGestureRecognizer(click)
-        setTabIndex(index, on: container)
-
-        // Double-click for rename
-        let doubleClick = NSClickGestureRecognizer(target: self, action: #selector(tabDoubleClicked(_:)))
-        doubleClick.numberOfClicksRequired = 2
-        container.addGestureRecognizer(doubleClick)
-        click.shouldRequireFailure(of: doubleClick)
-
-        return container
+        return button
     }
 
     private func updateSidebarSelection() {
@@ -352,9 +331,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private func updateSidebarItem(at index: Int) {
         guard index >= 0, index < sidebarStackView.arrangedSubviews.count else { return }
         let tab = tabs[index]
-        let container = sidebarStackView.arrangedSubviews[index]
-        if let label = container.subviews.compactMap({ $0 as? NSTextField }).first {
-            label.stringValue = tab.isMaster ? "\u{2605} \(tab.name)" : tab.name
+        if let button = sidebarStackView.arrangedSubviews[index] as? NSButton {
+            button.title = tab.isMaster ? "\u{2605} \(tab.name)" : tab.name
         }
     }
 
@@ -370,19 +348,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Sidebar Actions
 
-    @objc private func tabClicked(_ gesture: NSClickGestureRecognizer) {
-        guard let view = gesture.view else { return }
-        let index = getTabIndex(from: view)
+    @objc private func tabButtonClicked(_ sender: NSButton) {
+        let index = sender.tag
         if index >= 0, index < tabs.count {
             selectTab(at: index)
-        }
-    }
-
-    @objc private func tabDoubleClicked(_ gesture: NSClickGestureRecognizer) {
-        guard let view = gesture.view else { return }
-        let index = getTabIndex(from: view)
-        if index >= 0, index < tabs.count {
-            renameTabAtIndex(index)
         }
     }
 
