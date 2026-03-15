@@ -344,8 +344,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         var mcpFlag = ""
         if let mcpPath = Bundle.main.resourceURL?.appendingPathComponent("bin/deckard-mcp").path {
             let socketPath = ControlSocket.shared.path
+            // Use full path to python3 since Claude Code's MCP subprocess may have limited PATH
+            let python3Path = "/usr/bin/python3"
             let mcpConfig: [String: Any] = ["mcpServers": ["deckard": [
-                "command": "python3",
+                "command": python3Path,
                 "args": [mcpPath],
                 "env": ["DECKARD_SOCKET_PATH": socketPath]
             ]]]

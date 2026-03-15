@@ -185,14 +185,19 @@ def send_error(id, code, message):
     sys.stdout.write(f"Content-Length: {len(out)}\r\n\r\n{out}")
     sys.stdout.flush()
 
+_stdin_buffer = ""
+
 def read_message():
     """Read a JSON-RPC message from stdin using Content-Length framing."""
+    global _stdin_buffer
+
+    # Read headers
     headers = {}
     while True:
         line = sys.stdin.readline()
         if not line:
             return None
-        line = line.strip()
+        line = line.rstrip("\r\n")
         if line == "":
             break
         if ":" in line:
@@ -202,7 +207,15 @@ def read_message():
     length = int(headers.get("Content-Length", 0))
     if length == 0:
         return None
-    body = sys.stdin.read(length)
+
+    # Read exactly `length` bytes
+    body = ""
+    while len(body) < length:
+        chunk = sys.stdin.read(length - len(body))
+        if not chunk:
+            return None
+        body += chunk
+
     return json.loads(body)
 
 def main():
