@@ -321,8 +321,16 @@ class TerminalNSView: NSView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard let surface = self.surface else { return false }
-        let mods = Self.ghosttyMods(from: event)
 
+        // Arrow keys (125=down, 126=up, 123=left, 124=right) must always
+        // reach the terminal — macOS can intercept them for scrolling.
+        let arrowKeys: Set<UInt16> = [125, 126, 123, 124]
+        if arrowKeys.contains(event.keyCode) {
+            keyDown(with: event)
+            return true
+        }
+
+        let mods = Self.ghosttyMods(from: event)
         var input = ghostty_input_key_s()
         input.action = GHOSTTY_ACTION_PRESS
         input.mods = mods
