@@ -84,12 +84,10 @@ class TerminalNSView: NSView {
         allEnvVars["DECKARD_TAB_ID"] = tabId.uuidString
         allEnvVars["DECKARD_SOCKET_PATH"] = ControlSocket.shared.path
 
-        // Prepend our bin/ directory to PATH so our claude wrapper is found first.
+        // Set our bin/ directory so the shell can prepend it to PATH.
+        // We can't set PATH directly because the login shell resets it.
         if let binPath = Bundle.main.resourceURL?.appendingPathComponent("bin").path {
-            let currentPath = ProcessInfo.processInfo.environment["PATH"] ?? ""
-            if !currentPath.split(separator: ":").contains(Substring(binPath)) {
-                allEnvVars["PATH"] = "\(binPath):\(currentPath)"
-            }
+            allEnvVars["DECKARD_BIN_DIR"] = binPath
         }
 
         // Convert env vars to C representation

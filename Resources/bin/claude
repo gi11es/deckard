@@ -26,36 +26,56 @@ esac
 
 unset CLAUDECODE
 
-SKIP_SESSION_ID=false
+HAS_RESUME=false
 for arg in "$@"; do
     case "$arg" in
-        --resume|--resume=*|--session-id|--session-id=*|--continue|-c)
-            SKIP_SESSION_ID=true
+        --resume|--resume=*|--continue|-c)
+            HAS_RESUME=true
             break
             ;;
     esac
 done
 
-# Build hook commands. Each hook sends JSON to the Deckard control socket.
-# We write a small helper script that the hooks invoke, to avoid JSON-in-JSON escaping issues.
-HOOK_HELPER=$(mktemp /tmp/deckard-hook-XXXXXX.sh)
-cat > "$HOOK_HELPER" << 'HOOKEOF'
+# Bake the current values into the hook helper so they're available
+# even if Claude Code doesn't pass the full environment to hook commands.
+SURFACE_ID="$DECKARD_SURFACE_ID"
+SOCKET_PATH="$DECKARD_SOCKET_PATH"
+
+HOOK_HELPER="/tmp/deckard-hook-$(id -u).sh"
+cat > "$HOOK_HELPER" << HOOKEOF
 #!/bin/bash
-EVENT="$1"
-SURFACE="$DECKARD_SURFACE_ID"
-SOCKET="$DECKARD_SOCKET_PATH"
-if [[ -n "$SOCKET" ]] && [[ -S "$SOCKET" ]]; then
-    printf '{"command":"hook.%s","surfaceId":"%s"}\n' "$EVENT" "$SURFACE" | nc -U "$SOCKET" -w 1 2>/dev/null
+EVENT="\$1"
+SURFACE="$SURFACE_ID"
+SOCKET="$SOCKET_PATH"
+[[ -z "\$SOCKET" || ! -S "\$SOCKET" ]] && exit 0
+
+EXTRA=""
+if [[ "\$EVENT" == "session-start" ]]; then
+    # Find the session ID from Claude's session files.
+    # Try PPID first (Claude Code's PID), then search recent files.
+    SESSION_FILE="\$HOME/.claude/sessions/\$PPID.json"
+    if [[ -f "\$SESSION_FILE" ]]; then
+        SID=\$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sessionId'])" "\$SESSION_FILE" 2>/dev/null)
+    fi
+    if [[ -z "\$SID" ]]; then
+        # Fallback: search the most recent session files for a running process
+        for f in \$(ls -t "\$HOME/.claude/sessions/"*.json 2>/dev/null | head -5); do
+            CPID=\$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['pid'])" "\$f" 2>/dev/null)
+            if [[ -n "\$CPID" ]] && kill -0 "\$CPID" 2>/dev/null; then
+                SID=\$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sessionId'])" "\$f" 2>/dev/null)
+                [[ -n "\$SID" ]] && break
+            fi
+        done
+    fi
+    if [[ -n "\$SID" ]]; then
+        EXTRA=",\"sessionId\":\"\$SID\""
+    fi
 fi
+
+printf '{"command":"hook.%s","surfaceId":"%s"%s}\n' "\$EVENT" "\$SURFACE" "\$EXTRA" | nc -U "\$SOCKET" -w 1 2>/dev/null
 HOOKEOF
 chmod +x "$HOOK_HELPER"
 
-# Build hooks JSON using the helper script
 HOOKS_JSON="{\"hooks\":{\"SessionStart\":[{\"matcher\":\"\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK_HELPER session-start\",\"timeout\":10}]}],\"Stop\":[{\"matcher\":\"\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK_HELPER stop\",\"timeout\":10}]}],\"Notification\":[{\"matcher\":\"\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK_HELPER notification\",\"timeout\":10}]}],\"UserPromptSubmit\":[{\"matcher\":\"\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK_HELPER user-prompt-submit\",\"timeout\":10}]}]}}"
 
-if [[ "$SKIP_SESSION_ID" == true ]]; then
-    exec "$REAL_CLAUDE" --settings "$HOOKS_JSON" "$@"
-else
-    SESSION_ID="${DECKARD_CLAUDE_SESSION_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
-    exec "$REAL_CLAUDE" --session-id "$SESSION_ID" --settings "$HOOKS_JSON" "$@"
-fi
+exec "$REAL_CLAUDE" --settings "$HOOKS_JSON" "$@"

@@ -187,24 +187,24 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let tab = TabItem(surfaceView: surfaceView, name: tabName, isClaude: claude)
         tab.workingDirectory = effectiveWorkingDirectory
 
-        // Assign a session ID for Claude tabs so we can resume them later.
+        // Session ID will be captured from Claude Code via the SessionStart hook.
+        // For resumption, we pass --resume <id> via initialInput.
         var extraEnvVars: [String: String] = [:]
         if claude {
-            let sessionId = sessionIdToResume ?? UUID().uuidString.lowercased()
-            tab.sessionId = sessionId
+            tab.sessionId = sessionIdToResume // nil for new sessions, set for resumed ones
             extraEnvVars["DECKARD_SESSION_TYPE"] = "claude"
-            extraEnvVars["DECKARD_CLAUDE_SESSION_ID"] = sessionId
         }
 
         // For Claude tabs, launch claude via shell.
-        // "clear" hides the login message. No "exec" so the shell survives
-        // if claude exits (e.g., failed resume) — user gets a shell prompt.
+        // Prepend DECKARD_BIN_DIR to PATH so our wrapper is found first,
+        // then clear screen and run claude.
         let initialInput: String?
         if claude {
+            let pathPrefix = "export PATH=\"$DECKARD_BIN_DIR:$PATH\"; "
             if let sid = sessionIdToResume {
-                initialInput = "clear; claude --resume \(sid)\n"
+                initialInput = "\(pathPrefix)clear; claude --resume \(sid)\n"
             } else {
-                initialInput = "clear; claude\n"
+                initialInput = "\(pathPrefix)clear; claude\n"
             }
         } else {
             initialInput = nil
@@ -352,6 +352,22 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         guard let surfaceId = UUID(uuidString: surfaceIdStr) else { return false }
         guard selectedTabIndex >= 0, selectedTabIndex < tabs.count else { return false }
         return tabs[selectedTabIndex].id == surfaceId && (window?.isKeyWindow ?? false)
+    }
+
+    // MARK: - Session ID Tracking
+
+    func updateSessionId(forSurfaceId surfaceIdStr: String, sessionId: String) {
+        guard let surfaceId = UUID(uuidString: surfaceIdStr) else { return }
+        for tab in tabs {
+            if tab.id == surfaceId {
+                let oldId = tab.sessionId
+                tab.sessionId = sessionId
+                if oldId != sessionId {
+                    saveState()
+                }
+                break
+            }
+        }
     }
 
     // MARK: - Badge Updates
