@@ -270,45 +270,46 @@ class TerminalNSView: NSView {
 
     // MARK: - Keyboard Events
 
-    // Key codes for keys that should NOT pass text (function/arrow/modifier keys)
-    private static let noTextKeyCodes: Set<UInt16> = [
-        123, 124, 125, 126, // arrow keys: left, right, down, up
-        115, 116, 117, 119, 121, // home, page up, delete, end, page down
-        53,                  // escape
-        122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111, // F1-F12
-        105, 107, 113, 106,  // F13-F16
-        36, 76,              // return, numpad enter
-        51, 117,             // backspace, forward delete
-        48,                  // tab
-    ]
-
     override func keyDown(with event: NSEvent) {
         guard let surface = self.surface else { return }
 
         let mods = Self.ghosttyMods(from: event)
 
+        // Build key event for ghostty
         var input = ghostty_input_key_s()
         input.action = GHOSTTY_ACTION_PRESS
         input.mods = mods
         input.keycode = UInt32(event.keyCode)
         input.composing = false
 
-        // For arrow/function keys, send keycode only — macOS puts special
-        // Unicode chars in event.characters that confuse terminal key translation.
-        if Self.noTextKeyCodes.contains(event.keyCode) {
+        if let unshifted = event.charactersIgnoringModifiers?.unicodeScalars.first {
+            input.unshifted_codepoint = unshifted.value
+        }
+
+        // Check if ghostty handles this as a keybinding
+        var flags: ghostty_binding_flags_e = ghostty_binding_flags_e(rawValue: 0)
+        if ghostty_surface_key_is_binding(surface, input, &flags) {
             _ = ghostty_surface_key(surface, input)
-        } else if let characters = event.characters, !characters.isEmpty {
-            characters.withCString { ptr in
-                input.text = ptr
-                let codepoints = characters.unicodeScalars
-                if let first = codepoints.first {
-                    input.unshifted_codepoint = first.value
+            return
+        }
+
+        // Use macOS text input system for proper text handling
+        // (handles Shift+letters, IME, dead keys, etc.)
+        keyTextAccumulator = []
+        interpretKeyEvents([event])
+
+        // Send any accumulated text to the terminal
+        if let texts = keyTextAccumulator, !texts.isEmpty {
+            for text in texts {
+                text.withCString { ptr in
+                    ghostty_surface_text(surface, ptr, UInt(text.utf8.count))
                 }
-                _ = ghostty_surface_key(surface, input)
             }
         } else {
+            // No text produced — send as a raw key event (arrows, function keys, etc.)
             _ = ghostty_surface_key(surface, input)
         }
+        keyTextAccumulator = nil
     }
 
     override func keyUp(with event: NSEvent) {
@@ -336,32 +337,42 @@ class TerminalNSView: NSView {
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard let surface = self.surface else { return false }
 
-        // Arrow keys (125=down, 126=up, 123=left, 124=right) must always
-        // reach the terminal — macOS can intercept them for scrolling.
-        let arrowKeys: Set<UInt16> = [125, 126, 123, 124]
-        if arrowKeys.contains(event.keyCode) {
-            keyDown(with: event)
-            return true
-        }
-
         let mods = Self.ghosttyMods(from: event)
         var input = ghostty_input_key_s()
         input.action = GHOSTTY_ACTION_PRESS
         input.mods = mods
         input.keycode = UInt32(event.keyCode)
 
+        if let unshifted = event.charactersIgnoringModifiers?.unicodeScalars.first {
+            input.unshifted_codepoint = unshifted.value
+        }
+
+        // Let ghostty handle keybindings (Cmd+C, etc.)
         var flags: ghostty_binding_flags_e = ghostty_binding_flags_e(rawValue: 0)
         if ghostty_surface_key_is_binding(surface, input, &flags) {
             return ghostty_surface_key(surface, input)
         }
 
+        // Forward arrow/function keys that macOS might otherwise intercept
+        let interceptKeys: Set<UInt16> = [123, 124, 125, 126, 115, 116, 117, 119, 121]
+        if interceptKeys.contains(event.keyCode) {
+            keyDown(with: event)
+            return true
+        }
+
         return false
     }
 
-    // MARK: - Text Input
+    // MARK: - Text Input (NSResponder)
 
-    func insertText(_ string: String) {
-        keyTextAccumulator?.append(string)
+    override func insertText(_ insertString: Any) {
+        if let str = insertString as? String {
+            keyTextAccumulator?.append(str)
+        }
+    }
+
+    override func doCommand(by selector: Selector) {
+        // Intentionally empty — prevents NSBeep for unhandled keys
     }
 
     // MARK: - Drag and Drop
