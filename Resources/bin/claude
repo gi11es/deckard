@@ -52,19 +52,21 @@ SOCKET="$SOCKET_PATH"
 
 EXTRA=""
 if [[ "\$EVENT" == "session-start" ]]; then
-    # Walk up the process tree to find which ancestor has a session file.
-    # The hook runs as: Claude Code -> sh -c -> hook.sh
-    # So we check PPID, then its parent, etc.
+    # Find the session ID by matching: ancestor PID + correct CWD
     PID=\$\$
     for i in 1 2 3 4 5; do
         PID=\$(ps -o ppid= -p "\$PID" 2>/dev/null | tr -d ' ')
         [[ -z "\$PID" || "\$PID" == "1" ]] && break
         SESSION_FILE="\$HOME/.claude/sessions/\${PID}.json"
         if [[ -f "\$SESSION_FILE" ]]; then
-            SID=\$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sessionId'])" "\$SESSION_FILE" 2>/dev/null)
-            if [[ -n "\$SID" ]]; then
-                EXTRA=",\"sessionId\":\"\$SID\""
-                break
+            # Verify the CWD matches our project
+            FILE_CWD=\$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('cwd',''))" "\$SESSION_FILE" 2>/dev/null)
+            if [[ "\$FILE_CWD" == "$CWD" ]]; then
+                SID=\$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sessionId'])" "\$SESSION_FILE" 2>/dev/null)
+                if [[ -n "\$SID" ]]; then
+                    EXTRA=",\"sessionId\":\"\$SID\""
+                    break
+                fi
             fi
         fi
     done
