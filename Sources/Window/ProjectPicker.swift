@@ -14,6 +14,8 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
     private var allProjects: [(path: String, lastUsed: Date)] = []
     private var filteredProjects: [(path: String, lastUsed: Date)] = []
+    private var spotlightSearch: Process?
+    private var excludePaths: Set<String> = []
 
     override init() {
         // Create a floating panel
@@ -88,6 +90,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
     /// `excludePaths` are already-open projects that should be hidden from the list.
     func show(relativeTo window: NSWindow?, excludePaths: Set<String> = [], completion: @escaping Completion) {
         self.completion = completion
+        self.excludePaths = excludePaths
 
         // Load projects, excluding already-open ones
         allProjects = Self.loadRecentProjects().filter { !excludePaths.contains($0.path) }
@@ -181,15 +184,67 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
         let query = searchField.stringValue.lowercased()
         if query.isEmpty {
             filteredProjects = allProjects
+            spotlightSearch?.terminate()
+            spotlightSearch = nil
         } else {
-            filteredProjects = allProjects.filter { project in
-                project.path.lowercased().contains(query)
-            }
+            // Filter Claude projects
+            filteredProjects = allProjects.filter { $0.path.lowercased().contains(query) }
+
+            // Also search filesystem via mdfind (Spotlight)
+            spotlightSearch?.terminate()
+            searchFilesystem(query: searchField.stringValue)
         }
         tableView.reloadData()
         if !filteredProjects.isEmpty {
             tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
+    }
+
+    private func searchFilesystem(query: String) {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/mdfind")
+        process.arguments = [
+            "kMDItemContentType == public.folder && kMDItemFSName == '*\(query)*'cd"
+        ]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+
+        let knownPaths = Set(allProjects.map { $0.path })
+
+        pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
+            let data = handle.availableData
+            guard !data.isEmpty else { return }
+            let output = String(data: data, encoding: .utf8) ?? ""
+            let paths = output.components(separatedBy: "\n")
+                .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                .filter { !$0.isEmpty }
+
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                var added = false
+                for path in paths {
+                    // Skip already-shown, already-open, or hidden paths
+                    if knownPaths.contains(path) { continue }
+                    if self.excludePaths.contains(path) { continue }
+                    if self.filteredProjects.contains(where: { $0.path == path }) { continue }
+                    if path.contains("/.") || path.contains("/Library/") { continue }
+                    if path.contains("/node_modules/") || path.contains("/.git/") { continue }
+
+                    self.filteredProjects.append((path: path, lastUsed: .distantPast))
+                    added = true
+                }
+                if added {
+                    self.tableView.reloadData()
+                    if self.tableView.selectedRow < 0, !self.filteredProjects.isEmpty {
+                        self.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
+                    }
+                }
+            }
+        }
+
+        try? process.run()
+        spotlightSearch = process
     }
 
     // MARK: - NSTableViewDataSource
