@@ -233,7 +233,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         sidebarView.widthAnchor.constraint(greaterThanOrEqualToConstant: 80).isActive = true
 
         DispatchQueue.main.async { [self] in
-            splitView.setPosition(sidebarWidth, ofDividerAt: 0)
+            let saved = CGFloat(UserDefaults.standard.double(forKey: "sidebarWidth"))
+            splitView.setPosition(saved > 80 ? saved : sidebarWidth, ofDividerAt: 0)
         }
 
         window?.makeKeyAndOrderFront(nil)
@@ -244,6 +245,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate p: CGFloat, ofSubviewAt i: Int) -> CGFloat { 80 }
     func splitView(_ splitView: NSSplitView, constrainMaxCoordinate p: CGFloat, ofSubviewAt i: Int) -> CGFloat { splitView.bounds.width * 0.5 }
     func splitView(_ splitView: NSSplitView, canCollapseSubview s: NSView) -> Bool { false }
+
+    func splitViewDidResizeSubviews(_ notification: Notification) {
+        if sidebarView.frame.width > 0 {
+            UserDefaults.standard.set(Double(sidebarView.frame.width), forKey: "sidebarWidth")
+        }
+    }
 
     // MARK: - Project Management
 
@@ -687,7 +694,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for (i, project) in projects.enumerated() {
             let row = TabRowView(title: project.name, bold: false, index: i,
                                  target: self, action: #selector(projectRowClicked(_:)))
-            row.badgeStates = project.tabs.filter { $0.isClaude }.map { $0.badgeState }
+            row.badgeInfos = project.tabs.filter { $0.isClaude }.map { (state: $0.badgeState, name: $0.name) }
             row.onRename = { [weak self] newName in
                 guard let self = self, i < self.projects.count else { return }
                 self.projects[i].name = newName
@@ -841,8 +848,8 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     var isSelected: Bool = false {
         didSet { needsDisplay = true }
     }
-    /// Badge states for each Claude tab in this project, shown as right-aligned dots.
-    var badgeStates: [TabItem.BadgeState] = [] {
+    /// Badge info for each Claude tab in this project, shown as right-aligned dots.
+    var badgeInfos: [(state: TabItem.BadgeState, name: String)] = [] {
         didSet { updateBadgeDots() }
     }
     var onRename: ((String) -> Void)?
@@ -934,18 +941,18 @@ class TabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
             $0.layer?.removeAllAnimations()
             $0.removeFromSuperview()
         }
-        for state in badgeStates where state != .none {
+        for info in badgeInfos where info.state != .none {
             let dot = NSView()
             dot.wantsLayer = true
             dot.layer?.cornerRadius = 3.5
-            dot.layer?.backgroundColor = Self.colorForBadge(state).cgColor
-            dot.toolTip = Self.tooltipForBadge(state)
+            dot.layer?.backgroundColor = Self.colorForBadge(info.state).cgColor
+            dot.toolTip = "\(info.name): \(Self.tooltipForBadge(info.state))"
             dot.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
                 dot.widthAnchor.constraint(equalToConstant: 7),
                 dot.heightAnchor.constraint(equalToConstant: 7),
             ])
-            if state == .thinking {
+            if info.state == .thinking {
                 Self.addPulseAnimation(to: dot)
             }
             badgeContainer.addArrangedSubview(dot)
@@ -1125,6 +1132,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate {
             dot.wantsLayer = true
             dot.layer?.cornerRadius = 3.5
             dot.layer?.backgroundColor = TabRowView.colorForBadge(badgeState).cgColor
+            dot.toolTip = TabRowView.tooltipForBadge(badgeState)
             dot.translatesAutoresizingMaskIntoConstraints = false
             addSubview(dot)
             NSLayoutConstraint.activate([
