@@ -54,12 +54,21 @@ class DeckardGhosttyApp {
 
         runtimeConfig.read_clipboard_cb = { userdata, location, state -> Bool in
             guard let userdata, let state else { return false }
-            // userdata is the surface's SurfaceCallbackContext
             let ctx = Unmanaged<SurfaceCallbackContext>.fromOpaque(userdata).takeUnretainedValue()
             guard let view = ctx.view, let surface = view.surface else { return false }
 
             let pasteboard: NSPasteboard? = (location == GHOSTTY_CLIPBOARD_STANDARD) ? .general : nil
-            let value = pasteboard?.string(forType: .string) ?? ""
+            guard let pasteboard else { return false }
+
+            // Try text first
+            var value = pasteboard.string(forType: .string) ?? ""
+
+            // If no text, check for image data and save as temp file
+            if value.isEmpty {
+                if let imagePath = DeckardGhosttyApp.saveClipboardImage(from: pasteboard) {
+                    value = imagePath
+                }
+            }
 
             value.withCString { ptr in
                 ghostty_surface_complete_clipboard_request(surface, ptr, state, false)
@@ -164,6 +173,41 @@ class DeckardGhosttyApp {
     // MARK: - Focused Surface
 
     /// Returns the ghostty_surface_t for the currently focused tab.
+    /// Save clipboard image data to a temp PNG file and return the path.
+    static func saveClipboardImage(from pasteboard: NSPasteboard) -> String? {
+        // Check for image types
+        let imageTypes: [NSPasteboard.PasteboardType] = [.png, .tiff]
+        for type in imageTypes {
+            if let data = pasteboard.data(forType: type) {
+                guard let image = NSImage(data: data),
+                      let tiffData = image.tiffRepresentation,
+                      let bitmap = NSBitmapImageRep(data: tiffData),
+                      let pngData = bitmap.representation(using: .png, properties: [:]) else { continue }
+
+                let tmpDir = NSTemporaryDirectory()
+                let filename = "deckard-clipboard-\(UUID().uuidString.prefix(8)).png"
+                let path = (tmpDir as NSString).appendingPathComponent(filename)
+                do {
+                    try pngData.write(to: URL(fileURLWithPath: path))
+                    return path
+                } catch {
+                    return nil
+                }
+            }
+        }
+
+        // Also check if there are file URLs pointing to images
+        if let urls = pasteboard.readObjects(forClasses: [NSURL.self]) as? [URL] {
+            let imageExtensions = Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff"])
+            let imageURLs = urls.filter { imageExtensions.contains($0.pathExtension.lowercased()) }
+            if !imageURLs.isEmpty {
+                return imageURLs.map { $0.path }.joined(separator: " ")
+            }
+        }
+
+        return nil
+    }
+
     func focusedSurface() -> ghostty_surface_t? {
         return AppDelegate.shared?.windowController?.focusedSurface()
     }
