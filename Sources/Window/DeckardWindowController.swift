@@ -104,8 +104,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Stack view for tab buttons (vertical list)
         sidebarStackView.orientation = .vertical
         sidebarStackView.alignment = .width
-        sidebarStackView.spacing = 2
-        sidebarStackView.edgeInsets = NSEdgeInsets(top: 0, left: 4, bottom: 0, right: 4)
+        sidebarStackView.spacing = 1
         sidebarStackView.translatesAutoresizingMaskIntoConstraints = false
 
         sidebarScrollView.documentView = sidebarStackView
@@ -169,13 +168,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             extraEnvVars["DECKARD_SESSION_TYPE"] = "claude"
         }
 
+        // For Claude tabs, use a command that execs claude directly
+        // so no shell prompt or typed command is visible.
+        let command: String? = claude ? "claude" : nil
+
         surfaceView.createSurface(
             app: app,
             tabId: tab.id,
             workingDirectory: workingDirectory,
-            command: nil,
-            envVars: extraEnvVars,
-            initialInput: claude ? "claude\n" : nil
+            command: command,
+            envVars: extraEnvVars
         )
 
         tabs.append(tab)
@@ -297,7 +299,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     private func makeTabButton(for tab: TabItem, at index: Int) -> NSView {
-        let title = tab.isMaster ? "  \u{2605} \(tab.name)" : "  \(tab.name)"
+        let title = tab.isMaster ? "\u{2605} \(tab.name)" : tab.name
         let button = NSButton(title: title, target: self, action: #selector(tabButtonClicked(_:)))
         button.translatesAutoresizingMaskIntoConstraints = false
         button.bezelStyle = .recessed
@@ -307,9 +309,19 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         button.font = tab.isMaster ? .boldSystemFont(ofSize: 12) : .systemFont(ofSize: 12)
         button.contentTintColor = .labelColor
         button.tag = index
-
         button.wantsLayer = true
         button.layer?.cornerRadius = 4
+
+        // Use attributed title for left padding
+        let style = NSMutableParagraphStyle()
+        style.alignment = .left
+        style.firstLineHeadIndent = 10
+        let attrTitle = NSAttributedString(string: title, attributes: [
+            .font: button.font!,
+            .foregroundColor: NSColor.labelColor,
+            .paragraphStyle: style,
+        ])
+        button.attributedTitle = attrTitle
 
         NSLayoutConstraint.activate([
             button.heightAnchor.constraint(equalToConstant: 28),
@@ -332,7 +344,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         guard index >= 0, index < sidebarStackView.arrangedSubviews.count else { return }
         let tab = tabs[index]
         if let button = sidebarStackView.arrangedSubviews[index] as? NSButton {
-            button.title = tab.isMaster ? "\u{2605} \(tab.name)" : tab.name
+            let title = tab.isMaster ? "\u{2605} \(tab.name)" : tab.name
+            let style = NSMutableParagraphStyle()
+            style.alignment = .left
+            style.firstLineHeadIndent = 10
+            button.attributedTitle = NSAttributedString(string: title, attributes: [
+                .font: button.font!,
+                .foregroundColor: NSColor.labelColor,
+                .paragraphStyle: style,
+            ])
         }
     }
 
@@ -379,13 +399,3 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 }
 
-// Store tab index on views via associated objects
-private var tabIndexKey: UInt8 = 0
-
-private func setTabIndex(_ index: Int, on view: NSView) {
-    objc_setAssociatedObject(view, &tabIndexKey, index, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-}
-
-private func getTabIndex(from view: NSView) -> Int {
-    objc_getAssociatedObject(view, &tabIndexKey) as? Int ?? -1
-}
