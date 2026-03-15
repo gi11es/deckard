@@ -270,20 +270,34 @@ class TerminalNSView: NSView {
 
     // MARK: - Keyboard Events
 
+    // Key codes for keys that should NOT pass text (function/arrow/modifier keys)
+    private static let noTextKeyCodes: Set<UInt16> = [
+        123, 124, 125, 126, // arrow keys: left, right, down, up
+        115, 116, 117, 119, 121, // home, page up, delete, end, page down
+        53,                  // escape
+        122, 120, 99, 118, 96, 97, 98, 100, 101, 109, 103, 111, // F1-F12
+        105, 107, 113, 106,  // F13-F16
+        36, 76,              // return, numpad enter
+        51, 117,             // backspace, forward delete
+        48,                  // tab
+    ]
+
     override func keyDown(with event: NSEvent) {
         guard let surface = self.surface else { return }
 
         let mods = Self.ghosttyMods(from: event)
 
-        // Build the key input. We pass the text from the event for character translation.
         var input = ghostty_input_key_s()
         input.action = GHOSTTY_ACTION_PRESS
         input.mods = mods
         input.keycode = UInt32(event.keyCode)
         input.composing = false
 
-        // Set text from the event characters for key translation
-        if let characters = event.characters, !characters.isEmpty {
+        // For arrow/function keys, send keycode only — macOS puts special
+        // Unicode chars in event.characters that confuse terminal key translation.
+        if Self.noTextKeyCodes.contains(event.keyCode) {
+            _ = ghostty_surface_key(surface, input)
+        } else if let characters = event.characters, !characters.isEmpty {
             characters.withCString { ptr in
                 input.text = ptr
                 let codepoints = characters.unicodeScalars
