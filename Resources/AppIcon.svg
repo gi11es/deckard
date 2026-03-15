@@ -1,90 +1,48 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
-  <!-- Background: rounded macOS icon shape -->
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#1a1a2e"/>
-      <stop offset="100%" stop-color="#16213e"/>
-    </linearGradient>
-    <linearGradient id="humanGlow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#e8d5b7"/>
-      <stop offset="100%" stop-color="#c4956a"/>
-    </linearGradient>
-    <linearGradient id="digitalGlow" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0%" stop-color="#64b5f6"/>
-      <stop offset="100%" stop-color="#7c4dff"/>
-    </linearGradient>
-    <!-- Subtle glow filter -->
-    <filter id="glow">
-      <feGaussianBlur stdDeviation="8" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-    <filter id="softGlow">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge>
-        <feMergeNode in="blur"/>
-        <feMergeNode in="SourceGraphic"/>
-      </feMerge>
-    </filter>
-  </defs>
-
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <!-- macOS rounded rect background -->
-  <rect x="0" y="0" width="1024" height="1024" rx="228" ry="228" fill="url(#bg)"/>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#1e2a3a"/>
+      <stop offset="100%" stop-color="#0f1520"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="228" ry="228" fill="url(#bg)"/>
 
-  <!-- Connection lines between neurons (thin, subtle) -->
-  <g opacity="0.3" stroke-width="2">
-    <!-- Human to center connections -->
-    <line x1="280" y1="340" x2="460" y2="460" stroke="#c4956a"/>
-    <line x1="220" y1="512" x2="420" y2="512" stroke="#c4956a"/>
-    <line x1="280" y1="680" x2="460" y2="560" stroke="#c4956a"/>
-    <line x1="340" y1="260" x2="480" y2="430" stroke="#c4956a"/>
-    <line x1="340" y1="760" x2="480" y2="590" stroke="#c4956a"/>
-
-    <!-- Digital to center connections -->
-    <line x1="740" y1="340" x2="560" y2="460" stroke="#7c4dff"/>
-    <line x1="800" y1="512" x2="600" y2="512" stroke="#7c4dff"/>
-    <line x1="740" y1="680" x2="560" y2="560" stroke="#7c4dff"/>
-    <line x1="680" y1="260" x2="540" y2="430" stroke="#7c4dff"/>
-    <line x1="680" y1="760" x2="540" y2="590" stroke="#7c4dff"/>
-
-    <!-- Cross connections (human-digital bridge) -->
-    <line x1="460" y1="460" x2="560" y2="460" stroke="#9a8ab8" opacity="0.6"/>
-    <line x1="420" y1="512" x2="600" y2="512" stroke="#9a8ab8" opacity="0.8"/>
-    <line x1="460" y1="560" x2="560" y2="560" stroke="#9a8ab8" opacity="0.6"/>
-  </g>
-
-  <!-- Human neurons (left side, warm tones) -->
-  <g filter="url(#softGlow)">
-    <!-- Organic, slightly irregular positioning -->
-    <circle cx="280" cy="340" r="14" fill="url(#humanGlow)" opacity="0.9"/>
-    <circle cx="220" cy="512" r="18" fill="url(#humanGlow)" opacity="1.0"/>
-    <circle cx="280" cy="680" r="14" fill="url(#humanGlow)" opacity="0.9"/>
-    <circle cx="340" cy="260" r="10" fill="url(#humanGlow)" opacity="0.7"/>
-    <circle cx="340" cy="760" r="10" fill="url(#humanGlow)" opacity="0.7"/>
-    <circle cx="180" cy="420" r="8" fill="url(#humanGlow)" opacity="0.5"/>
-    <circle cx="180" cy="600" r="8" fill="url(#humanGlow)" opacity="0.5"/>
-  </g>
-
-  <!-- Digital neurons (right side, cool tones) -->
-  <g filter="url(#softGlow)">
-    <!-- More geometric, precise positioning -->
-    <circle cx="740" cy="340" r="14" fill="url(#digitalGlow)" opacity="0.9"/>
-    <circle cx="800" cy="512" r="18" fill="url(#digitalGlow)" opacity="1.0"/>
-    <circle cx="740" cy="680" r="14" fill="url(#digitalGlow)" opacity="0.9"/>
-    <circle cx="680" cy="260" r="10" fill="url(#digitalGlow)" opacity="0.7"/>
-    <circle cx="680" cy="760" r="10" fill="url(#digitalGlow)" opacity="0.7"/>
-    <circle cx="840" cy="420" r="8" fill="url(#digitalGlow)" opacity="0.5"/>
-    <circle cx="840" cy="600" r="8" fill="url(#digitalGlow)" opacity="0.5"/>
-  </g>
-
-  <!-- Central bridge nodes (where they meet, blended color) -->
-  <g filter="url(#glow)">
-    <circle cx="460" cy="460" r="10" fill="#b8937a" opacity="0.8"/>
-    <circle cx="512" cy="512" r="16" fill="#9a8ab8" opacity="1.0"/>
-    <circle cx="560" cy="460" r="10" fill="#8a7abf" opacity="0.8"/>
-    <circle cx="460" cy="560" r="10" fill="#b8937a" opacity="0.8"/>
-    <circle cx="560" cy="560" r="10" fill="#8a7abf" opacity="0.8"/>
+  <!-- Center and scale the neural art (original 250x250 → scaled ~3.2x, centered) -->
+  <g transform="translate(112, 112) scale(3.2)">
+    <path d="m233.5 89.66c-0.43-5.9 0.22-12.59-10.71-21.27l-4.67-3.27c-0.65-7.39-2.63-12.06-8.63-16.84l-14.86-12.58c-7.17-6-11.57-6.99-20.86-6.99-1.87-6.57-7.66-9.96-18.27-7.75-5.41-3.95-7.61-5.96-13.97-5.96-5.89 0-8.53 1.66-11.81 4.2l-6.79-3.39c-1.21-0.43-2.31-0.65-3.75-0.65h-17.09c-7.06 0-12.06 3.06-16.62 7.85-12.25-0.99-20.38 0.77-31.53 9.02-4.22 3.23-7.28 7.28-8.82 11.41-8.25 2.43-11.99 3.42-19.27 13.26-3.23 3.95-5.66 8.42-6.77 13.31-8.36 5.51-12.07 15.25-12.07 24.88v16.87c0 8.36 1.11 13.36 8.27 20.3l10.72 9.95c5.17 4.78 7.82 4.67 15.53 4.67h22v7.92c0 7.81 4.31 14.38 12.33 19.89 6.79 4.79 7.11 6 13.25 5.78h11.05c7.16 0 9.14-1.54 16.96-4.49 2.75 7.39 8.9 13.39 17.26 16.55l26.14 41.67 16.27-5.28-6.79-24.75c12.79 2.54 23.19-1.08 32.82-7.87 12.68-9.19 22.86-20.22 18.18-34.41l-0.88-1.33c12.03-2.1 22.89-12.6 22.89-26.57v-19.08c0-9.35-3.74-17.95-9.51-25.05z" fill="#30A6D1"/>
+    <path d="m216.9 156.6h-32.66c-4.4 0-6.17 6.35-12.31 6.78-6.04 0.43-8.35-4.66-13.76-4.66-3.06 0-7.52 2.2-8.95 3.42l-1.98 38.19 19.54 32.02 9.94-3.62-7.17-25.19c13.24 3.16 23.64-0.67 33.27-7.46 12.68-9.19 22.97-20.32 17.97-34.16-0.65-1.98-0.87-5.32-3.89-5.32z" fill="#1172B1"/>
+    <path d="m134 192.2 26.36 41.78 5.8-2.09-15.95-31.26-1.21-48.29-11.93-30.7-13.84-9.63-1.1 8.03c0 3.05 3.94 6.55 7.78 6.55l1.87 5.22v15.08l-18.01 21.43c-3.84 2.95-5.92 4.05-10.93 4.05h-15.73l-9.63-8.47v-11.34l2.64-2.54c0.99 0.22 4.16 0.22 5.93-2.84 1.21-2.21 0.66-5.59-2.4-6.8-2.86-1.11-5.61 0.76-6.05 3.51v3.06l-3.94 3.06v13.84l11.92 11.14h19.08c4.57 0 8.2-2.32 11.93-6.55l17.47-21.21v-17.36l-3.63-6.84 6.26 0.17 9.52 9.84 0.8 27.79 0.1 34.13-13.11-2.76z" fill="#1172B1"/>
+    <path d="m108.1 43.66c0-3.51 4.05-7.85 6.26-9.72 1.22-0.99 0.45-4.04-1.98-3.39-4.46 1.21-8.19 9.6-8.19 13.11l0.99 2.53 2.92-2.53z" fill="#1172B1"/>
+    <path d="m107.2 45.04v47.95l30.91 32.99v3.95l-33.84-34.52v-50.37c0-3.28 2.93-3.39 2.93 0z" fill="#F08A21"/>
+    <path d="m124.6 92.06 24.11 26.14v76.89l14.27 25.81" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m139.7 35.81 2.96-3.06v-4.89c0-3.06 5.11-4.28 4.01 0.5l-0.99 6.46-3.57 3.95v15.08l8.47 8.47v39.29c0 2.43-3.91 2.43-3.91 0v-37.74l-8.96-8.97v-16.89l1.99-2.2z" fill="#F08A21"/>
+    <path d="m157.6 31.32-8.47 9.63v9.29" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m174.9 62.21v14.86l-17.25 20.14v24.97" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m173.5 94.89-7.05 8.47v18.82" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m177.3 41.43h7.48l7.92 6.95v19.56l-10.5 12.03v20.15l-10.51 9.95" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m165.3 65.12v-11.49l3.17-5.25h12.25l3.94 3.95v12.79" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m170.1 137.9h28.93l16.47-17.8" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m186.1 129.1h7.61l7.61-8.47v-60.22" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m192.7 86.59v25.07l-15.4 15.07h-12.68l-11.71 12.03" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m171.1 139.2 12.68 9.73h32.56l11.4-9.19 5.23-6.78v-12.94l-19.21-15.97" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m233.2 134.1c2.95 0 4.28 1.97 4.28 4.6 0 3.06-2.75 5.8-5.7 4.81-3.17-1.1-3.6-4.28-2.28-6.71 0.99-1.75 2.16-2.7 3.7-2.7z" fill="#F08A21"/>
+    <path d="m155 149.7c3.22-1.87 7.06-0.56 10.23 2.6 1.98 1.98 3.85 3.74 6.49 3.74 2.43 0 3.64-2.09 3.64-3.2 0-2.95-2.09-4.38-4.41-4.38-2.2 0-3.08 1.54-4.41 0.67-2.85-1.87-5.6-3.52-9.34-2.65-4.46 1.01-4.46 4.52-2.2 3.22z" fill="#1172B1"/>
+    <path d="m129.7 19.2v37.95l10 10.16v28.65" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+    <path d="m35.69 60.44 5-6.15h11.61" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4.5"/>
+    <path d="m30.39 71.93h19.53l1.1-9.19 21.41-19.52h10.4l15.08-17.8" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+    <path d="m18.26 96.22v23.67l19.92 19.08 0.43 0.54h24.58l11.26-10.49h11.6l14.05 15.97-7.82 12.72" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+    <path d="m30.72 94.9v15.86l8.02 6.84h11.4v-13.9l10.51-9.74h10.51v11.14l39.05 38.19v11.31" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+    <path d="m30.28 97.1c-3.38-0.99-4.92-4.05-3.49-5.92 1.65-2.21 3.49-2.32 4.81-2.1 3.17 0.55 3.71 3.19 3.17 5.62-0.43 1.74-1.86 3.13-4.49 2.4z" fill="#1172B1"/>
+    <path d="m66.05 130.4c-3.39-0.99-4.27-4.47-2.84-6.34 1.65-2.21 3.49-1.99 4.81-1.77 2.64 0.54 3.41 3.08 2.64 5.4-0.76 2.21-2.64 3.2-4.61 2.71z" fill="#1172B1"/>
+    <path d="m79.11 65.94c-3.39-0.99-3.82-3.73-3.39-5.39 0.99-3.39 3.39-3.5 4.71-3.17 3.39 0.65 4.04 3.06 3.72 5.37-0.44 2.53-2.2 3.96-5.04 3.19z" fill="#1172B1"/>
+    <path d="m90.02 165c-3.39-0.99-3.82-3.73-3.39-5.38 0.99-3.39 3.39-3.5 4.71-3.17 3.39 0.65 4.04 3.06 3.72 5.38-0.44 2.53-2.2 3.95-5.04 3.17z" fill="#1172B1"/>
+    <path d="m41.52 108.7v-17.59l9.62-10.65v-17.13" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+    <path d="m83.17 63.18 6.52 8.25v34.69l20.15 22.05h16.06" stroke="#1172B1" stroke-linecap="round" stroke-linejoin="round" stroke-width="4"/>
+    <path d="m126.8 163.3v10.65l9.28 7.49c-2.95-0.99-10.77-3.42-12.89-11.34" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+    <path d="m162 167.9-3.06 8.68" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+    <path d="m158.5 183.8 7.93-6.16h17.8l9.29 10.26h2.75" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+    <path d="m184.2 177.6 6.04-5.26h15.96" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
+    <path d="m165 187.9c2.21 3.28 4.64 3.83 9.51 3.83" stroke="#F08A21" stroke-linecap="round" stroke-linejoin="round" stroke-width="5"/>
   </g>
 </svg>
