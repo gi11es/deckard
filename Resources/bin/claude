@@ -1,12 +1,6 @@
 #!/usr/bin/env bash
 # Deckard claude wrapper - injects hooks and session tracking
-#
-# When running inside a Deckard terminal (DECKARD_SURFACE_ID is set), this wrapper
-# intercepts `claude` invocations to inject --session-id and --settings flags
-# so that Claude Code hooks fire back into Deckard for notifications/status.
-# Outside Deckard, it passes through to the real claude binary unchanged.
 
-# Find the real claude binary, skipping our own directory.
 find_real_claude() {
     local self_dir
     self_dir="$(cd "$(dirname "$0")" && pwd)"
@@ -18,34 +12,20 @@ find_real_claude() {
     return 1
 }
 
-# Send a JSON message to the Deckard control socket.
-deckard_hook() {
-    local cmd="$1"
-    local extra="$2"
-    local json="{\"command\":\"${cmd}\",\"surfaceId\":\"${DECKARD_SURFACE_ID}\"${extra}}"
-    if [[ -n "$DECKARD_SOCKET_PATH" ]] && [[ -S "$DECKARD_SOCKET_PATH" ]]; then
-        echo "$json" | nc -U "$DECKARD_SOCKET_PATH" -w 1 2>/dev/null &
-    fi
-}
-
 # Pass through if not in a Deckard terminal or hooks are disabled.
 if [[ -z "$DECKARD_SURFACE_ID" || "$DECKARD_HOOKS_DISABLED" == "1" ]]; then
     REAL_CLAUDE="$(find_real_claude)" || { echo "Error: claude not found in PATH" >&2; exit 127; }
     exec "$REAL_CLAUDE" "$@"
 fi
 
-# Find real claude.
 REAL_CLAUDE="$(find_real_claude)" || { echo "Error: claude not found in PATH" >&2; exit 127; }
 
-# Pass through subcommands that don't support session/hook flags.
 case "${1:-}" in
     mcp|config|api-key) exec "$REAL_CLAUDE" "$@" ;;
 esac
 
-# Unset CLAUDECODE to avoid "nested session" detection.
 unset CLAUDECODE
 
-# Check if the user already specified a session/resume flag.
 SKIP_SESSION_ID=false
 for arg in "$@"; do
     case "$arg" in
@@ -56,24 +36,26 @@ for arg in "$@"; do
     esac
 done
 
-# Build hooks that send JSON to the Deckard control socket.
-# We use a bash function defined above, invoked via the wrapper script itself.
-HOOK_CMD_BASE="echo '{\"command\":\"hook.EVENT\",\"surfaceId\":\"$DECKARD_SURFACE_ID\"}' | nc -U $DECKARD_SOCKET_PATH -w 1 2>/dev/null"
+# Build hook commands. Each hook sends JSON to the Deckard control socket.
+# We write a small helper script that the hooks invoke, to avoid JSON-in-JSON escaping issues.
+HOOK_HELPER=$(mktemp /tmp/deckard-hook-XXXXXX.sh)
+cat > "$HOOK_HELPER" << 'HOOKEOF'
+#!/bin/bash
+EVENT="$1"
+SURFACE="$DECKARD_SURFACE_ID"
+SOCKET="$DECKARD_SOCKET_PATH"
+if [[ -n "$SOCKET" ]] && [[ -S "$SOCKET" ]]; then
+    printf '{"command":"hook.%s","surfaceId":"%s"}\n' "$EVENT" "$SURFACE" | nc -U "$SOCKET" -w 1 2>/dev/null
+fi
+HOOKEOF
+chmod +x "$HOOK_HELPER"
 
-SESSION_START_CMD="echo '{\"command\":\"hook.session-start\",\"surfaceId\":\"$DECKARD_SURFACE_ID\"}' | nc -U $DECKARD_SOCKET_PATH -w 1 2>/dev/null"
-STOP_CMD="echo '{\"command\":\"hook.stop\",\"surfaceId\":\"$DECKARD_SURFACE_ID\"}' | nc -U $DECKARD_SOCKET_PATH -w 1 2>/dev/null"
-NOTIFICATION_CMD="echo '{\"command\":\"hook.notification\",\"surfaceId\":\"$DECKARD_SURFACE_ID\"}' | nc -U $DECKARD_SOCKET_PATH -w 1 2>/dev/null"
-USER_PROMPT_CMD="echo '{\"command\":\"hook.user-prompt-submit\",\"surfaceId\":\"$DECKARD_SURFACE_ID\"}' | nc -U $DECKARD_SOCKET_PATH -w 1 2>/dev/null"
-
-HOOKS_JSON=$(cat <<ENDJSON
-{"hooks":{"SessionStart":[{"matcher":"","hooks":[{"type":"command","command":"$SESSION_START_CMD","timeout":10}]}],"Stop":[{"matcher":"","hooks":[{"type":"command","command":"$STOP_CMD","timeout":10}]}],"Notification":[{"matcher":"","hooks":[{"type":"command","command":"$NOTIFICATION_CMD","timeout":10}]}],"UserPromptSubmit":[{"matcher":"","hooks":[{"type":"command","command":"$USER_PROMPT_CMD","timeout":10}]}]}}
-ENDJSON
-)
+# Build hooks JSON using the helper script
+HOOKS_JSON="{\"hooks\":{\"SessionStart\":[{\"matcher\":\"\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK_HELPER session-start\",\"timeout\":10}]}],\"Stop\":[{\"matcher\":\"\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK_HELPER stop\",\"timeout\":10}]}],\"Notification\":[{\"matcher\":\"\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK_HELPER notification\",\"timeout\":10}]}],\"UserPromptSubmit\":[{\"matcher\":\"\",\"hooks\":[{\"type\":\"command\",\"command\":\"$HOOK_HELPER user-prompt-submit\",\"timeout\":10}]}]}}"
 
 if [[ "$SKIP_SESSION_ID" == true ]]; then
     exec "$REAL_CLAUDE" --settings "$HOOKS_JSON" "$@"
 else
-    # Use the session ID assigned by Deckard if available, otherwise generate one.
     SESSION_ID="${DECKARD_CLAUDE_SESSION_ID:-$(uuidgen | tr '[:upper:]' '[:lower:]')}"
     exec "$REAL_CLAUDE" --session-id "$SESSION_ID" --settings "$HOOKS_JSON" "$@"
 fi
