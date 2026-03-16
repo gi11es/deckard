@@ -1,15 +1,18 @@
 import AppKit
+import KeyboardShortcuts
 
 class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     static let shared = SettingsWindowController()
 
     private enum Pane: String, CaseIterable {
         case general = "General"
+        case shortcuts = "Shortcuts"
         case about = "About"
 
         var icon: NSImage {
             switch self {
             case .general: return NSImage(systemSymbolName: "gearshape", accessibilityDescription: "General")!
+            case .shortcuts: return NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Shortcuts")!
             case .about: return NSImage(systemSymbolName: "info.circle", accessibilityDescription: "About")!
             }
         }
@@ -80,6 +83,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         let newView: NSView
         switch pane {
         case .general: newView = makeGeneralPane()
+        case .shortcuts: newView = makeShortcutsPane()
         case .about: newView = makeAboutPane()
         }
 
@@ -166,6 +170,66 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         ])
 
         return pane
+    }
+
+    // MARK: - Shortcuts Pane
+
+    private func makeShortcutsPane() -> NSView {
+        let pane = NSView()
+
+        // 4-column grid: label1 | recorder1 | label2 | recorder2
+        let grid = NSGridView(numberOfColumns: 4, rows: 0)
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        grid.column(at: 0).xPlacement = .trailing
+        grid.column(at: 1).xPlacement = .leading
+        grid.column(at: 2).xPlacement = .trailing
+        grid.column(at: 3).xPlacement = .leading
+        grid.rowSpacing = 8
+        grid.columnSpacing = 12
+
+        // Lay out entries in two columns
+        let entries = configurableShortcuts
+        let rows = (entries.count + 1) / 2
+        for row in 0..<rows {
+            let leftIdx = row
+            let rightIdx = row + rows
+
+            let leftLabel = NSTextField(labelWithString: entries[leftIdx].label)
+            leftLabel.alignment = .right
+            let leftRecorder = KeyboardShortcuts.RecorderCocoa(for: entries[leftIdx].name)
+
+            if rightIdx < entries.count {
+                let rightLabel = NSTextField(labelWithString: entries[rightIdx].label)
+                rightLabel.alignment = .right
+                let rightRecorder = KeyboardShortcuts.RecorderCocoa(for: entries[rightIdx].name)
+                grid.addRow(with: [leftLabel, leftRecorder, rightLabel, rightRecorder])
+            } else {
+                grid.addRow(with: [leftLabel, leftRecorder, NSView(), NSView()])
+            }
+        }
+
+        // Reset button spanning the right side
+        let resetButton = NSButton(title: "Reset All to Defaults", target: self, action: #selector(resetShortcuts))
+        resetButton.bezelStyle = .rounded
+        grid.addRow(with: [NSView(), NSView(), NSView(), resetButton])
+
+        pane.addSubview(grid)
+        NSLayoutConstraint.activate([
+            grid.topAnchor.constraint(equalTo: pane.topAnchor, constant: 20),
+            grid.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 24),
+            grid.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -24),
+            grid.bottomAnchor.constraint(equalTo: pane.bottomAnchor, constant: -20),
+        ])
+
+        return pane
+    }
+
+    @objc private func resetShortcuts() {
+        for entry in configurableShortcuts {
+            KeyboardShortcuts.reset(entry.name)
+        }
+        // Rebuild the pane to reflect reset values
+        switchToPane(.shortcuts)
     }
 
     // MARK: - About Pane

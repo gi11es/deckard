@@ -11,6 +11,7 @@
 		0E3E58425DB2C3A859EA0ADA /* UpdateController.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA1846BAAA05144280A0788D /* UpdateController.swift */; };
 		214FB56FE27976FFA0E33CE3 /* UpdateViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDE6A767090CB9D9078C780A /* UpdateViewModel.swift */; };
 		2B88AE148A7F948F9A9C2E9D /* Sparkle in Frameworks */ = {isa = PBXBuildFile; productRef = 1A1660206E09A9AEECF7BFDA /* Sparkle */; };
+		AABB0001AABB0001AABB0001 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = AABB0002AABB0002AABB0002 /* KeyboardShortcuts */; };
 		2D322E22D0679FD39D688539 /* SessionState.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7BE2AA0719D32ACCD1549184 /* SessionState.swift */; };
 		2E4FF6C3438B5F0E73C4FA87 /* ContextMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = E5FD7F070DDB4216278EFDE6 /* ContextMonitor.swift */; };
 		37FA9D946FD6ECA1DDF5898A /* DeckardWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8391EFB62A21AFA1DA62733F /* DeckardWindowController.swift */; };
@@ -24,6 +25,7 @@
 		A0FF9B9E99BC8B33FDCAB7E5 /* HookHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2B375A023FEBCB272DCFD7 /* HookHandler.swift */; };
 		EC5216EB6832E81D0BF41280 /* UpdateDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3088990C379385805D6B8EEA /* UpdateDelegate.swift */; };
 		F14F059C3523C8983BFF01FD /* SurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1819508589B0D94AC0310DDB /* SurfaceView.swift */; };
+		AABB0004AABB0004AABB0004 /* ShortcutNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABB0005AABB0005AABB0005 /* ShortcutNames.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -45,6 +47,7 @@
 		DD37F7C8CC5243DCF0A1346E /* SettingsWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindow.swift; sourceTree = "<group>"; };
 		DDE6A767090CB9D9078C780A /* UpdateViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UpdateViewModel.swift; sourceTree = "<group>"; };
 		E5FD7F070DDB4216278EFDE6 /* ContextMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextMonitor.swift; sourceTree = "<group>"; };
+		AABB0005AABB0005AABB0005 /* ShortcutNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutNames.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -53,6 +56,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				2B88AE148A7F948F9A9C2E9D /* Sparkle in Frameworks */,
+				AABB0001AABB0001AABB0001 /* KeyboardShortcuts in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -151,6 +155,7 @@
 				7F505D5B7348F40C2CBD6F83 /* AppDelegate.swift */,
 				6C2CC70A6932271D0EE46154 /* Deckard-Bridging-Header.h */,
 				88AA91CDBC6DDE958543FB29 /* main.swift */,
+				AABB0005AABB0005AABB0005 /* ShortcutNames.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -174,6 +179,7 @@
 			name = Deckard;
 			packageProductDependencies = (
 				1A1660206E09A9AEECF7BFDA /* Sparkle */,
+				AABB0002AABB0002AABB0002 /* KeyboardShortcuts */,
 			);
 			productName = Deckard;
 			productReference = A32278396B92132B3CE7A5A4 /* Deckard.app */;
@@ -200,6 +206,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				D1985904AEE80B97C0632EED /* XCRemoteSwiftPackageReference "Sparkle" */,
+				AABB0003AABB0003AABB0003 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */,
 			);
 			preferredProjectObjectVersion = 77;
 			projectDirPath = "";
@@ -270,6 +277,7 @@
 				9EA9D663A1123CA5BC0DDDD6 /* UpdateDriver.swift in Sources */,
 				214FB56FE27976FFA0E33CE3 /* UpdateViewModel.swift in Sources */,
 				432752F9187D2E815F617B96 /* main.swift in Sources */,
+				AABB0004AABB0004AABB0004 /* ShortcutNames.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -521,6 +529,14 @@
 				minimumVersion = 2.5.1;
 			};
 		};
+		AABB0003AABB0003AABB0003 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/sindresorhus/KeyboardShortcuts";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 2.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -528,6 +544,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = D1985904AEE80B97C0632EED /* XCRemoteSwiftPackageReference "Sparkle" */;
 			productName = Sparkle;
+		};
+		AABB0002AABB0002AABB0002 /* KeyboardShortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AABB0003AABB0003AABB0003 /* XCRemoteSwiftPackageReference "KeyboardShortcuts" */;
+			productName = KeyboardShortcuts;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

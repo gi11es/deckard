@@ -1,5 +1,6 @@
 import AppKit
 import GhosttyKit
+import KeyboardShortcuts
 
 class AppDelegate: NSObject, NSApplicationDelegate {
     static var shared: AppDelegate?
@@ -100,7 +101,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Menu
 
-    private func setupMainMenu() {
+    @MainActor private func setupMainMenu() {
         let mainMenu = NSMenu()
 
         // App menu
@@ -109,7 +110,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         appMenu.addItem(withTitle: "About Deckard", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Check for Updates...", action: #selector(checkForUpdates), keyEquivalent: "")
-        appMenu.addItem(withTitle: "Settings...", action: #selector(showSettings), keyEquivalent: ",")
+        let settingsItem = NSMenuItem(title: "Settings...", action: #selector(showSettings), keyEquivalent: "")
+        settingsItem.setShortcut(for: .settings)
+        appMenu.addItem(settingsItem)
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Deckard", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         appMenuItem.submenu = appMenu
@@ -118,40 +121,52 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // File menu
         let fileMenuItem = NSMenuItem()
         let fileMenu = NSMenu(title: "File")
-        fileMenu.addItem(withTitle: "Open Folder...", action: #selector(openProject), keyEquivalent: "o")
+
+        let openItem = NSMenuItem(title: "Open Folder...", action: #selector(openProject), keyEquivalent: "")
+        openItem.setShortcut(for: .openFolder)
+        fileMenu.addItem(openItem)
         fileMenu.addItem(.separator())
-        fileMenu.addItem(withTitle: "New Claude Tab", action: #selector(newClaudeTab), keyEquivalent: "t")
-        let termItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalTab), keyEquivalent: "t")
-        termItem.keyEquivalentModifierMask = [.command, .shift]
+
+        let claudeItem = NSMenuItem(title: "New Claude Tab", action: #selector(newClaudeTab), keyEquivalent: "")
+        claudeItem.setShortcut(for: .newClaudeTab)
+        fileMenu.addItem(claudeItem)
+
+        let termItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalTab), keyEquivalent: "")
+        termItem.setShortcut(for: .newTerminalTab)
         fileMenu.addItem(termItem)
-        fileMenu.addItem(withTitle: "Duplicate Tab", action: #selector(duplicateTab), keyEquivalent: "d")
+
         fileMenu.addItem(.separator())
-        fileMenu.addItem(withTitle: "Close Tab", action: #selector(closeCurrentTab), keyEquivalent: "w")
-        let closeProjectItem = NSMenuItem(title: "Close Folder", action: #selector(closeCurrentProject), keyEquivalent: "w")
-        closeProjectItem.keyEquivalentModifierMask = [.command, .shift]
+
+        let closeItem = NSMenuItem(title: "Close Tab", action: #selector(closeCurrentTab), keyEquivalent: "")
+        closeItem.setShortcut(for: .closeTab)
+        fileMenu.addItem(closeItem)
+
+        let closeProjectItem = NSMenuItem(title: "Close Folder", action: #selector(closeCurrentProject), keyEquivalent: "")
+        closeProjectItem.setShortcut(for: .closeFolder)
         fileMenu.addItem(closeProjectItem)
         fileMenu.addItem(.separator())
 
-        // Tab navigation — standard macOS shortcuts
-        let nextTabItem = NSMenuItem(title: "Next Tab", action: #selector(selectNextTab), keyEquivalent: "]")
-        nextTabItem.keyEquivalentModifierMask = [.command, .shift]
+        let nextTabItem = NSMenuItem(title: "Next Tab", action: #selector(selectNextTab), keyEquivalent: "")
+        nextTabItem.setShortcut(for: .nextTab)
         fileMenu.addItem(nextTabItem)
-        let prevTabItem = NSMenuItem(title: "Previous Tab", action: #selector(selectPrevTab), keyEquivalent: "[")
-        prevTabItem.keyEquivalentModifierMask = [.command, .shift]
+
+        let prevTabItem = NSMenuItem(title: "Previous Tab", action: #selector(selectPrevTab), keyEquivalent: "")
+        prevTabItem.setShortcut(for: .previousTab)
         fileMenu.addItem(prevTabItem)
         fileMenu.addItem(.separator())
 
         // Cmd+1-9 for direct tab access
         for i in 1...9 {
-            let item = NSMenuItem(title: "Tab \(i)", action: #selector(selectTabByNumber(_:)), keyEquivalent: "\(i)")
+            let item = NSMenuItem(title: "Tab \(i)", action: #selector(selectTabByNumber(_:)), keyEquivalent: "")
             item.tag = i - 1
+            item.setShortcut(for: tabShortcutNames[i - 1])
             fileMenu.addItem(item)
         }
 
         fileMenuItem.submenu = fileMenu
         mainMenu.addItem(fileMenuItem)
 
-        // Edit menu
+        // Edit menu (system standard — not configurable)
         let editMenuItem = NSMenuItem()
         let editMenu = NSMenu(title: "Edit")
         editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
@@ -163,14 +178,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // View menu
         let viewMenuItem = NSMenuItem()
         let viewMenu = NSMenu(title: "View")
-        let toggleSidebarItem = NSMenuItem(title: "Hide Sidebar", action: #selector(toggleSidebar), keyEquivalent: "s")
-        toggleSidebarItem.keyEquivalentModifierMask = [.command, .control]
+        let toggleSidebarItem = NSMenuItem(title: "Hide Sidebar", action: #selector(toggleSidebar), keyEquivalent: "")
+        toggleSidebarItem.setShortcut(for: .toggleSidebar)
         toggleSidebarItem.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "Toggle Sidebar")
         viewMenu.addItem(toggleSidebarItem)
         viewMenuItem.submenu = viewMenu
         mainMenu.addItem(viewMenuItem)
 
-        // Window menu
+        // Window menu (system standard — not configurable)
         let windowMenuItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
         windowMenu.addItem(withTitle: "Minimize", action: #selector(NSWindow.miniaturize(_:)), keyEquivalent: "m")
@@ -213,9 +228,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.closeCurrentProject()
     }
 
-    @objc private func duplicateTab() {
-        windowController?.duplicateCurrentTab()
-    }
 
 
     @objc private func selectNextTab() {

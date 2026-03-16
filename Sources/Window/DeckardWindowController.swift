@@ -1,5 +1,15 @@
 import AppKit
 import GhosttyKit
+import KeyboardShortcuts
+
+/// Format a tooltip with the current shortcut, e.g. "Open Folder (Cmd+O)"
+@MainActor
+func shortcutTooltip(_ label: String, for name: KeyboardShortcuts.Name) -> String {
+    if let shortcut = KeyboardShortcuts.getShortcut(for: name) {
+        return "\(label) (\(shortcut.description))"
+    }
+    return label
+}
 
 // MARK: - Data Models
 
@@ -207,7 +217,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         openButton.bezelStyle = .recessed
         openButton.isBordered = false
         openButton.contentTintColor = .secondaryLabelColor
-        openButton.toolTip = "Open Folder (\u{2318}O)"
+        openButton.toolTip = shortcutTooltip("Open Folder", for: .openFolder)
         openButton.translatesAutoresizingMaskIntoConstraints = false
 
         let accessoryVC = NSTitlebarAccessoryViewController()
@@ -566,13 +576,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         project.selectedTabIndex = tabIndex
         rebuildTabBar()
         showTab(project.tabs[tabIndex])
-    }
-
-    func duplicateCurrentTab() {
-        guard let project = currentProject else { return }
-        guard project.selectedTabIndex >= 0, project.selectedTabIndex < project.tabs.count else { return }
-        let current = project.tabs[project.selectedTabIndex]
-        addTabToCurrentProject(isClaude: current.isClaude)
     }
 
     func selectNextTab() {
@@ -1316,7 +1319,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         wantsLayer = true
 
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.toolTip = "Close Folder (\u{21E7}\u{2318}W)"
+        label.toolTip = shortcutTooltip("Close Folder", for: .closeFolder)
         badgeContainer.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
         addSubview(badgeContainer)
@@ -1552,7 +1555,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
         }
 
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.toolTip = "Close Tab (\u{2318}W)"
+        label.toolTip = shortcutTooltip("Close Tab", for: .closeTab)
         addSubview(label)
 
         // Layout: [label] [badge]
@@ -1697,7 +1700,8 @@ class AddTabButton: NSView {
         label.textColor = .secondaryLabelColor
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
-        toolTip = "New Claude tab (\u{2318}T)\nRight-click: new Terminal (\u{21E7}\u{2318}T)"
+        toolTip = shortcutTooltip("New Claude tab", for: .newClaudeTab)
+            + "\nRight-click: " + shortcutTooltip("new Terminal", for: .newTerminalTab)
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
         NSLayoutConstraint.activate([
