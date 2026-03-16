@@ -173,6 +173,21 @@ class TerminalNSView: NSView {
         updateSurfaceSize()
     }
 
+    override func viewDidUnhide() {
+        super.viewDidUnhide()
+        // When a hidden tab becomes visible again (e.g. after a screen/DPI
+        // change while it was in the background), refresh the content scale
+        // so the Metal layer renders at the correct resolution.
+        guard let surface = self.surface, let window = self.window else { return }
+        let scale = window.backingScaleFactor
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.contentsScale = scale
+        CATransaction.commit()
+        ghostty_surface_set_content_scale(surface, scale, scale)
+        updateSurfaceSize()
+    }
+
     override func setFrameSize(_ newSize: NSSize) {
         super.setFrameSize(newSize)
         updateSurfaceSize()
@@ -182,6 +197,14 @@ class TerminalNSView: NSView {
         super.viewDidChangeBackingProperties()
         guard let surface = self.surface else { return }
         let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2.0
+
+        // Update the layer's contentsScale so Core Animation composites at
+        // the correct resolution instead of scaling the old backing store.
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.contentsScale = scale
+        CATransaction.commit()
+
         ghostty_surface_set_content_scale(surface, scale, scale)
         updateSurfaceSize()
     }
