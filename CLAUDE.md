@@ -13,3 +13,5 @@ xcodebuild -project Deckard.xcodeproj -scheme Deckard -configuration Debug build
 osascript -e 'tell application "Deckard" to quit'
 open /Users/gilles/Library/Developer/Xcode/DerivedData/Deckard-hkgvzqxyznptcubawtorcnhugxer/Build/Products/Debug/Deckard.app
 ```
+
+**Always ask for confirmation before restarting Deckard** — do not quit and relaunch the app automatically after a build. Ask the user first.
