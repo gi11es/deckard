@@ -9,6 +9,17 @@ class DeckardGhosttyApp {
     private(set) var app: ghostty_app_t?
     private(set) var config: ghostty_config_t?
     private(set) var defaultBackgroundColor: NSColor = .windowBackgroundColor
+    /// Coalesces rapid wakeup signals from libghostty's I/O thread into a single
+    /// tick() call on the main thread, preventing main queue starvation during
+    /// heavy terminal output.
+    private let tickSource: DispatchSourceUserDataAdd = {
+        let source = DispatchSource.makeUserDataAddSource(queue: .main)
+        source.setEventHandler {
+            DeckardGhosttyApp.instance?.tick()
+        }
+        source.resume()
+        return source
+    }()
 
     init() {
         Self.instance = self
@@ -43,9 +54,7 @@ class DeckardGhosttyApp {
         runtimeConfig.supports_selection_clipboard = true
 
         runtimeConfig.wakeup_cb = { _ in
-            DispatchQueue.main.async {
-                DeckardGhosttyApp.instance?.tick()
-            }
+            DeckardGhosttyApp.instance?.tickSource.add(data: 1)
         }
 
         runtimeConfig.action_cb = { app, target, action in
