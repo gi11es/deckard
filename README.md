@@ -4,7 +4,7 @@ A native macOS terminal manager for [Claude Code](https://docs.anthropic.com/en/
 
 Built with Swift and AppKit. Terminal rendering powered by [Ghostty](https://ghostty.org/).
 
-**[Download the latest release](https://github.com/gi11es/deckard/releases/latest)** (macOS 14+, Apple Silicon)
+[![Download for macOS](https://img.shields.io/badge/Download_for_macOS-v0.1.0-black?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gi11es/deckard/releases/latest)
 
 ![Deckard screenshot](screenshot.png)
 
