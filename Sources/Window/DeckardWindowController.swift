@@ -1435,8 +1435,14 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
             startEditing()
         } else {
             dragStartPoint = convert(event.locationInWindow, from: nil)
-            _ = target?.perform(clickAction, with: self)
+            // Select on mouseUp so the view isn't destroyed before mouseDragged fires
         }
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        guard dragStartPoint != nil else { return }
+        dragStartPoint = nil
+        _ = target?.perform(clickAction, with: self)
     }
 
     override func mouseDragged(with event: NSEvent) {
