@@ -6,7 +6,7 @@ Run multiple sessions side by side in a single window with tabs, projects, and s
 
 [![Download for macOS](https://img.shields.io/badge/Download_for_macOS-v0.1.2-black?style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gi11es/deckard/releases/latest)
 
-![Deckard screenshot](screenshot.png)
+![Deckard screenshot](screenshot.jpg)
 
 ## Features
 
