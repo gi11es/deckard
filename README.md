@@ -4,6 +4,8 @@ A native macOS terminal manager for [Claude Code](https://docs.anthropic.com/en/
 
 Built with Swift and AppKit. Terminal rendering powered by [Ghostty](https://ghostty.org/).
 
+![Deckard screenshot](screenshot.png)
+
 ## Features
 
 - **Multi-tab sessions** — Open multiple Claude Code (and plain terminal) tabs per project. Switch between them with Cmd+1–9 or drag to reorder.
