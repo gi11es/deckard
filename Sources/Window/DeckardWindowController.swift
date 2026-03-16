@@ -68,13 +68,23 @@ struct DefaultTabConfig {
 let deckardProjectDragType = NSPasteboard.PasteboardType("com.deckard.project-reorder")
 
 
+private class CollapsibleSplitView: NSSplitView {
+    var sidebarCollapsed = false
+    override var dividerThickness: CGFloat {
+        sidebarCollapsed ? 0 : super.dividerThickness
+    }
+    override func drawDivider(in rect: NSRect) {
+        if !sidebarCollapsed { super.drawDivider(in: rect) }
+    }
+}
+
 class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private let ghosttyApp: DeckardGhosttyApp
     private var projects: [ProjectItem] = []
     private var selectedProjectIndex: Int = -1
 
     // UI
-    private let splitView = NSSplitView()
+    private let splitView = CollapsibleSplitView()
     private let sidebarView = NSView()
     private let sidebarStackView = ReorderableStackView()
     private let rightPane = NSView()
@@ -89,6 +99,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private let sidebarDropZone = SidebarDropZone()
     private let sidebarWidth: CGFloat = 210
     private var sidebarInitialized = false
+    private var sidebarWidthBeforeCollapse: CGFloat = 210
     private var startupOverlay: NSView?
     /// Recently closed projects — stored so reopening the same path restores tabs.
     private var recentlyClosedProjects: [ProjectState] = []
@@ -283,8 +294,14 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         sidebarView.widthAnchor.constraint(greaterThanOrEqualToConstant: 80).isActive = true
 
         DispatchQueue.main.async { [self] in
-            let saved = CGFloat(UserDefaults.standard.double(forKey: "sidebarWidth"))
-            splitView.setPosition(saved > 80 ? saved : sidebarWidth, ofDividerAt: 0)
+            if UserDefaults.standard.bool(forKey: "sidebarCollapsed") {
+                splitView.sidebarCollapsed = true
+                sidebarView.isHidden = true
+                splitView.adjustSubviews()
+            } else {
+                let saved = CGFloat(UserDefaults.standard.double(forKey: "sidebarWidth"))
+                splitView.setPosition(saved > 80 ? saved : sidebarWidth, ofDividerAt: 0)
+            }
             sidebarInitialized = true
         }
 
@@ -295,11 +312,48 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func splitView(_ splitView: NSSplitView, constrainMinCoordinate p: CGFloat, ofSubviewAt i: Int) -> CGFloat { 80 }
     func splitView(_ splitView: NSSplitView, constrainMaxCoordinate p: CGFloat, ofSubviewAt i: Int) -> CGFloat { splitView.bounds.width * 0.5 }
-    func splitView(_ splitView: NSSplitView, canCollapseSubview s: NSView) -> Bool { false }
+    func splitView(_ splitView: NSSplitView, canCollapseSubview s: NSView) -> Bool { s === sidebarView }
+
+    func splitView(_ splitView: NSSplitView, shouldCollapseSubview s: NSView, forDoubleClickOnDividerAt i: Int) -> Bool {
+        s === sidebarView
+    }
 
     func splitViewDidResizeSubviews(_ notification: Notification) {
-        guard sidebarInitialized, sidebarView.frame.width > 0 else { return }
+        guard sidebarInitialized, !splitView.isSubviewCollapsed(sidebarView), sidebarView.frame.width > 0 else { return }
         UserDefaults.standard.set(Double(sidebarView.frame.width), forKey: "sidebarWidth")
+    }
+
+    // MARK: - Sidebar Toggle
+
+    var isSidebarCollapsed: Bool {
+        splitView.sidebarCollapsed
+    }
+
+    @objc func toggleSidebar() {
+        if splitView.sidebarCollapsed {
+            splitView.sidebarCollapsed = false
+            sidebarView.isHidden = false
+            splitView.adjustSubviews()
+            let target = sidebarWidthBeforeCollapse > 80 ? sidebarWidthBeforeCollapse : sidebarWidth
+            splitView.setPosition(target, ofDividerAt: 0)
+        } else {
+            sidebarWidthBeforeCollapse = sidebarView.frame.width
+            splitView.sidebarCollapsed = true
+            sidebarView.isHidden = true
+            splitView.adjustSubviews()
+        }
+        splitView.needsDisplay = true
+        UserDefaults.standard.set(splitView.sidebarCollapsed, forKey: "sidebarCollapsed")
+        // Update the View > Toggle Sidebar menu item title
+        let newTitle = splitView.sidebarCollapsed ? "Show Sidebar" : "Hide Sidebar"
+        if let mainMenu = NSApp.mainMenu {
+            for item in mainMenu.items {
+                if item.submenu?.title == "View" {
+                    item.submenu?.items.first?.title = newTitle
+                    break
+                }
+            }
+        }
     }
 
     // MARK: - Project Management

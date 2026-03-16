@@ -149,6 +149,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         editMenuItem.submenu = editMenu
         mainMenu.addItem(editMenuItem)
 
+        // View menu
+        let viewMenuItem = NSMenuItem()
+        let viewMenu = NSMenu(title: "View")
+        let toggleSidebarItem = NSMenuItem(title: "Hide Sidebar", action: #selector(toggleSidebar), keyEquivalent: "s")
+        toggleSidebarItem.keyEquivalentModifierMask = [.command, .control]
+        toggleSidebarItem.image = NSImage(systemSymbolName: "sidebar.left", accessibilityDescription: "Toggle Sidebar")
+        viewMenu.addItem(toggleSidebarItem)
+        viewMenuItem.submenu = viewMenu
+        mainMenu.addItem(viewMenuItem)
+
         // Window menu
         let windowMenuItem = NSMenuItem()
         let windowMenu = NSMenu(title: "Window")
@@ -209,7 +219,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.selectProject(byNumber: sender.tag)
     }
 
-    @objc private func showSettings() {
+    @objc private func toggleSidebar() {
+        windowController?.toggleSidebar()
+    }
+
+@objc private func showSettings() {
         SettingsWindowController.shared.show()
     }
 }
