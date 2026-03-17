@@ -3,19 +3,20 @@ import Darwin
 
 /// Monitors terminal tab shell processes to detect CPU, disk, and network activity.
 ///
-/// Discovery works by scanning children of the Deckard process (login processes),
-/// finding their shell children, and excluding Claude sessions (which have a `claude`
-/// process in their foreground group). The remaining shells are terminal tabs.
-///
-/// Since we can't map login PIDs to specific surface UUIDs via env vars (login is
-/// setuid root), the window controller provides the list of terminal tab surface IDs
-/// each poll cycle, and we match them to discovered login PIDs by order.
+/// The window controller provides all tab info (surface IDs + isClaude flags).
+/// We match login PIDs to tabs by sorted PID order ↔ sorted tab creation order,
+/// skipping Claude tabs in both lists.
 ///
 /// All mutable state is accessed exclusively on `queue` (a serial dispatch queue).
 class ProcessMonitor {
     static let shared = ProcessMonitor()
 
     private let queue = DispatchQueue(label: "com.deckard.process-monitor")
+
+    struct TabInfo {
+        let surfaceId: UUID
+        let isClaude: Bool
+    }
 
     /// Last known foreground PID per login (keyed by login PID).
     private var lastFgPids: [pid_t: pid_t] = [:]
@@ -26,79 +27,58 @@ class ProcessMonitor {
     /// Total socket buffer bytes from the previous poll cycle (keyed by login PID).
     private var lastSocketBytes: [pid_t: UInt64] = [:]
 
+    /// Minimum CPU delta (nanoseconds) to count as activity.
+    /// Filters out micro-variations from idle shells (~10ms per 2.5s poll).
+    private let cpuThreshold: UInt64 = 10_000_000
+
     // MARK: - Public API
 
-    /// Poll terminal shells. Takes ordered list of terminal tab surface IDs.
-    /// Returns surface UUID → hasActivity for each terminal tab.
-    func pollTerminalTabs(terminalSurfaceIds: [UUID]) -> [UUID: Bool] {
-        queue.sync { _poll(terminalSurfaceIds: terminalSurfaceIds) }
+    /// Poll all tabs. Returns surface UUID → hasActivity for each terminal tab.
+    /// `tabs` must be in creation order (matching PID creation order).
+    func poll(tabs: [TabInfo]) -> [UUID: Bool] {
+        queue.sync { _poll(tabs: tabs) }
     }
 
     // MARK: - Core Poll (called on queue)
 
-    private func _poll(terminalSurfaceIds: [UUID]) -> [UUID: Bool] {
-        guard !terminalSurfaceIds.isEmpty else { return [:] }
+    private func _poll(tabs: [TabInfo]) -> [UUID: Bool] {
+        let terminalTabs = tabs.filter { !$0.isClaude }
+        guard !terminalTabs.isEmpty else { return [:] }
 
         let allProcs = allProcesses() ?? []
         let myPid = getpid()
 
-        // Find all login children of Deckard
+        // Find all login children of Deckard, sorted by PID (creation order)
         let loginPids = allProcs
             .filter { $0.kp_eproc.e_ppid == myPid }
             .map { $0.kp_proc.p_pid }
+            .sorted()
 
-        // For each login, find its shell child and determine if it's a terminal (non-Claude) tab
+        // Build parallel arrays: for each login, determine if it's Claude
+        // by checking tab order. Tabs and logins are both in creation order,
+        // so the Nth login corresponds to the Nth tab.
         var terminalLoginPids: [pid_t] = []
+        var tabIdx = 0
         for loginPid in loginPids {
-            // Find the shell (login's child)
-            guard let shellProc = allProcs.first(where: { $0.kp_eproc.e_ppid == loginPid }) else {
-                continue
+            guard tabIdx < tabs.count else { break }
+            let tab = tabs[tabIdx]
+            tabIdx += 1
+            if !tab.isClaude {
+                terminalLoginPids.append(loginPid)
             }
-            let shellPid = shellProc.kp_proc.p_pid
-
-            // Check if this is a Claude session by looking at the foreground process name
-            let shellInfo = getKInfoProc(pid: shellPid)
-            let termFgPgid = shellInfo?.kp_eproc.e_tpgid ?? 0
-            let shellPgid = shellInfo?.kp_eproc.e_pgid ?? 0
-
-            if termFgPgid != shellPgid {
-                // There's a foreground process — check if it's claude
-                var name = [CChar](repeating: 0, count: Int(MAXCOMLEN) + 1)
-                proc_name(termFgPgid, &name, UInt32(name.count))
-                let processName = String(cString: name)
-                if processName == "claude" {
-                    continue  // Claude tab, skip
-                }
-            }
-
-            // Also check if the shell itself was started by a claude wrapper
-            // by checking if any child of the shell is named "claude"
-            let shellChildren = allProcs.filter { $0.kp_eproc.e_ppid == shellPid }
-            let hasClaude = shellChildren.contains { proc in
-                var name = [CChar](repeating: 0, count: Int(MAXCOMLEN) + 1)
-                proc_name(proc.kp_proc.p_pid, &name, UInt32(name.count))
-                return String(cString: name) == "claude"
-            }
-            if hasClaude { continue }
-
-            terminalLoginPids.append(loginPid)
         }
-
-        // Match terminal logins to surface IDs by order
-        // Both lists are in creation order (PIDs increase, tabs are appended in order)
-        terminalLoginPids.sort()
 
         var results: [UUID: Bool] = [:]
-        for (i, surfaceId) in terminalSurfaceIds.enumerated() {
+        for (i, tab) in terminalTabs.enumerated() {
             if i < terminalLoginPids.count {
-                let loginPid = terminalLoginPids[i]
-                results[surfaceId] = checkActivity(loginPid: loginPid, allProcs: allProcs)
+                results[tab.surfaceId] = checkActivity(
+                    loginPid: terminalLoginPids[i], allProcs: allProcs)
             } else {
-                results[surfaceId] = false
+                results[tab.surfaceId] = false
             }
         }
 
-        // Clean up stale tracking data for logins no longer present
+        // Clean up stale tracking data
         let activeLogins = Set(terminalLoginPids)
         lastFgPids = lastFgPids.filter { activeLogins.contains($0.key) }
         lastCpuTimes = lastCpuTimes.filter { activeLogins.contains($0.key) }
@@ -127,21 +107,30 @@ class ProcessMonitor {
             return false
         }
 
-        // Find the leaf process in the foreground group
-        let fgPid = findLeafProcess(inGroup: termFgPgid, allProcs: allProcs) ?? termFgPgid
+        // Find the foreground process group leader (stable, unlike leaf selection)
+        let fgPid = termFgPgid
 
         // Get CPU time, disk I/O, and network buffer state
         guard let cpuTime = getCpuTime(pid: fgPid) else { return false }
         let diskBytes = getDiskBytes(pid: fgPid) ?? 0
         let socketBytes = getSocketBufferBytes(pid: fgPid)
 
-        // If the foreground process changed, reset baseline and show activity
+        // First time seeing this login — just set baseline, don't pulse
+        if lastFgPids[loginPid] == nil {
+            lastFgPids[loginPid] = fgPid
+            lastCpuTimes[loginPid] = cpuTime
+            lastDiskBytes[loginPid] = diskBytes
+            lastSocketBytes[loginPid] = socketBytes
+            return false
+        }
+
+        // Foreground process changed — new command started, pulse
         if lastFgPids[loginPid] != fgPid {
             lastFgPids[loginPid] = fgPid
             lastCpuTimes[loginPid] = cpuTime
             lastDiskBytes[loginPid] = diskBytes
             lastSocketBytes[loginPid] = socketBytes
-            return true  // new process just started → pulse
+            return true
         }
 
         let prevCpu = lastCpuTimes[loginPid] ?? cpuTime
@@ -151,21 +140,10 @@ class ProcessMonitor {
         lastDiskBytes[loginPid] = diskBytes
         lastSocketBytes[loginPid] = socketBytes
 
-        return cpuTime > prevCpu || diskBytes > prevDisk || socketBytes != prevSocket
-    }
-
-    private func findLeafProcess(inGroup pgid: pid_t, allProcs: [kinfo_proc]) -> pid_t? {
-        let groupProcs = allProcs.filter { $0.kp_eproc.e_pgid == pgid }
-        guard !groupProcs.isEmpty else { return pgid }
-
-        let pidsInGroup = Set(groupProcs.map { $0.kp_proc.p_pid })
-        let parentsInGroup = Set(groupProcs.compactMap { proc -> pid_t? in
-            let ppid = proc.kp_eproc.e_ppid
-            return pidsInGroup.contains(ppid) ? ppid : nil
-        })
-
-        let leaves = pidsInGroup.subtracting(parentsInGroup)
-        return leaves.first ?? pgid
+        let cpuDelta = cpuTime &- prevCpu > cpuThreshold
+        let diskDelta = diskBytes > prevDisk
+        let sockDelta = socketBytes != prevSocket
+        return cpuDelta || diskDelta || sockDelta
     }
 
     // MARK: - System Calls

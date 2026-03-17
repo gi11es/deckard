@@ -727,12 +727,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private func startProcessMonitor() {
         processMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
             guard let self = self else { return }
-            // Collect terminal tab surface IDs on main thread (in creation order)
-            let terminalIds = self.projects.flatMap { project in
-                project.tabs.filter { !$0.isClaude }.map { $0.id }
+            // Collect all tabs in creation order with isClaude flag
+            let tabInfos = self.projects.flatMap { project in
+                project.tabs.map { ProcessMonitor.TabInfo(surfaceId: $0.id, isClaude: $0.isClaude) }
             }
             DispatchQueue.global(qos: .utility).async {
-                let states = ProcessMonitor.shared.pollTerminalTabs(terminalSurfaceIds: terminalIds)
+                let states = ProcessMonitor.shared.poll(tabs: tabInfos)
                 DispatchQueue.main.async {
                     self.applyTerminalBadgeStates(states)
                 }
