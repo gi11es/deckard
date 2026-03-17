@@ -232,7 +232,7 @@ def main():
             send_response(id, {
                 "protocolVersion": "2024-11-05",
                 "capabilities": {"tools": {}},
-                "serverInfo": {"name": "deckard", "version": "0.1.5"}
+                "serverInfo": {"name": "deckard", "version": "0.1.6"}
             })
 
         elif method == "notifications/initialized":
