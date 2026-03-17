@@ -1013,13 +1013,40 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         isRestoring = true
 
-        for ps in projectStates {
+        // Restore the selected project first so its sessions start resuming immediately,
+        // then restore remaining projects in top-to-bottom sidebar order.
+        let selectedIdx = min(max(state.selectedTabIndex, 0), projectStates.count - 1)
+        var restoreOrder = [selectedIdx]
+        for i in 0..<projectStates.count where i != selectedIdx {
+            restoreOrder.append(i)
+        }
+
+        var restoredProjects = [ProjectItem?](repeating: nil, count: projectStates.count)
+        for i in restoreOrder {
+            let ps = projectStates[i]
             let project = ProjectItem(path: ps.path)
             project.name = ps.name  // restore custom name if renamed
 
-            for ts in ps.tabs {
+            // Restore the selected tab first so its session resumes immediately,
+            // then restore remaining tabs in left-to-right order.
+            let selTab = min(max(ps.selectedTabIndex, 0), max(ps.tabs.count - 1, 0))
+            var tabOrder = [selTab]
+            for t in 0..<ps.tabs.count where t != selTab {
+                tabOrder.append(t)
+            }
+            for t in tabOrder {
+                let ts = ps.tabs[t]
                 createTabInProject(project, isClaude: ts.isClaude, name: ts.name,
                                    sessionIdToResume: ts.isClaude ? ts.sessionId : nil)
+            }
+            // createTabInProject appends tabs, so reorder to match saved order
+            if tabOrder != Array(0..<ps.tabs.count) {
+                let unordered = project.tabs
+                var reordered = [TabItem?](repeating: nil, count: unordered.count)
+                for (creationIdx, originalIdx) in tabOrder.enumerated() {
+                    reordered[originalIdx] = unordered[creationIdx]
+                }
+                project.tabs = reordered.compactMap { $0 }
             }
 
             if project.tabs.isEmpty {
@@ -1031,15 +1058,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
 
             project.selectedTabIndex = min(ps.selectedTabIndex, project.tabs.count - 1)
-            projects.append(project)
+            restoredProjects[i] = project
         }
+        projects = restoredProjects.compactMap { $0 }
 
         isRestoring = false
 
         rebuildSidebar()
-        let idx = min(state.selectedTabIndex, projects.count - 1)
-        if idx >= 0 {
-            selectProject(at: idx)
+        if selectedIdx >= 0 && selectedIdx < projects.count {
+            selectProject(at: selectedIdx)
         }
         saveState()
     }
