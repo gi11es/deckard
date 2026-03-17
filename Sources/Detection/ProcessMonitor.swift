@@ -20,6 +20,8 @@ class ProcessMonitor {
     private var lastCpuTimes: [pid_t: UInt64] = [:]
     /// Disk I/O bytes (read + written) from the previous poll cycle (keyed by shell PID).
     private var lastDiskBytes: [pid_t: UInt64] = [:]
+    /// Total socket buffer bytes from the previous poll cycle (keyed by shell PID).
+    private var lastSocketBytes: [pid_t: UInt64] = [:]
     /// Counter to trigger periodic re-discovery.
     private var pollsSinceDiscovery = 0
     private let rediscoveryInterval = 12  // re-discover every ~30s at 2.5s poll
@@ -92,6 +94,7 @@ class ProcessMonitor {
         let activePids = Set(newMap.values)
         lastCpuTimes = lastCpuTimes.filter { activePids.contains($0.key) }
         lastDiskBytes = lastDiskBytes.filter { activePids.contains($0.key) }
+        lastSocketBytes = lastSocketBytes.filter { activePids.contains($0.key) }
         lastFgPids = lastFgPids.filter { activePids.contains($0.key) }
 
         shellPids = newMap
@@ -114,24 +117,28 @@ class ProcessMonitor {
         // Find the leaf process in the foreground group
         let fgPid = findLeafProcess(inGroup: termFgPgid, allProcs: allProcs) ?? termFgPgid
 
-        // Get CPU time and disk I/O for the foreground process
+        // Get CPU time, disk I/O, and network buffer state for the foreground process
         guard let cpuTime = getCpuTime(pid: fgPid) else { return false }
         let diskBytes = getDiskBytes(pid: fgPid) ?? 0
+        let socketBytes = getSocketBufferBytes(pid: fgPid)
 
         // If the foreground process changed, reset baseline and show activity
         if lastFgPids[shellPid] != fgPid {
             lastFgPids[shellPid] = fgPid
             lastCpuTimes[shellPid] = cpuTime
             lastDiskBytes[shellPid] = diskBytes
+            lastSocketBytes[shellPid] = socketBytes
             return true  // new process just started → pulse
         }
 
         let prevCpu = lastCpuTimes[shellPid] ?? cpuTime
         let prevDisk = lastDiskBytes[shellPid] ?? diskBytes
+        let prevSocket = lastSocketBytes[shellPid] ?? socketBytes
         lastCpuTimes[shellPid] = cpuTime
         lastDiskBytes[shellPid] = diskBytes
+        lastSocketBytes[shellPid] = socketBytes
 
-        return cpuTime > prevCpu || diskBytes > prevDisk
+        return cpuTime > prevCpu || diskBytes > prevDisk || socketBytes != prevSocket
     }
 
     private func findLeafProcess(inGroup pgid: pid_t, allProcs: [kinfo_proc]) -> pid_t? {
@@ -189,6 +196,37 @@ class ProcessMonitor {
         }
         guard ret == 0 else { return nil }
         return usage.ri_diskio_bytesread + usage.ri_diskio_byteswritten
+    }
+
+    /// Get total bytes across all socket buffers (receive + send).
+    /// A change between polls indicates active network I/O.
+    private func getSocketBufferBytes(pid: pid_t) -> UInt64 {
+        // Get the buffer size needed for the FD list
+        let bufSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
+        guard bufSize > 0 else { return 0 }
+
+        let fdCount = Int(bufSize) / MemoryLayout<proc_fdinfo>.size
+        var fds = [proc_fdinfo](repeating: proc_fdinfo(), count: fdCount)
+        let ret = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, &fds, bufSize)
+        guard ret > 0 else { return 0 }
+
+        let actualCount = Int(ret) / MemoryLayout<proc_fdinfo>.size
+        var total: UInt64 = 0
+
+        for i in 0..<min(actualCount, 256) {
+            guard fds[i].proc_fdtype == PROX_FDTYPE_SOCKET else { continue }
+
+            var socketInfo = socket_fdinfo()
+            let infoSize = Int32(MemoryLayout<socket_fdinfo>.size)
+            let infoRet = proc_pidfdinfo(pid, fds[i].proc_fd, PROC_PIDFDSOCKETINFO,
+                                         &socketInfo, infoSize)
+            guard infoRet == infoSize else { continue }
+
+            total += UInt64(socketInfo.psi.soi_rcv.sbi_cc)
+            total += UInt64(socketInfo.psi.soi_snd.sbi_cc)
+        }
+
+        return total
     }
 
     private func processName(pid: pid_t) -> String {
