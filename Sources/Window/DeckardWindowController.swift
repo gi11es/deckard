@@ -458,16 +458,22 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     func selectProject(at index: Int) {
         guard index >= 0, index < projects.count else { return }
         selectedProjectIndex = index
-        rebuildTabBar()
 
         let project = projects[index]
+        if !project.tabs.isEmpty {
+            project.selectedTabIndex = max(0, min(project.selectedTabIndex, project.tabs.count - 1))
+        }
+
+        rebuildTabBar()
+
         if project.tabs.isEmpty {
-            currentTerminalView?.isHidden = true
+            // Hide all terminal views so nothing bleeds through
+            for sub in terminalContainerView.subviews where sub is TerminalNSView {
+                sub.isHidden = true
+            }
             currentTerminalView = nil
             welcomeLabel?.isHidden = false
         } else {
-            // Clamp selectedTabIndex to valid range
-            project.selectedTabIndex = max(0, min(project.selectedTabIndex, project.tabs.count - 1))
             showTab(project.tabs[project.selectedTabIndex])
         }
 
@@ -604,8 +610,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let view = tab.surfaceView
 
-        // Hide the previous surface instead of removing it (avoids Metal context teardown)
-        currentTerminalView?.isHidden = true
+        // Hide ALL terminal surfaces, not just currentTerminalView.
+        // When switching projects, currentTerminalView might not be the
+        // topmost visible view (z-order depends on add order).
+        for sub in terminalContainerView.subviews where sub is TerminalNSView {
+            sub.isHidden = true
+        }
 
         // Add to container only once; subsequent switches just unhide
         if view.superview !== terminalContainerView {
@@ -956,7 +966,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Phase 1: Create the active project's active tab immediately so the user
         // sees a working terminal right away. Collect remaining tabs for Phase 2.
-        var pending: [(project: ProjectItem, tab: ProjectTabState)] = []
+        var pending: [(project: ProjectItem, tab: ProjectTabState, originalIndex: Int)] = []
 
         for (i, ps) in projectStates.enumerated() {
             let project = ProjectItem(path: ps.path)
@@ -970,11 +980,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                     createTabInProject(project, isClaude: ts.isClaude, name: ts.name,
                                        sessionIdToResume: ts.isClaude ? ts.sessionId : nil)
                 } else {
-                    pending.append((project: project, tab: ts))
+                    pending.append((project: project, tab: ts, originalIndex: t))
                 }
             }
 
-            project.selectedTabIndex = min(ps.selectedTabIndex, project.tabs.count - 1)
+            project.selectedTabIndex = selTab
             projects.append(project)
         }
 
@@ -990,7 +1000,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         createTabsProgressively(pending)
     }
 
-    private func createTabsProgressively(_ remaining: [(project: ProjectItem, tab: ProjectTabState)]) {
+    private func createTabsProgressively(_ remaining: [(project: ProjectItem, tab: ProjectTabState, originalIndex: Int)]) {
         guard let first = remaining.first else {
             // All tabs created — rebuild UI to reflect the full state
             rebuildSidebar()
@@ -1000,8 +1010,18 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         let ts = first.tab
-        createTabInProject(first.project, isClaude: ts.isClaude, name: ts.name,
+        let project = first.project
+        let insertAt = first.originalIndex
+
+        // Create the tab (appends to project.tabs)
+        createTabInProject(project, isClaude: ts.isClaude, name: ts.name,
                            sessionIdToResume: ts.isClaude ? ts.sessionId : nil)
+
+        // Move it from the end to its original position
+        if insertAt < project.tabs.count - 1 {
+            let tab = project.tabs.removeLast()
+            project.tabs.insert(tab, at: min(insertAt, project.tabs.count))
+        }
 
         DispatchQueue.main.async { [self] in
             createTabsProgressively(Array(remaining.dropFirst()))
