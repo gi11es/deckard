@@ -1,19 +1,17 @@
 import Foundation
 import Darwin
 
-/// Monitors terminal tab shell processes to detect CPU activity.
-/// Shells are direct children of the Deckard process (fork/exec by libghostty).
-/// We discover them by reading DECKARD_SURFACE_ID from their environment.
+/// Monitors terminal tab shell processes to detect CPU, disk, and network activity.
+/// Shell PIDs are registered by the window controller at tab creation time.
 ///
 /// All mutable state is accessed exclusively on `queue` (a serial dispatch queue).
-/// `pollAll()` must be called from this queue or a background queue — never from main.
 class ProcessMonitor {
     static let shared = ProcessMonitor()
 
     private let queue = DispatchQueue(label: "com.deckard.process-monitor")
 
-    /// Map from surface UUID to shell PID.
-    private var shellPids: [UUID: pid_t] = [:]
+    /// Registered mappings: surface UUID → login/shell PID (set by window controller).
+    private var registeredPids: [UUID: pid_t] = [:]
     /// Last known foreground PID per shell (keyed by shell PID).
     private var lastFgPids: [pid_t: pid_t] = [:]
     /// CPU time (user + system nanoseconds) from the previous poll cycle (keyed by shell PID).
@@ -22,44 +20,48 @@ class ProcessMonitor {
     private var lastDiskBytes: [pid_t: UInt64] = [:]
     /// Total socket buffer bytes from the previous poll cycle (keyed by shell PID).
     private var lastSocketBytes: [pid_t: UInt64] = [:]
-    /// Counter to trigger periodic re-discovery.
-    private var pollsSinceDiscovery = 0
-    private let rediscoveryInterval = 12  // re-discover every ~30s at 2.5s poll
 
     // MARK: - Public API
 
-    /// Poll all known terminal shells. Returns surface UUID → hasActivity.
+    /// Register a shell/login PID for a surface. Called from the main thread at tab creation.
+    func register(surfaceId: UUID, pid: pid_t) {
+        queue.sync { registeredPids[surfaceId] = pid }
+    }
+
+    /// Unregister a surface (tab closed).
+    func unregister(surfaceId: UUID) {
+        queue.sync {
+            if let pid = registeredPids.removeValue(forKey: surfaceId) {
+                lastFgPids.removeValue(forKey: pid)
+                lastCpuTimes.removeValue(forKey: pid)
+                lastDiskBytes.removeValue(forKey: pid)
+                lastSocketBytes.removeValue(forKey: pid)
+            }
+        }
+    }
+
+    /// Poll all registered terminal shells. Returns surface UUID → hasActivity.
     func pollAll() -> [UUID: Bool] {
         queue.sync { _pollAll() }
     }
 
-    /// Get the name of the foreground process for a surface (for tooltips).
-    func foregroundProcessName(forSurface surfaceId: UUID) -> String? {
-        queue.sync {
-            guard let shellPid = shellPids[surfaceId] else { return nil }
-            guard let info = getKInfoProc(pid: shellPid) else { return nil }
-            let fgPgid = info.kp_eproc.e_tpgid
-            guard fgPgid != info.kp_eproc.e_pgid else { return nil }
-            // Use a single-PID lookup rather than scanning all processes
-            return processName(pid: fgPgid)
-        }
+    /// List PIDs of all direct children of this process.
+    /// Used by the window controller to detect newly spawned shell processes.
+    func childPids() -> [pid_t] {
+        let myPid = getpid()
+        guard let allProcs = allProcesses() else { return [] }
+        return allProcs
+            .filter { $0.kp_eproc.e_ppid == myPid }
+            .map { $0.kp_proc.p_pid }
     }
 
     // MARK: - Core Poll (called on queue)
 
     private func _pollAll() -> [UUID: Bool] {
-        pollsSinceDiscovery += 1
-
-        // Fetch the full process table once per poll cycle
         let allProcs = allProcesses() ?? []
 
-        if shellPids.isEmpty || pollsSinceDiscovery >= rediscoveryInterval {
-            discoverShells(allProcs: allProcs)
-            pollsSinceDiscovery = 0
-        }
-
         var results: [UUID: Bool] = [:]
-        for (surfaceId, shellPid) in shellPids {
+        for (surfaceId, shellPid) in registeredPids {
             guard getKInfoProc(pid: shellPid) != nil else {
                 results[surfaceId] = false
                 continue
@@ -67,37 +69,6 @@ class ProcessMonitor {
             results[surfaceId] = checkActivity(shellPid: shellPid, allProcs: allProcs)
         }
         return results
-    }
-
-    // MARK: - Shell Discovery
-
-    private func discoverShells(allProcs: [kinfo_proc]) {
-        let myPid = getpid()
-        var newMap: [UUID: pid_t] = [:]
-
-        for proc in allProcs {
-            guard proc.kp_eproc.e_ppid == myPid else { continue }
-            let childPid = proc.kp_proc.p_pid
-
-            guard let env = readProcessEnv(pid: childPid) else { continue }
-
-            // Skip Claude sessions — they have their own badge system
-            if env["DECKARD_SESSION_TYPE"] == "claude" { continue }
-
-            if let surfaceIdStr = env["DECKARD_SURFACE_ID"],
-               let surfaceId = UUID(uuidString: surfaceIdStr) {
-                newMap[surfaceId] = childPid
-            }
-        }
-
-        // Clean up state for shells no longer tracked
-        let activePids = Set(newMap.values)
-        lastCpuTimes = lastCpuTimes.filter { activePids.contains($0.key) }
-        lastDiskBytes = lastDiskBytes.filter { activePids.contains($0.key) }
-        lastSocketBytes = lastSocketBytes.filter { activePids.contains($0.key) }
-        lastFgPids = lastFgPids.filter { activePids.contains($0.key) }
-
-        shellPids = newMap
     }
 
     // MARK: - Activity Detection
@@ -201,7 +172,6 @@ class ProcessMonitor {
     /// Get total bytes across all socket buffers (receive + send).
     /// A change between polls indicates active network I/O.
     private func getSocketBufferBytes(pid: pid_t) -> UInt64 {
-        // Get the buffer size needed for the FD list
         let bufSize = proc_pidinfo(pid, PROC_PIDLISTFDS, 0, nil, 0)
         guard bufSize > 0 else { return 0 }
 
@@ -227,62 +197,5 @@ class ProcessMonitor {
         }
 
         return total
-    }
-
-    private func processName(pid: pid_t) -> String {
-        var name = [CChar](repeating: 0, count: Int(MAXCOMLEN) + 1)
-        proc_name(pid, &name, UInt32(name.count))
-        return String(cString: name)
-    }
-
-    private func readProcessEnv(pid: pid_t) -> [String: String]? {
-        var mib: [Int32] = [CTL_KERN, KERN_PROCARGS2, pid]
-        var size: Int = 0
-        guard sysctl(&mib, 3, nil, &size, nil, 0) == 0, size > 0 else { return nil }
-
-        var buffer = [UInt8](repeating: 0, count: size)
-        guard sysctl(&mib, 3, &buffer, &size, nil, 0) == 0 else { return nil }
-
-        // KERN_PROCARGS2 layout:
-        // [4 bytes: argc] [executable path\0] [padding \0s] [argv strings\0...] [env strings\0...]
-        guard size > 4 else { return nil }
-
-        let argc = buffer.withUnsafeBytes { $0.load(as: Int32.self) }
-        var offset = 4
-
-        // Skip executable path
-        while offset < size && buffer[offset] != 0 { offset += 1 }
-        // Skip padding nulls
-        while offset < size && buffer[offset] == 0 { offset += 1 }
-
-        // Skip argv (argc strings)
-        var argsSkipped: Int32 = 0
-        while offset < size && argsSkipped < argc {
-            while offset < size && buffer[offset] != 0 { offset += 1 }
-            offset += 1  // skip null terminator
-            argsSkipped += 1
-        }
-
-        // Read environment variables
-        var env: [String: String] = [:]
-        while offset < size {
-            let start = offset
-            while offset < size && buffer[offset] != 0 { offset += 1 }
-            if offset > start {
-                let str = String(bytes: buffer[start..<offset], encoding: .utf8) ?? ""
-                if let eqIdx = str.firstIndex(of: "=") {
-                    let key = String(str[str.startIndex..<eqIdx])
-                    let value = String(str[str.index(after: eqIdx)...])
-                    env[key] = value
-                    // Early exit once we have what we need
-                    if env["DECKARD_SURFACE_ID"] != nil && env["DECKARD_SESSION_TYPE"] != nil {
-                        break
-                    }
-                }
-            }
-            offset += 1
-        }
-
-        return env.isEmpty ? nil : env
     }
 }
