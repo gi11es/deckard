@@ -2,7 +2,6 @@ import AppKit
 import GhosttyKit
 
 /// Wraps the ghostty_app_t singleton with runtime callbacks.
-/// Follows cmux's GhosttyApp pattern for libghostty integration.
 class DeckardGhosttyApp {
     static var instance: DeckardGhosttyApp?
 

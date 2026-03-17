@@ -1527,7 +1527,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
 // MARK: - HorizontalTabView
 
-/// A single tab in the horizontal tab bar, cmux-style.
+/// A single tab in the horizontal tab bar.
 let deckardTabDragType = NSPasteboard.PasteboardType("com.deckard.tab-reorder")
 
 class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {

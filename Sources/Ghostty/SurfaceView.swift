@@ -453,7 +453,10 @@ class TerminalNSView: NSView {
             keyEvent.mods = Self.ghosttyMods(from: event)
             keyEvent.consumed_mods = GHOSTTY_MODS_NONE
             keyEvent.composing = false
-            keyEvent.unshifted_codepoint = Self.unshiftedCodepoint(for: event)
+            if let chars = event.characters(byApplyingModifiers: []),
+               let scalar = chars.unicodeScalars.first {
+                keyEvent.unshifted_codepoint = scalar.value
+            }
 
             let text = event.charactersIgnoringModifiers ?? event.characters ?? ""
             if text.isEmpty {
@@ -498,8 +501,14 @@ class TerminalNSView: NSView {
         keyEvent.action = action
         keyEvent.keycode = UInt32(event.keyCode)
         keyEvent.mods = Self.ghosttyMods(from: event)
-        keyEvent.consumed_mods = Self.consumedMods(from: translationMods)
-        keyEvent.unshifted_codepoint = Self.unshiftedCodepoint(for: event)
+        // Consumed mods: control and command never contribute to text translation
+        // (Ghostty NSEvent+Extension.swift, MIT licensed).
+        keyEvent.consumed_mods = Self.ghosttyMods(fromCocoa:
+            translationMods.subtracting([.control, .command]))
+        if let chars = event.characters(byApplyingModifiers: []),
+           let scalar = chars.unicodeScalars.first {
+            keyEvent.unshifted_codepoint = scalar.value
+        }
         keyEvent.composing = markedText.length > 0 || markedTextBefore
 
         let accumulatedText = keyTextAccumulator ?? []
@@ -507,7 +516,10 @@ class TerminalNSView: NSView {
             // Text from interpretKeyEvents (IME composition result)
             keyEvent.composing = false
             for text in accumulatedText {
-                if Self.shouldSendText(text) {
+                // Only send text with printable first byte (>= 0x20).
+                // Control characters are encoded by Ghostty itself.
+                // (Ghostty keyAction pattern, MIT licensed)
+                if let codepoint = text.utf8.first, codepoint >= 0x20 {
                     text.withCString { ptr in
                         keyEvent.text = ptr
                         _ = ghostty_surface_key(surface, keyEvent)
@@ -518,9 +530,11 @@ class TerminalNSView: NSView {
                 }
             }
         } else {
-            // No accumulated text — compute from the event
-            if let text = Self.textForKeyEvent(translationEvt),
-               Self.shouldSendText(text), !keyEvent.composing {
+            // No accumulated text — extract characters from the event
+            // (Ghostty ghosttyCharacters pattern, MIT licensed)
+            if let text = Self.ghosttyCharacters(for: translationEvt),
+               let codepoint = text.utf8.first, codepoint >= 0x20,
+               !keyEvent.composing {
                 text.withCString { ptr in
                     keyEvent.text = ptr
                     _ = ghostty_surface_key(surface, keyEvent)
@@ -532,53 +546,24 @@ class TerminalNSView: NSView {
         }
     }
 
-    /// Only send text if the first byte is printable (>= 0x20).
-    private static func shouldSendText(_ text: String) -> Bool {
-        guard let first = text.utf8.first else { return false }
-        return first >= 0x20
-    }
-
-    /// Consumed mods: only Shift and Option (never Ctrl/Cmd).
-    private static func consumedMods(from flags: NSEvent.ModifierFlags) -> ghostty_input_mods_e {
-        var mods = GHOSTTY_MODS_NONE.rawValue
-        if flags.contains(.shift) { mods |= GHOSTTY_MODS_SHIFT.rawValue }
-        if flags.contains(.option) { mods |= GHOSTTY_MODS_ALT.rawValue }
-        return ghostty_input_mods_e(rawValue: mods)
-    }
-
-    /// Get the unshifted codepoint for a key event.
-    private static func unshiftedCodepoint(for event: NSEvent) -> UInt32 {
-        guard event.type == .keyDown || event.type == .keyUp else { return 0 }
-        guard let chars = event.characters(byApplyingModifiers: []),
-              let scalar = chars.unicodeScalars.first else { return 0 }
-        return scalar.value
-    }
-
-    /// Extract the text payload for a key event.
-    /// For control characters with Ctrl held, returns the base character so
-    /// Ghostty's KeyEncoder can apply its own control-character encoding.
-    /// Filters out Private Use Area characters (function keys).
-    private static func textForKeyEvent(_ event: NSEvent) -> String? {
-        guard let chars = event.characters, !chars.isEmpty else { return nil }
-
-        if chars.count == 1, let scalar = chars.unicodeScalars.first {
-            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-
-            if scalar.value < 0x20 {
-                if flags.contains(.control) {
-                    return event.characters(byApplyingModifiers: event.modifierFlags.subtracting(.control))
-                }
-                // Shift+` can report as bare ESC — return "~" instead
-                if scalar.value == 0x1B, flags == [.shift],
-                   event.charactersIgnoringModifiers == "`" {
-                    return "~"
-                }
-            }
-            if scalar.value >= 0xF700 && scalar.value <= 0xF8FF {
-                return nil
-            }
+    /// Extract the terminal-appropriate characters from a key event.
+    /// Based on Ghostty's `ghosttyCharacters` (MIT, NSEvent+Extension.swift).
+    /// Control characters are re-extracted without the Ctrl modifier so
+    /// Ghostty's KeyEncoder can apply its own encoding. Function key
+    /// characters (Private Use Area) are filtered out.
+    private static func ghosttyCharacters(for event: NSEvent) -> String? {
+        guard let characters = event.characters, !characters.isEmpty else { return nil }
+        guard characters.count == 1,
+              let scalar = characters.unicodeScalars.first else {
+            return characters
         }
-        return chars
+        if scalar.value < 0x20 {
+            return event.characters(byApplyingModifiers: event.modifierFlags.subtracting(.control))
+        }
+        if scalar.value >= 0xF700, scalar.value <= 0xF8FF {
+            return nil
+        }
+        return characters
     }
 
     override func keyUp(with event: NSEvent) {
