@@ -18,6 +18,8 @@ class ProcessMonitor {
     private var lastFgPids: [pid_t: pid_t] = [:]
     /// CPU time (user + system nanoseconds) from the previous poll cycle (keyed by shell PID).
     private var lastCpuTimes: [pid_t: UInt64] = [:]
+    /// Disk I/O bytes (read + written) from the previous poll cycle (keyed by shell PID).
+    private var lastDiskBytes: [pid_t: UInt64] = [:]
     /// Counter to trigger periodic re-discovery.
     private var pollsSinceDiscovery = 0
     private let rediscoveryInterval = 12  // re-discover every ~30s at 2.5s poll
@@ -89,6 +91,7 @@ class ProcessMonitor {
         // Clean up state for shells no longer tracked
         let activePids = Set(newMap.values)
         lastCpuTimes = lastCpuTimes.filter { activePids.contains($0.key) }
+        lastDiskBytes = lastDiskBytes.filter { activePids.contains($0.key) }
         lastFgPids = lastFgPids.filter { activePids.contains($0.key) }
 
         shellPids = newMap
@@ -111,19 +114,24 @@ class ProcessMonitor {
         // Find the leaf process in the foreground group
         let fgPid = findLeafProcess(inGroup: termFgPgid, allProcs: allProcs) ?? termFgPgid
 
-        // Get CPU time for the foreground process
+        // Get CPU time and disk I/O for the foreground process
         guard let cpuTime = getCpuTime(pid: fgPid) else { return false }
+        let diskBytes = getDiskBytes(pid: fgPid) ?? 0
 
         // If the foreground process changed, reset baseline and show activity
         if lastFgPids[shellPid] != fgPid {
             lastFgPids[shellPid] = fgPid
             lastCpuTimes[shellPid] = cpuTime
+            lastDiskBytes[shellPid] = diskBytes
             return true  // new process just started → pulse
         }
 
-        let prevTime = lastCpuTimes[shellPid] ?? cpuTime
+        let prevCpu = lastCpuTimes[shellPid] ?? cpuTime
+        let prevDisk = lastDiskBytes[shellPid] ?? diskBytes
         lastCpuTimes[shellPid] = cpuTime
-        return cpuTime > prevTime
+        lastDiskBytes[shellPid] = diskBytes
+
+        return cpuTime > prevCpu || diskBytes > prevDisk
     }
 
     private func findLeafProcess(inGroup pgid: pid_t, allProcs: [kinfo_proc]) -> pid_t? {
@@ -169,6 +177,18 @@ class ProcessMonitor {
         let ret = proc_pidinfo(pid, PROC_PIDTASKINFO, 0, &taskInfo, Int32(size))
         guard ret == size else { return nil }
         return taskInfo.pti_total_user + taskInfo.pti_total_system
+    }
+
+    /// Get cumulative disk I/O bytes (read + written) via proc_pid_rusage.
+    private func getDiskBytes(pid: pid_t) -> UInt64? {
+        var usage = rusage_info_v4()
+        let ret = withUnsafeMutablePointer(to: &usage) { ptr in
+            ptr.withMemoryRebound(to: rusage_info_t?.self, capacity: 1) { rusagePtr in
+                proc_pid_rusage(pid, RUSAGE_INFO_V4, rusagePtr)
+            }
+        }
+        guard ret == 0 else { return nil }
+        return usage.ri_diskio_bytesread + usage.ri_diskio_byteswritten
     }
 
     private func processName(pid: pid_t) -> String {
