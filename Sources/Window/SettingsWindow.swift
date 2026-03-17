@@ -260,7 +260,6 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
             badgeGrid.topAnchor.constraint(equalTo: badgeLabel.bottomAnchor, constant: 8),
             badgeGrid.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
-            badgeGrid.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -20),
             badgeGrid.bottomAnchor.constraint(equalTo: pane.bottomAnchor, constant: -16),
         ])
 
@@ -340,70 +339,154 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     }
 
     private func makeBadgeColorGrid() -> NSView {
-        // 6-column grid: [label] [well] [pulse] [label] [well] [pulse]
-        let grid = NSGridView(numberOfColumns: 6, rows: 0)
-        grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 1).xPlacement = .leading
-        grid.column(at: 2).xPlacement = .center
-        grid.column(at: 3).xPlacement = .trailing
-        grid.column(at: 4).xPlacement = .leading
-        grid.column(at: 5).xPlacement = .center
-        grid.rowSpacing = 4
-        grid.columnSpacing = 6
+        let borderColor = NSColor.separatorColor.cgColor
+        let rowHeight: CGFloat = 28
+        let colWidths: [CGFloat] = [70, 120, 50, 50]  // section, state, color, blink
+        let tableWidth = colWidths.reduce(0, +)
 
-        func makeEntryViews(_ entry: (state: TabItem.BadgeState, label: String)) -> (NSView, NSView, NSView) {
-            let label = NSTextField(labelWithString: entry.label)
-            label.alignment = .right
-            label.font = .systemFont(ofSize: 12)
-            let well = makeBadgeColorWell(for: entry.state)
-            let toggle = NSButton(checkboxWithTitle: "", target: self, action: #selector(badgeAnimateChanged(_:)))
-            toggle.state = Self.isBadgeAnimated(entry.state) ? .on : .off
-            objc_setAssociatedObject(toggle, &settingsKeyAssoc, entry.state.rawValue, .OBJC_ASSOCIATION_RETAIN)
-            return (label, well, toggle)
+        let allSections: [(title: String, entries: [(state: TabItem.BadgeState, label: String)])] = [
+            ("Claude", Self.claudeBadgeEntries),
+            ("Terminal", Self.terminalBadgeEntries),
+        ]
+
+        // Count total rows: header + all entries
+        let totalRows = 1 + allSections.reduce(0) { $0 + $1.entries.count }
+
+        let container = NSView()
+        container.wantsLayer = true
+        container.layer?.borderColor = borderColor
+        container.layer?.borderWidth = 1
+        container.layer?.cornerRadius = 4
+        container.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            container.widthAnchor.constraint(equalToConstant: tableWidth),
+            container.heightAnchor.constraint(equalToConstant: CGFloat(totalRows) * rowHeight),
+        ])
+
+        func makeCell(_ width: CGFloat, y: CGFloat) -> NSView {
+            let cell = NSView()
+            cell.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(cell)
+            NSLayoutConstraint.activate([
+                cell.widthAnchor.constraint(equalToConstant: width),
+                cell.heightAnchor.constraint(equalToConstant: rowHeight),
+            ])
+            return cell
         }
 
-        func addSection(_ title: String, entries: [(state: TabItem.BadgeState, label: String)]) {
-            // Section header as its own row, left-aligned
-            let header = NSTextField(labelWithString: title)
-            header.font = .systemFont(ofSize: 10, weight: .semibold)
-            header.textColor = .tertiaryLabelColor
-            header.alignment = .left
-            let headerRow = grid.addRow(with: [header, NSView(), NSView(), NSView(), NSView(), NSView()])
-            headerRow.mergeCells(in: NSRange(location: 0, length: 6))
+        func addHLine(y: CGFloat) {
+            let line = NSView()
+            line.wantsLayer = true
+            line.layer?.backgroundColor = borderColor
+            line.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(line)
+            NSLayoutConstraint.activate([
+                line.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                line.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                line.topAnchor.constraint(equalTo: container.topAnchor, constant: y),
+                line.heightAnchor.constraint(equalToConstant: 1),
+            ])
+        }
 
-            let rows = (entries.count + 1) / 2
-            for r in 0..<rows {
-                let leftIdx = r
-                let rightIdx = r + rows
-                let (ll, lw, lt) = makeEntryViews(entries[leftIdx])
+        func addVLine(x: CGFloat, fromY: CGFloat, toY: CGFloat) {
+            let line = NSView()
+            line.wantsLayer = true
+            line.layer?.backgroundColor = borderColor
+            line.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(line)
+            NSLayoutConstraint.activate([
+                line.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: x),
+                line.widthAnchor.constraint(equalToConstant: 1),
+                line.topAnchor.constraint(equalTo: container.topAnchor, constant: fromY),
+                line.heightAnchor.constraint(equalToConstant: toY - fromY),
+            ])
+        }
 
-                if rightIdx < entries.count {
-                    let (rl, rw, rt) = makeEntryViews(entries[rightIdx])
-                    grid.addRow(with: [ll, lw, lt, rl, rw, rt])
-                } else {
-                    grid.addRow(with: [ll, lw, lt, NSView(), NSView(), NSView()])
+        func placeView(_ view: NSView, x: CGFloat, y: CGFloat, width: CGFloat) {
+            view.translatesAutoresizingMaskIntoConstraints = false
+            container.addSubview(view)
+            NSLayoutConstraint.activate([
+                view.centerYAnchor.constraint(equalTo: container.topAnchor, constant: y + rowHeight / 2),
+                view.centerXAnchor.constraint(equalTo: container.leadingAnchor, constant: x + width / 2),
+            ])
+        }
+
+        func placeLabel(_ text: String, x: CGFloat, y: CGFloat, width: CGFloat, bold: Bool = false, align: NSTextAlignment = .center) {
+            let label = NSTextField(labelWithString: text)
+            label.font = bold ? .systemFont(ofSize: 11, weight: .medium) : .systemFont(ofSize: 12)
+            label.textColor = bold ? .secondaryLabelColor : .labelColor
+            label.alignment = align
+            placeView(label, x: x, y: y, width: width)
+        }
+
+        // Header row
+        var x: CGFloat = 0
+        placeLabel("", x: x, y: 0, width: colWidths[0], bold: true)
+        x += colWidths[0]
+        placeLabel("State", x: x, y: 0, width: colWidths[1], bold: true)
+        x += colWidths[1]
+        placeLabel("Color", x: x, y: 0, width: colWidths[2], bold: true)
+        x += colWidths[2]
+        placeLabel("Blink", x: x, y: 0, width: colWidths[3], bold: true)
+
+        addHLine(y: rowHeight)
+
+        // Vertical lines for all columns
+        x = colWidths[0]
+        for i in 1..<colWidths.count {
+            addVLine(x: x, fromY: 0, toY: CGFloat(totalRows) * rowHeight)
+            x += colWidths[i]
+        }
+
+        // Data rows
+        var row = 1
+        for (si, section) in allSections.enumerated() {
+            for (ei, entry) in section.entries.enumerated() {
+                let y = CGFloat(row) * rowHeight
+
+                // Section label — only on first entry of each section
+                if ei == 0 {
+                    placeLabel(section.title, x: 0, y: y, width: colWidths[0], bold: true)
                 }
+
+                // State label
+                placeLabel(entry.label, x: colWidths[0], y: y, width: colWidths[1])
+
+                // Color well
+                let well = makeBadgeColorWell(for: entry.state)
+                placeView(well, x: colWidths[0] + colWidths[1], y: y, width: colWidths[2])
+
+                // Blink toggle
+                let toggle = NSButton(checkboxWithTitle: "", target: self, action: #selector(badgeAnimateChanged(_:)))
+                toggle.state = Self.isBadgeAnimated(entry.state) ? .on : .off
+                toggle.controlSize = .small
+                objc_setAssociatedObject(toggle, &settingsKeyAssoc, entry.state.rawValue, .OBJC_ASSOCIATION_RETAIN)
+                placeView(toggle, x: colWidths[0] + colWidths[1] + colWidths[2], y: y, width: colWidths[3])
+
+                addHLine(y: y + rowHeight)
+                row += 1
+            }
+
+            // Section separator (thicker line between Claude and Terminal)
+            if si < allSections.count - 1 {
+                // The horizontal line is already drawn — we could make it thicker
+                // but the regular 1px line is fine for a spreadsheet look
             }
         }
 
-        addSection("CLAUDE", entries: Self.claudeBadgeEntries)
+        // Wrap in a vertical stack with the reset button
+        let wrapper = NSStackView()
+        wrapper.orientation = .vertical
+        wrapper.alignment = .trailing
+        wrapper.spacing = 8
+        wrapper.addArrangedSubview(container)
 
-        // Separator
-        let sep = NSBox()
-        sep.boxType = .separator
-        sep.translatesAutoresizingMaskIntoConstraints = false
-        let sepRow = grid.addRow(with: [sep, NSView(), NSView(), NSView(), NSView(), NSView()])
-        sepRow.mergeCells(in: NSRange(location: 0, length: 6))
-
-        addSection("TERMINAL", entries: Self.terminalBadgeEntries)
-
-        // Reset button
         let resetButton = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetBadgeColors))
         resetButton.bezelStyle = .rounded
         resetButton.controlSize = .small
-        grid.addRow(with: [NSView(), NSView(), NSView(), NSView(), NSView(), resetButton])
+        wrapper.addArrangedSubview(resetButton)
 
-        return grid
+        return wrapper
     }
 
     private func makeBadgeColorWell(for state: TabItem.BadgeState) -> NSColorWell {
