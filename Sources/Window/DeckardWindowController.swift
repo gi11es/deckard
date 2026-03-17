@@ -21,8 +21,6 @@ class TabItem {
     var isClaude: Bool
     var sessionId: String?
     var badgeState: BadgeState = .none
-    /// PID of the login/shell process spawned by ghostty for this tab.
-    var shellPid: pid_t = 0
 
     enum BadgeState: String {
         case none
@@ -456,7 +454,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Destroy all surfaces
         for tab in project.tabs {
             tab.surfaceView.destroySurface()
-            ProcessMonitor.shared.unregister(surfaceId: tab.id)
+
         }
 
         projects.remove(at: index)
@@ -543,9 +541,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Non-Claude terminals never emit a title OSC, so the overlay would just block for 3s.
         surfaceView.needsOverlay = isClaude
 
-        // Snapshot children before surface creation to detect the new login PID
-        let pidsBefore = Set(ProcessMonitor.shared.childPids())
-
         surfaceView.createSurface(
             app: app,
             tabId: tab.id,
@@ -554,15 +549,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             envVars: envVars,
             initialInput: initialInput
         )
-
-        // Find the newly spawned child process (login/shell) and record its PID
-        let pidsAfter = Set(ProcessMonitor.shared.childPids())
-        if let newPid = pidsAfter.subtracting(pidsBefore).first {
-            tab.shellPid = newPid
-            if !isClaude {
-                ProcessMonitor.shared.register(surfaceId: tab.id, pid: newPid)
-            }
-        }
 
         project.tabs.append(tab)
     }
@@ -584,7 +570,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let tab = project.tabs[idx]
         tab.surfaceView.destroySurface()
-        ProcessMonitor.shared.unregister(surfaceId: tab.id)
+
         project.tabs.remove(at: idx)
 
         if project.tabs.isEmpty {
@@ -741,8 +727,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private func startProcessMonitor() {
         processMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
             guard let self = self else { return }
+            // Collect terminal tab surface IDs on main thread (in creation order)
+            let terminalIds = self.projects.flatMap { project in
+                project.tabs.filter { !$0.isClaude }.map { $0.id }
+            }
             DispatchQueue.global(qos: .utility).async {
-                let states = ProcessMonitor.shared.pollAll()
+                let states = ProcessMonitor.shared.pollTerminalTabs(terminalSurfaceIds: terminalIds)
                 DispatchQueue.main.async {
                     self.applyTerminalBadgeStates(states)
                 }
@@ -860,7 +850,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             if let ti = project.tabs.firstIndex(where: { $0.id == surfaceId }) {
                 let tab = project.tabs[ti]
                 tab.surfaceView.destroySurface()
-                ProcessMonitor.shared.unregister(surfaceId: tab.id)
+    
                 project.tabs.remove(at: ti)
 
                 if project.tabs.isEmpty {
@@ -1331,7 +1321,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let tab = project.tabs[idx]
         tab.surfaceView.destroySurface()
-        ProcessMonitor.shared.unregister(surfaceId: tab.id)
+
         project.tabs.remove(at: idx)
 
         if project.tabs.isEmpty {
