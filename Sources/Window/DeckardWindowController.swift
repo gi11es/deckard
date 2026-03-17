@@ -461,7 +461,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         rebuildTabBar()
 
         let project = projects[index]
-        if project.selectedTabIndex >= 0, project.selectedTabIndex < project.tabs.count {
+        if project.tabs.isEmpty {
+            currentTerminalView?.isHidden = true
+            currentTerminalView = nil
+        } else if project.selectedTabIndex >= 0, project.selectedTabIndex < project.tabs.count {
             showTab(project.tabs[project.selectedTabIndex])
         }
 
@@ -556,10 +559,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         project.tabs.remove(at: idx)
 
         if project.tabs.isEmpty {
-            // Close the whole project if no tabs left
-            if let pi = projects.firstIndex(where: { $0.id == project.id }) {
-                closeProject(at: pi)
-            }
+            // Keep the project in the sidebar with just the "+" button
+            currentTerminalView?.isHidden = true
+            currentTerminalView = nil
+            rebuildTabBar()
+            rebuildSidebar()
         } else {
             project.selectedTabIndex = min(idx, project.tabs.count - 1)
             rebuildTabBar()
@@ -782,8 +786,13 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
                 project.tabs.remove(at: ti)
 
-                if project.tabs.isEmpty {
-                    closeProject(at: pi)
+                if project.tabs.isEmpty && pi == selectedProjectIndex {
+                    currentTerminalView?.isHidden = true
+                    currentTerminalView = nil
+                    rebuildTabBar()
+                    rebuildSidebar()
+                } else if project.tabs.isEmpty {
+                    rebuildSidebar()
                 } else if pi == selectedProjectIndex {
                     project.selectedTabIndex = min(project.selectedTabIndex, project.tabs.count - 1)
                     rebuildTabBar()
@@ -977,11 +986,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
 
             if project.tabs.isEmpty {
-                // Restore with defaults if tabs were lost
-                let config = DefaultTabConfig.current
-                for entry in config.entries {
-                    createTabInProject(project, isClaude: entry.isClaude, name: entry.name)
-                }
+                // Empty project — keep it as-is (sticky/pinned)
             }
 
             project.selectedTabIndex = min(ps.selectedTabIndex, project.tabs.count - 1)
@@ -1126,7 +1131,20 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         resumeItem.submenu = resumeSubmenu
         menu.addItem(resumeItem)
 
+        menu.addItem(.separator())
+
+        let closeItem = NSMenuItem(title: "Close Folder", action: #selector(closeProjectMenuAction(_:)), keyEquivalent: "")
+        closeItem.target = self
+        closeItem.representedObject = project
+        menu.addItem(closeItem)
+
         return menu
+    }
+
+    @objc private func closeProjectMenuAction(_ sender: NSMenuItem) {
+        guard let project = sender.representedObject as? ProjectItem,
+              let pi = projects.firstIndex(where: { $0.id == project.id }) else { return }
+        closeProject(at: pi)
     }
 
     @objc private func resumeSessionMenuAction(_ sender: NSMenuItem) {
@@ -1285,9 +1303,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         project.tabs.remove(at: idx)
 
         if project.tabs.isEmpty {
-            if let pi = projects.firstIndex(where: { $0.id == project.id }) {
-                closeProject(at: pi)
-            }
+            currentTerminalView?.isHidden = true
+            currentTerminalView = nil
+            rebuildTabBar()
+            rebuildSidebar()
         } else {
             project.selectedTabIndex = min(idx, project.tabs.count - 1)
             rebuildTabBar()
