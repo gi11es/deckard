@@ -492,6 +492,14 @@ class TerminalNSView: NSView {
             return false
         }
 
+        // Let Deckard's menu shortcuts (Cmd+Q, Cmd+W, Cmd+T, etc.) take
+        // priority over Ghostty's default keybindings.
+        if event.modifierFlags.contains(.command) {
+            if NSApp.mainMenu?.performKeyEquivalent(with: event) == true {
+                return true
+            }
+        }
+
         // Check if this event matches a Ghostty keybinding.
         var keyEv = Self.ghosttyKeyEvent(event, GHOSTTY_ACTION_PRESS)
         let isBinding: Bool = (event.characters ?? "").withCString { ptr in
