@@ -29,7 +29,8 @@ class TabItem {
         case waitingForInput
         case needsPermission
         case error
-        case terminalActive   // grey pulsing - terminal foreground process has CPU activity
+        case terminalIdle     // muted teal - terminal at prompt
+        case terminalActive   // teal pulsing - terminal foreground process has activity
     }
 
     init(surfaceView: TerminalNSView, name: String, isClaude: Bool) {
@@ -506,7 +507,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             tabName = "\(base) #\(count)"
         }
         let tab = TabItem(surfaceView: surfaceView, name: tabName, isClaude: isClaude)
-        tab.badgeState = .idle
+        tab.badgeState = isClaude ? .idle : .terminalIdle
 
         var envVars: [String: String] = [:]
         if isClaude {
@@ -740,18 +741,18 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    private func applyTerminalBadgeStates(_ states: [UUID: Bool]) {
+    /// Last activity info per surface, used for tooltips.
+    private var terminalActivity: [UUID: ProcessMonitor.ActivityInfo] = [:]
+
+    private func applyTerminalBadgeStates(_ states: [UUID: ProcessMonitor.ActivityInfo]) {
         var changed = false
         for project in projects {
             for tab in project.tabs where !tab.isClaude {
-                let newBadge: TabItem.BadgeState
-                if let hasActivity = states[tab.id] {
-                    newBadge = hasActivity ? .terminalActive : .idle
-                } else {
-                    newBadge = .idle  // not yet discovered — show grey
-                }
-                if tab.badgeState != newBadge {
+                let activity = states[tab.id] ?? ProcessMonitor.ActivityInfo()
+                let newBadge: TabItem.BadgeState = activity.isActive ? .terminalActive : .terminalIdle
+                if tab.badgeState != newBadge || terminalActivity[tab.id] != activity {
                     tab.badgeState = newBadge
+                    terminalActivity[tab.id] = activity
                     changed = true
                 }
             }
@@ -1044,13 +1045,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Sidebar (project list)
 
-    private func rebuildSidebar() {
+    func rebuildSidebar() {
         sidebarStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
 
         for (i, project) in projects.enumerated() {
             let row = VerticalTabRowView(title: project.name, bold: false, index: i,
                                  target: self, action: #selector(projectRowClicked(_:)))
-            row.badgeInfos = project.tabs.filter { $0.badgeState != .none }.map { (state: $0.badgeState, name: $0.name) }
+            row.badgeInfos = project.tabs.filter { $0.badgeState != .none }.map { tab in
+                (state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id])
+            }
             row.onRename = { [weak self] newName in
                 guard let self = self, i < self.projects.count else { return }
                 self.projects[i].name = newName
@@ -1212,7 +1215,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         tabBar.arrangedSubviews.contains { ($0 as? HorizontalTabView)?.isEditing == true }
     }
 
-    private func rebuildTabBar() {
+    func rebuildTabBar() {
         guard !isRebuildingTabBar else { return }
         if isTabEditing {
             needsTabBarRebuild = true
@@ -1233,6 +1236,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 editableName: tab.name,
                 isClaude: tab.isClaude,
                 badgeState: tab.badgeState,
+                activity: terminalActivity[tab.id],
                 isSelected: isSelected,
                 index: i,
                 target: self,
@@ -1367,7 +1371,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         didSet { needsDisplay = true }
     }
     /// Badge info for each Claude tab in this project, shown as right-aligned dots.
-    var badgeInfos: [(state: TabItem.BadgeState, name: String)] = [] {
+    var badgeInfos: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?)] = [] {
         didSet { updateBadgeDots() }
     }
     var onRename: ((String) -> Void)?
@@ -1438,7 +1442,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
             dot.wantsLayer = true
             dot.layer?.cornerRadius = 3.5
             dot.layer?.backgroundColor = Self.colorForBadge(info.state).cgColor
-            dot.toolTip = "\(info.name): \(Self.tooltipForBadge(info.state))"
+            dot.toolTip = "\(info.name): \(Self.tooltipForBadge(info.state, activity: info.activity))"
             dot.translatesAutoresizingMaskIntoConstraints = false
             NSLayoutConstraint.activate([
                 dot.widthAnchor.constraint(equalToConstant: 7),
@@ -1463,7 +1467,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         layer.add(anim, forKey: "pulse")
     }
 
-    static func tooltipForBadge(_ state: TabItem.BadgeState) -> String {
+    static func tooltipForBadge(_ state: TabItem.BadgeState, activity: ProcessMonitor.ActivityInfo? = nil) -> String {
         switch state {
         case .none: return ""
         case .idle: return "Idle"
@@ -1471,20 +1475,28 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         case .waitingForInput: return "Waiting for input"
         case .needsPermission: return "Needs permission"
         case .error: return "Error"
-        case .terminalActive: return "Running"
+        case .terminalIdle: return "Idle"
+        case .terminalActive: return activity?.description ?? "Running"
         }
     }
 
+    static let defaultBadgeColors: [TabItem.BadgeState: NSColor] = [
+        .idle: .systemGray,
+        .thinking: NSColor(red: 0.85, green: 0.65, blue: 0.2, alpha: 1.0),
+        .waitingForInput: NSColor(red: 0.65, green: 0.4, blue: 0.9, alpha: 1.0),
+        .needsPermission: .systemOrange,
+        .error: .systemRed,
+        .terminalIdle: NSColor(red: 0.45, green: 0.72, blue: 0.71, alpha: 0.5),
+        .terminalActive: NSColor(red: 0.45, green: 0.72, blue: 0.71, alpha: 0.5),
+    ]
+
     static func colorForBadge(_ state: TabItem.BadgeState) -> NSColor {
-        switch state {
-        case .none: return .clear
-        case .idle: return .systemGray
-        case .thinking: return NSColor(red: 0.85, green: 0.65, blue: 0.2, alpha: 1.0)
-        case .waitingForInput: return .systemBlue
-        case .needsPermission: return .systemOrange
-        case .error: return .systemRed
-        case .terminalActive: return .systemGray
+        if state == .none { return .clear }
+        if let hex = UserDefaults.standard.string(forKey: "badgeColor.\(state.rawValue)"),
+           let color = NSColor.fromHex(hex) {
+            return color
         }
+        return defaultBadgeColors[state] ?? .systemGray
     }
 
     override func mouseDown(with event: NSEvent) {
@@ -1600,6 +1612,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
     init(displayTitle: String, editableName: String, isClaude: Bool = false,
          badgeState: TabItem.BadgeState = .none,
+         activity: ProcessMonitor.ActivityInfo? = nil,
          isSelected: Bool, index: Int,
          target: AnyObject, clickAction: Selector) {
         self.index = index
@@ -1627,7 +1640,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
             dot.wantsLayer = true
             dot.layer?.cornerRadius = 3.5
             dot.layer?.backgroundColor = VerticalTabRowView.colorForBadge(badgeState).cgColor
-            dot.toolTip = VerticalTabRowView.tooltipForBadge(badgeState)
+            dot.toolTip = VerticalTabRowView.tooltipForBadge(badgeState, activity: activity)
             dot.translatesAutoresizingMaskIntoConstraints = false
             addSubview(dot)
             NSLayoutConstraint.activate([
@@ -1788,7 +1801,7 @@ class AddTabButton: NSView {
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         toolTip = shortcutTooltip("New Claude tab", for: .newClaudeTab)
-            + "\nRight-click: " + shortcutTooltip("new Terminal", for: .newTerminalTab)
+            + "\nShift-click or right-click: " + shortcutTooltip("new Terminal", for: .newTerminalTab)
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
         NSLayoutConstraint.activate([
@@ -1803,7 +1816,11 @@ class AddTabButton: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override func mouseDown(with event: NSEvent) {
-        leftClickAction()
+        if event.modifierFlags.contains(.shift) {
+            rightClickAction()  // Shift+click opens terminal tab
+        } else {
+            leftClickAction()
+        }
     }
 
     override func rightMouseDown(with event: NSEvent) {
@@ -2028,5 +2045,39 @@ class SidebarDropZone: NSView {
 extension Collection {
     subscript(safe index: Index) -> Element? {
         indices.contains(index) ? self[index] : nil
+    }
+}
+
+extension NSColor {
+    func toHex() -> String {
+        guard let rgb = usingColorSpace(.sRGB) else { return "#808080" }
+        let r = Int(rgb.redComponent * 255)
+        let g = Int(rgb.greenComponent * 255)
+        let b = Int(rgb.blueComponent * 255)
+        let a = Int(rgb.alphaComponent * 255)
+        if a == 255 {
+            return String(format: "#%02X%02X%02X", r, g, b)
+        }
+        return String(format: "#%02X%02X%02X%02X", r, g, b, a)
+    }
+
+    static func fromHex(_ hex: String) -> NSColor? {
+        var h = hex.trimmingCharacters(in: .whitespacesAndNewlines)
+        if h.hasPrefix("#") { h.removeFirst() }
+        guard h.count == 6 || h.count == 8 else { return nil }
+        var value: UInt64 = 0
+        Scanner(string: h).scanHexInt64(&value)
+        if h.count == 6 {
+            return NSColor(
+                red: CGFloat((value >> 16) & 0xFF) / 255,
+                green: CGFloat((value >> 8) & 0xFF) / 255,
+                blue: CGFloat(value & 0xFF) / 255,
+                alpha: 1.0)
+        }
+        return NSColor(
+            red: CGFloat((value >> 24) & 0xFF) / 255,
+            green: CGFloat((value >> 16) & 0xFF) / 255,
+            blue: CGFloat((value >> 8) & 0xFF) / 255,
+            alpha: CGFloat(value & 0xFF) / 255)
     }
 }

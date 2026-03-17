@@ -221,6 +221,16 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         pane.addSubview(searchField)
         pane.addSubview(scrollView)
 
+        // Badge Colors section
+        let badgeLabel = NSTextField(labelWithString: "Badge Colors:")
+        badgeLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        badgeLabel.translatesAutoresizingMaskIntoConstraints = false
+        pane.addSubview(badgeLabel)
+
+        let badgeGrid = makeBadgeColorGrid()
+        badgeGrid.translatesAutoresizingMaskIntoConstraints = false
+        pane.addSubview(badgeGrid)
+
         NSLayoutConstraint.activate([
             label.topAnchor.constraint(equalTo: pane.topAnchor, constant: 16),
             label.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
@@ -233,8 +243,15 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             scrollView.topAnchor.constraint(equalTo: searchField.bottomAnchor, constant: 10),
             scrollView.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
             scrollView.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -20),
-            scrollView.bottomAnchor.constraint(equalTo: pane.bottomAnchor, constant: -16),
-            scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 300),
+            scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
+
+            badgeLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 16),
+            badgeLabel.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
+
+            badgeGrid.topAnchor.constraint(equalTo: badgeLabel.bottomAnchor, constant: 8),
+            badgeGrid.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
+            badgeGrid.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -20),
+            badgeGrid.bottomAnchor.constraint(equalTo: pane.bottomAnchor, constant: -16),
         ])
 
         // Populate theme list
@@ -284,6 +301,99 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
     @objc private func themeRowClicked() {
         applySelectedTheme()
+    }
+
+    // MARK: - Badge Color Grid
+
+    private static let badgeColorEntries: [(state: TabItem.BadgeState, label: String)] = [
+        (.idle, "Claude Idle"),
+        (.thinking, "Claude Thinking"),
+        (.waitingForInput, "Claude Ready"),
+        (.needsPermission, "Needs Permission"),
+        (.error, "Error"),
+        (.terminalIdle, "Terminal Idle"),
+        (.terminalActive, "Terminal Busy"),
+    ]
+
+    private func makeBadgeColorGrid() -> NSView {
+        let grid = NSGridView(numberOfColumns: 4, rows: 0)
+        grid.column(at: 0).xPlacement = .trailing
+        grid.column(at: 1).xPlacement = .leading
+        grid.column(at: 2).xPlacement = .trailing
+        grid.column(at: 3).xPlacement = .leading
+        grid.rowSpacing = 6
+        grid.columnSpacing = 8
+
+        let entries = Self.badgeColorEntries
+        let rows = (entries.count + 1) / 2
+        for row in 0..<rows {
+            let leftIdx = row
+            let rightIdx = row + rows
+
+            let leftLabel = NSTextField(labelWithString: entries[leftIdx].label)
+            leftLabel.alignment = .right
+            leftLabel.font = .systemFont(ofSize: 12)
+            let leftWell = makeBadgeColorWell(for: entries[leftIdx].state)
+
+            if rightIdx < entries.count {
+                let rightLabel = NSTextField(labelWithString: entries[rightIdx].label)
+                rightLabel.alignment = .right
+                rightLabel.font = .systemFont(ofSize: 12)
+                let rightWell = makeBadgeColorWell(for: entries[rightIdx].state)
+                grid.addRow(with: [leftLabel, leftWell, rightLabel, rightWell])
+            } else {
+                grid.addRow(with: [leftLabel, leftWell, NSView(), NSView()])
+            }
+        }
+
+        // Reset button
+        let resetButton = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetBadgeColors))
+        resetButton.bezelStyle = .rounded
+        grid.addRow(with: [NSView(), NSView(), NSView(), resetButton])
+
+        return grid
+    }
+
+    private func makeBadgeColorWell(for state: TabItem.BadgeState) -> NSColorWell {
+        let well: NSColorWell
+        if #available(macOS 14.0, *) {
+            well = NSColorWell(style: .minimal)
+        } else {
+            well = NSColorWell()
+        }
+        well.color = VerticalTabRowView.colorForBadge(state)
+        well.translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            well.widthAnchor.constraint(equalToConstant: 36),
+            well.heightAnchor.constraint(equalToConstant: 24),
+        ])
+        well.tag = state.hashValue
+        objc_setAssociatedObject(well, &settingsKeyAssoc, state.rawValue, .OBJC_ASSOCIATION_RETAIN)
+        well.target = self
+        well.action = #selector(badgeColorChanged(_:))
+        return well
+    }
+
+    @objc private func badgeColorChanged(_ sender: NSColorWell) {
+        guard let stateRaw = objc_getAssociatedObject(sender, &settingsKeyAssoc) as? String else { return }
+        UserDefaults.standard.set(sender.color.toHex(), forKey: "badgeColor.\(stateRaw)")
+        // Trigger immediate UI update
+        if let wc = NSApp.delegate as? AppDelegate {
+            wc.windowController?.rebuildSidebar()
+            wc.windowController?.rebuildTabBar()
+        }
+    }
+
+    @objc private func resetBadgeColors() {
+        for entry in Self.badgeColorEntries {
+            UserDefaults.standard.removeObject(forKey: "badgeColor.\(entry.state.rawValue)")
+        }
+        // Refresh the pane to show default colors
+        switchToPane(.appearance)
+        if let wc = NSApp.delegate as? AppDelegate {
+            wc.windowController?.rebuildSidebar()
+            wc.windowController?.rebuildTabBar()
+        }
     }
 
     // MARK: - Shortcuts Pane
