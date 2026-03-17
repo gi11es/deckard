@@ -221,8 +221,14 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         pane.addSubview(searchField)
         pane.addSubview(scrollView)
 
-        // Badge Colors section
-        let badgeLabel = NSTextField(labelWithString: "Badge Colors:")
+        // Divider between theme picker and badge colors
+        let divider = NSBox()
+        divider.boxType = .separator
+        divider.translatesAutoresizingMaskIntoConstraints = false
+        pane.addSubview(divider)
+
+        // Status indicators section
+        let badgeLabel = NSTextField(labelWithString: "Status Indicators:")
         badgeLabel.font = .systemFont(ofSize: 13, weight: .medium)
         badgeLabel.translatesAutoresizingMaskIntoConstraints = false
         pane.addSubview(badgeLabel)
@@ -245,7 +251,11 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             scrollView.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -20),
             scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
 
-            badgeLabel.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 16),
+            divider.topAnchor.constraint(equalTo: scrollView.bottomAnchor, constant: 20),
+            divider.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
+            divider.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -20),
+
+            badgeLabel.topAnchor.constraint(equalTo: divider.bottomAnchor, constant: 16),
             badgeLabel.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
 
             badgeGrid.topAnchor.constraint(equalTo: badgeLabel.bottomAnchor, constant: 8),
@@ -305,51 +315,93 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
 
     // MARK: - Badge Color Grid
 
-    private static let badgeColorEntries: [(state: TabItem.BadgeState, label: String)] = [
-        (.idle, "Claude Idle"),
-        (.thinking, "Claude Thinking"),
-        (.waitingForInput, "Claude Ready"),
+    private static let claudeBadgeEntries: [(state: TabItem.BadgeState, label: String)] = [
+        (.idle, "Idle"),
+        (.thinking, "Thinking"),
+        (.waitingForInput, "Ready"),
         (.needsPermission, "Needs Permission"),
         (.error, "Error"),
-        (.terminalIdle, "Terminal Idle"),
-        (.terminalActive, "Terminal Busy"),
     ]
 
+    private static let terminalBadgeEntries: [(state: TabItem.BadgeState, label: String)] = [
+        (.terminalIdle, "Idle"),
+        (.terminalActive, "Busy"),
+        (.terminalError, "Error"),
+    ]
+
+    /// Default animation settings per state.
+    static let defaultBadgeAnimated: Set<TabItem.BadgeState> = [.thinking, .terminalActive]
+
+    static func isBadgeAnimated(_ state: TabItem.BadgeState) -> Bool {
+        if let saved = UserDefaults.standard.object(forKey: "badgeAnimate.\(state.rawValue)") as? Bool {
+            return saved
+        }
+        return defaultBadgeAnimated.contains(state)
+    }
+
     private func makeBadgeColorGrid() -> NSView {
-        let grid = NSGridView(numberOfColumns: 4, rows: 0)
+        // 6-column grid: [label] [well] [pulse] [label] [well] [pulse]
+        let grid = NSGridView(numberOfColumns: 6, rows: 0)
         grid.column(at: 0).xPlacement = .trailing
         grid.column(at: 1).xPlacement = .leading
-        grid.column(at: 2).xPlacement = .trailing
-        grid.column(at: 3).xPlacement = .leading
-        grid.rowSpacing = 6
-        grid.columnSpacing = 8
+        grid.column(at: 2).xPlacement = .center
+        grid.column(at: 3).xPlacement = .trailing
+        grid.column(at: 4).xPlacement = .leading
+        grid.column(at: 5).xPlacement = .center
+        grid.rowSpacing = 4
+        grid.columnSpacing = 6
 
-        let entries = Self.badgeColorEntries
-        let rows = (entries.count + 1) / 2
-        for row in 0..<rows {
-            let leftIdx = row
-            let rightIdx = row + rows
+        func makeEntryViews(_ entry: (state: TabItem.BadgeState, label: String)) -> (NSView, NSView, NSView) {
+            let label = NSTextField(labelWithString: entry.label)
+            label.alignment = .right
+            label.font = .systemFont(ofSize: 12)
+            let well = makeBadgeColorWell(for: entry.state)
+            let toggle = NSButton(checkboxWithTitle: "", target: self, action: #selector(badgeAnimateChanged(_:)))
+            toggle.state = Self.isBadgeAnimated(entry.state) ? .on : .off
+            objc_setAssociatedObject(toggle, &settingsKeyAssoc, entry.state.rawValue, .OBJC_ASSOCIATION_RETAIN)
+            return (label, well, toggle)
+        }
 
-            let leftLabel = NSTextField(labelWithString: entries[leftIdx].label)
-            leftLabel.alignment = .right
-            leftLabel.font = .systemFont(ofSize: 12)
-            let leftWell = makeBadgeColorWell(for: entries[leftIdx].state)
+        func addSection(_ title: String, entries: [(state: TabItem.BadgeState, label: String)]) {
+            // Section header as its own row, left-aligned
+            let header = NSTextField(labelWithString: title)
+            header.font = .systemFont(ofSize: 10, weight: .semibold)
+            header.textColor = .tertiaryLabelColor
+            header.alignment = .left
+            let headerRow = grid.addRow(with: [header, NSView(), NSView(), NSView(), NSView(), NSView()])
+            headerRow.mergeCells(in: NSRange(location: 0, length: 6))
 
-            if rightIdx < entries.count {
-                let rightLabel = NSTextField(labelWithString: entries[rightIdx].label)
-                rightLabel.alignment = .right
-                rightLabel.font = .systemFont(ofSize: 12)
-                let rightWell = makeBadgeColorWell(for: entries[rightIdx].state)
-                grid.addRow(with: [leftLabel, leftWell, rightLabel, rightWell])
-            } else {
-                grid.addRow(with: [leftLabel, leftWell, NSView(), NSView()])
+            let rows = (entries.count + 1) / 2
+            for r in 0..<rows {
+                let leftIdx = r
+                let rightIdx = r + rows
+                let (ll, lw, lt) = makeEntryViews(entries[leftIdx])
+
+                if rightIdx < entries.count {
+                    let (rl, rw, rt) = makeEntryViews(entries[rightIdx])
+                    grid.addRow(with: [ll, lw, lt, rl, rw, rt])
+                } else {
+                    grid.addRow(with: [ll, lw, lt, NSView(), NSView(), NSView()])
+                }
             }
         }
+
+        addSection("CLAUDE", entries: Self.claudeBadgeEntries)
+
+        // Separator
+        let sep = NSBox()
+        sep.boxType = .separator
+        sep.translatesAutoresizingMaskIntoConstraints = false
+        let sepRow = grid.addRow(with: [sep, NSView(), NSView(), NSView(), NSView(), NSView()])
+        sepRow.mergeCells(in: NSRange(location: 0, length: 6))
+
+        addSection("TERMINAL", entries: Self.terminalBadgeEntries)
 
         // Reset button
         let resetButton = NSButton(title: "Reset to Defaults", target: self, action: #selector(resetBadgeColors))
         resetButton.bezelStyle = .rounded
-        grid.addRow(with: [NSView(), NSView(), NSView(), resetButton])
+        resetButton.controlSize = .small
+        grid.addRow(with: [NSView(), NSView(), NSView(), NSView(), NSView(), resetButton])
 
         return grid
     }
@@ -384,9 +436,19 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         }
     }
 
+    @objc private func badgeAnimateChanged(_ sender: NSButton) {
+        guard let stateRaw = objc_getAssociatedObject(sender, &settingsKeyAssoc) as? String else { return }
+        UserDefaults.standard.set(sender.state == .on, forKey: "badgeAnimate.\(stateRaw)")
+        if let wc = NSApp.delegate as? AppDelegate {
+            wc.windowController?.rebuildSidebar()
+            wc.windowController?.rebuildTabBar()
+        }
+    }
+
     @objc private func resetBadgeColors() {
-        for entry in Self.badgeColorEntries {
+        for entry in Self.claudeBadgeEntries + Self.terminalBadgeEntries {
             UserDefaults.standard.removeObject(forKey: "badgeColor.\(entry.state.rawValue)")
+            UserDefaults.standard.removeObject(forKey: "badgeAnimate.\(entry.state.rawValue)")
         }
         // Refresh the pane to show default colors
         switchToPane(.appearance)

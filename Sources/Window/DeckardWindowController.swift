@@ -31,6 +31,7 @@ class TabItem {
         case error
         case terminalIdle     // muted teal - terminal at prompt
         case terminalActive   // teal pulsing - terminal foreground process has activity
+        case terminalError    // red - terminal process exited with error
     }
 
     init(surfaceView: TerminalNSView, name: String, isClaude: Bool) {
@@ -1448,7 +1449,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
                 dot.widthAnchor.constraint(equalToConstant: 7),
                 dot.heightAnchor.constraint(equalToConstant: 7),
             ])
-            if info.state == .thinking || info.state == .terminalActive {
+            if SettingsWindowController.isBadgeAnimated(info.state) {
                 Self.addPulseAnimation(to: dot)
             }
             badgeContainer.addArrangedSubview(dot)
@@ -1477,6 +1478,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         case .error: return "Error"
         case .terminalIdle: return "Idle"
         case .terminalActive: return activity?.description ?? "Running"
+        case .terminalError: return "Error"
         }
     }
 
@@ -1486,8 +1488,9 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         .waitingForInput: NSColor(red: 0.65, green: 0.4, blue: 0.9, alpha: 1.0),
         .needsPermission: .systemOrange,
         .error: .systemRed,
-        .terminalIdle: NSColor(red: 0.45, green: 0.72, blue: 0.71, alpha: 0.5),
-        .terminalActive: NSColor(red: 0.45, green: 0.72, blue: 0.71, alpha: 0.5),
+        .terminalIdle: NSColor(red: 0.35, green: 0.55, blue: 0.54, alpha: 1.0),
+        .terminalActive: NSColor(red: 0.45, green: 0.72, blue: 0.71, alpha: 1.0),
+        .terminalError: NSColor(red: 0.85, green: 0.3, blue: 0.3, alpha: 1.0),
     ]
 
     static func colorForBadge(_ state: TabItem.BadgeState) -> NSColor {
@@ -1648,7 +1651,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
                 dot.heightAnchor.constraint(equalToConstant: 7),
                 dot.centerYAnchor.constraint(equalTo: centerYAnchor),
             ])
-            if badgeState == .thinking || badgeState == .terminalActive {
+            if SettingsWindowController.isBadgeAnimated(badgeState) {
                 VerticalTabRowView.addPulseAnimation(to: dot)
             }
             badgeDot = dot
