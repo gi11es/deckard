@@ -454,6 +454,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Destroy all surfaces
         for tab in project.tabs {
             tab.surfaceView.destroySurface()
+
         }
 
         projects.remove(at: index)
@@ -569,6 +570,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let tab = project.tabs[idx]
         tab.surfaceView.destroySurface()
+
         project.tabs.remove(at: idx)
 
         if project.tabs.isEmpty {
@@ -725,8 +727,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private func startProcessMonitor() {
         processMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
             guard let self = self else { return }
+            // Collect all tabs in creation order with isClaude flag
+            let tabInfos = self.projects.flatMap { project in
+                project.tabs.map { ProcessMonitor.TabInfo(surfaceId: $0.id, isClaude: $0.isClaude) }
+            }
             DispatchQueue.global(qos: .utility).async {
-                let states = ProcessMonitor.shared.pollAll()
+                let states = ProcessMonitor.shared.poll(tabs: tabInfos)
                 DispatchQueue.main.async {
                     self.applyTerminalBadgeStates(states)
                 }
@@ -844,6 +850,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             if let ti = project.tabs.firstIndex(where: { $0.id == surfaceId }) {
                 let tab = project.tabs[ti]
                 tab.surfaceView.destroySurface()
+    
                 project.tabs.remove(at: ti)
 
                 if project.tabs.isEmpty {
@@ -1314,6 +1321,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let tab = project.tabs[idx]
         tab.surfaceView.destroySurface()
+
         project.tabs.remove(at: idx)
 
         if project.tabs.isEmpty {
