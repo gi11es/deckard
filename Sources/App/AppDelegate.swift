@@ -72,6 +72,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Set socket path in environment for child processes.
         setenv("DECKARD_SOCKET_PATH", ControlSocket.shared.path, 1)
 
+        // Install the /deckard feedback skill if gh CLI is available.
+        installDeckardSkill()
+
         // Create and show the main window.
         windowController = DeckardWindowController(ghosttyApp: ghosttyApp)
         hookHandler.windowController = windowController
@@ -274,4 +277,64 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         SettingsWindowController.shared.show()
     }
 
+    // MARK: - Deckard Skill
+
+    private func installDeckardSkill() {
+        DispatchQueue.global(qos: .utility).async {
+            // Only install if gh CLI is available
+            guard FileManager.default.isExecutableFile(atPath: "/usr/local/bin/gh")
+                    || FileManager.default.isExecutableFile(atPath: "/opt/homebrew/bin/gh")
+                    || Self.whichGh() != nil else { return }
+
+            let commandsDir = NSHomeDirectory() + "/.claude/commands"
+            let skillPath = commandsDir + "/deckard.md"
+
+            try? FileManager.default.createDirectory(
+                atPath: commandsDir,
+                withIntermediateDirectories: true)
+
+            let content = """
+            File a bug report or feature request for Deckard.
+
+            Ask the user to describe the issue or feature. Then use `gh issue create` to file it:
+
+            ```
+            gh issue create --repo gi11es/deckard --title "<concise title>" --body "<structured body>"
+            ```
+
+            Format the body as:
+
+            - **Bug reports:** `## Bug` heading, reproduction steps, expected vs actual behavior.
+            - **Feature requests:** `## Feature request` heading, description of the desired behavior.
+
+            Before filing, show the user the title and body and ask for confirmation. Offer to anonymize repo names, file paths, and other potentially sensitive details.
+
+            After filing, show the issue URL.
+            """
+
+            // Only write if the file doesn't exist or was written by Deckard
+            let marker = "gh issue create --repo gi11es/deckard"
+            if let existing = try? String(contentsOfFile: skillPath, encoding: .utf8),
+               !existing.contains(marker) {
+                return  // User has a custom /deckard command, don't overwrite
+            }
+
+            try? content.write(toFile: skillPath, atomically: true, encoding: .utf8)
+        }
+    }
+
+    private static func whichGh() -> String? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
+        process.arguments = ["gh"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        try? process.run()
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return path?.isEmpty == false ? path : nil
+    }
 }
