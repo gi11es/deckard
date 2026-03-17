@@ -29,6 +29,7 @@ class TabItem {
         case waitingForInput
         case needsPermission
         case error
+        case terminalActive   // grey pulsing - terminal foreground process has CPU activity
     }
 
     init(surfaceView: TerminalNSView, name: String, isClaude: Bool) {
@@ -108,6 +109,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private let contextProgressBar = NSView()
     private var contextProgressFill = NSView()
     private var contextTimer: Timer?
+    private var processMonitorTimer: Timer?
     private var currentTerminalView: TerminalNSView?
     private var welcomeLabel: NSTextField?
 
@@ -184,11 +186,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         SessionManager.shared.startAutosave { [weak self] in
             self?.captureState() ?? DeckardState()
         }
+
+        startProcessMonitor()
     }
 
     required init?(coder: NSCoder) { fatalError() }
 
-    deinit { SessionManager.shared.stopAutosave() }
+    deinit {
+        SessionManager.shared.stopAutosave()
+        processMonitorTimer?.invalidate()
+    }
 
     // MARK: - UI Setup
 
@@ -498,9 +505,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             tabName = "\(base) #\(count)"
         }
         let tab = TabItem(surfaceView: surfaceView, name: tabName, isClaude: isClaude)
-        if isClaude {
-            tab.badgeState = .idle
-        }
+        tab.badgeState = .idle
 
         var envVars: [String: String] = [:]
         if isClaude {
@@ -713,6 +718,42 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         progressWidthConstraint?.isActive = false
         progressWidthConstraint = contextProgressFill.widthAnchor.constraint(equalToConstant: barWidth)
         progressWidthConstraint?.isActive = true
+    }
+
+    // MARK: - Process Monitor
+
+    private func startProcessMonitor() {
+        processMonitorTimer = Timer.scheduledTimer(withTimeInterval: 2.5, repeats: true) { [weak self] _ in
+            guard let self = self else { return }
+            DispatchQueue.global(qos: .utility).async {
+                let states = ProcessMonitor.shared.pollAll()
+                DispatchQueue.main.async {
+                    self.applyTerminalBadgeStates(states)
+                }
+            }
+        }
+    }
+
+    private func applyTerminalBadgeStates(_ states: [UUID: Bool]) {
+        var changed = false
+        for project in projects {
+            for tab in project.tabs where !tab.isClaude {
+                let newBadge: TabItem.BadgeState
+                if let hasActivity = states[tab.id] {
+                    newBadge = hasActivity ? .terminalActive : .idle
+                } else {
+                    newBadge = .idle  // not yet discovered — show grey
+                }
+                if tab.badgeState != newBadge {
+                    tab.badgeState = newBadge
+                    changed = true
+                }
+            }
+        }
+        if changed {
+            rebuildSidebar()
+            rebuildTabBar()
+        }
     }
 
     func focusedSurface() -> ghostty_surface_t? {
@@ -1002,7 +1043,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for (i, project) in projects.enumerated() {
             let row = VerticalTabRowView(title: project.name, bold: false, index: i,
                                  target: self, action: #selector(projectRowClicked(_:)))
-            row.badgeInfos = project.tabs.filter { $0.isClaude }.map { (state: $0.badgeState, name: $0.name) }
+            row.badgeInfos = project.tabs.filter { $0.badgeState != .none }.map { (state: $0.badgeState, name: $0.name) }
             row.onRename = { [weak self] newName in
                 guard let self = self, i < self.projects.count else { return }
                 self.projects[i].name = newName
@@ -1184,7 +1225,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 displayTitle: title,
                 editableName: tab.name,
                 isClaude: tab.isClaude,
-                badgeState: tab.isClaude ? tab.badgeState : .none,
+                badgeState: tab.badgeState,
                 isSelected: isSelected,
                 index: i,
                 target: self,
@@ -1395,7 +1436,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
                 dot.widthAnchor.constraint(equalToConstant: 7),
                 dot.heightAnchor.constraint(equalToConstant: 7),
             ])
-            if info.state == .thinking {
+            if info.state == .thinking || info.state == .terminalActive {
                 Self.addPulseAnimation(to: dot)
             }
             badgeContainer.addArrangedSubview(dot)
@@ -1422,6 +1463,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         case .waitingForInput: return "Waiting for input"
         case .needsPermission: return "Needs permission"
         case .error: return "Error"
+        case .terminalActive: return "Running"
         }
     }
 
@@ -1433,6 +1475,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         case .waitingForInput: return .systemBlue
         case .needsPermission: return .systemOrange
         case .error: return .systemRed
+        case .terminalActive: return .systemGray
         }
     }
 
@@ -1570,8 +1613,8 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
         translatesAutoresizingMaskIntoConstraints = false
         wantsLayer = true
 
-        // Badge dot for Claude tabs — positioned on the right by layout constraints below
-        if isClaude {
+        // Badge dot — positioned on the right by layout constraints below
+        if badgeState != .none {
             let dot = NSView()
             dot.wantsLayer = true
             dot.layer?.cornerRadius = 3.5
@@ -1584,7 +1627,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
                 dot.heightAnchor.constraint(equalToConstant: 7),
                 dot.centerYAnchor.constraint(equalTo: centerYAnchor),
             ])
-            if badgeState == .thinking {
+            if badgeState == .thinking || badgeState == .terminalActive {
                 VerticalTabRowView.addPulseAnimation(to: dot)
             }
             badgeDot = dot

@@ -26,6 +26,7 @@
 		AABB0004AABB0004AABB0004 /* ShortcutNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABB0005AABB0005AABB0005 /* ShortcutNames.swift */; };
 		CC110001CC110001CC110001 /* ThemeColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC110002CC110002CC110002 /* ThemeColors.swift */; };
 		CC110003CC110003CC110003 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC110004CC110004CC110004 /* ThemeManager.swift */; };
+		DD220001DD220001DD220001 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD220002DD220002DD220002 /* ProcessMonitor.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -50,6 +51,7 @@
 		AABB0005AABB0005AABB0005 /* ShortcutNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutNames.swift; sourceTree = "<group>"; };
 		CC110002CC110002CC110002 /* ThemeColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeColors.swift; sourceTree = "<group>"; };
 		CC110004CC110004CC110004 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
+		DD220002DD220002DD220002 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -70,6 +72,7 @@
 				E5FD7F070DDB4216278EFDE6 /* ContextMonitor.swift */,
 				4A2B375A023FEBCB272DCFD7 /* HookHandler.swift */,
 				A5EB9FA577948DC32DED47B7 /* NotificationManager.swift */,
+				DD220002DD220002DD220002 /* ProcessMonitor.swift */,
 			);
 			path = Detection;
 			sourceTree = "<group>";
@@ -266,6 +269,7 @@
 				AABB0004AABB0004AABB0004 /* ShortcutNames.swift in Sources */,
 				CC110001CC110001CC110001 /* ThemeColors.swift in Sources */,
 				CC110003CC110003CC110003 /* ThemeManager.swift in Sources */,
+				DD220001DD220001DD220001 /* ProcessMonitor.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
