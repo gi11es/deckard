@@ -119,7 +119,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private let sidebarWidth: CGFloat = 210
     private var sidebarInitialized = false
     private var sidebarWidthBeforeCollapse: CGFloat = 210
-    private var startupOverlay: NSView?
     /// Recently closed projects — stored so reopening the same path restores tabs.
     private var recentlyClosedProjects: [ProjectState] = []
     private var isRestoring = false
@@ -155,26 +154,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange(_:)),
                                                name: .deckardThemeChanged, object: nil)
-
-        // Startup overlay — removed when the shell finishes initializing
-        // (detected by the clear command completing, which triggers a title/pwd change)
-        let startupOverlay = NSView()
-        startupOverlay.wantsLayer = true
-        startupOverlay.layer?.backgroundColor = currentThemeColors.background.cgColor
-        startupOverlay.layer?.zPosition = 9999
-        startupOverlay.translatesAutoresizingMaskIntoConstraints = false
-        terminalContainerView.addSubview(startupOverlay)
-        self.startupOverlay = startupOverlay
-        NSLayoutConstraint.activate([
-            startupOverlay.topAnchor.constraint(equalTo: terminalContainerView.topAnchor),
-            startupOverlay.bottomAnchor.constraint(equalTo: terminalContainerView.bottomAnchor),
-            startupOverlay.leadingAnchor.constraint(equalTo: terminalContainerView.leadingAnchor),
-            startupOverlay.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
-        ])
-        // Safety fallback in case signal never comes
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
-            self?.dismissStartupOverlay()
-        }
 
         restoreOrCreateInitial()
 
@@ -539,10 +518,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             initialInput = nil
         }
 
-        // Only Claude tabs need the overlay (hides stty/clear setup until CLI sets title).
-        // Non-Claude terminals never emit a title OSC, so the overlay would just block for 3s.
-        surfaceView.needsOverlay = isClaude
-
         surfaceView.createSurface(
             app: app,
             tabId: tab.id,
@@ -612,16 +587,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         return projects[selectedProjectIndex]
     }
 
-    private var currentOverlay: NSView?
-
     private func showTab(_ tab: TabItem) {
         welcomeLabel?.isHidden = true
 
         let view = tab.surfaceView
 
         // Hide the previous surface instead of removing it (avoids Metal context teardown)
-        currentOverlay?.removeFromSuperview()
-        currentOverlay = nil
         currentTerminalView?.isHidden = true
 
         // Add to container only once; subsequent switches just unhide
@@ -638,31 +609,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         view.isHidden = false
         currentTerminalView = view
 
-        // Add opaque overlay on top if surface isn't ready yet
-        if view.needsOverlay {
-            let overlay = NSView()
-            overlay.wantsLayer = true
-            overlay.layer?.backgroundColor = currentThemeColors.background.cgColor
-            overlay.translatesAutoresizingMaskIntoConstraints = false
-            terminalContainerView.addSubview(overlay, positioned: .above, relativeTo: view)
-            NSLayoutConstraint.activate([
-                overlay.topAnchor.constraint(equalTo: terminalContainerView.topAnchor),
-                overlay.bottomAnchor.constraint(equalTo: terminalContainerView.bottomAnchor),
-                overlay.leadingAnchor.constraint(equalTo: terminalContainerView.leadingAnchor),
-                overlay.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
-            ])
-            currentOverlay = overlay
-            // Safety fallback
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self, weak overlay, weak view] in
-                view?.needsOverlay = false
-                overlay?.removeFromSuperview()
-                if self?.currentOverlay === overlay { self?.currentOverlay = nil }
-            }
-        }
-
         window?.makeFirstResponder(view)
-
-        // Show context bar for Claude tabs
         refreshContextBar(for: tab)
     }
 
@@ -781,19 +728,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    // MARK: - Surface Callbacks
-
-    func dismissStartupOverlay() {
-        guard let overlay = startupOverlay else { return }
-        startupOverlay = nil
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.15
-            overlay.animator().alphaValue = 0
-        }, completionHandler: {
-            overlay.removeFromSuperview()
-        })
-    }
-
     // MARK: - Theme
 
     @objc private func themeDidChange(_ notification: Notification) {
@@ -811,37 +745,21 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         rebuildTabBar()
     }
 
-    private func revealSurface(_ view: TerminalNSView) {
-        view.needsOverlay = false
-        guard let overlay = currentOverlay, view === currentTerminalView else { return }
-        currentOverlay = nil
-        NSAnimationContext.runAnimationGroup({ ctx in
-            ctx.duration = 0.1
-            overlay.animator().alphaValue = 0
-        }, completionHandler: {
-            overlay.removeFromSuperview()
-        })
-    }
-
     func setTitle(_ title: String, forSurface surface: ghostty_surface_t?) {
-        dismissStartupOverlay()
         guard let surface = surface else { return }
         for project in projects {
             for tab in project.tabs where tab.surfaceView.surface == surface {
                 tab.surfaceView.title = title
-                revealSurface(tab.surfaceView)
                 return
             }
         }
     }
 
     func setPwd(_ pwd: String, forSurface surface: ghostty_surface_t?) {
-        dismissStartupOverlay()
         guard let surface = surface else { return }
         for project in projects {
             for tab in project.tabs where tab.surfaceView.surface == surface {
                 tab.surfaceView.pwd = pwd
-                revealSurface(tab.surfaceView)
                 return
             }
         }

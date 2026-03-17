@@ -36,7 +36,6 @@ class TerminalNSView: NSView {
 
     var title: String = ""
     var pwd: String?
-    var needsOverlay: Bool = false
 
     override var acceptsFirstResponder: Bool { true }
 
