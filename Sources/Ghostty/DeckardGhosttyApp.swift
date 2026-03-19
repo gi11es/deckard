@@ -382,8 +382,14 @@ class DeckardGhosttyApp {
             }
             return true
 
-        case GHOSTTY_ACTION_MOUSE_VISIBILITY,
-             GHOSTTY_ACTION_RENDERER_HEALTH,
+        case GHOSTTY_ACTION_MOUSE_VISIBILITY:
+            let visibility = action.action.mouse_visibility
+            DispatchQueue.main.async {
+                NSCursor.setHiddenUntilMouseMoves(visibility == GHOSTTY_MOUSE_HIDDEN)
+            }
+            return true
+
+        case GHOSTTY_ACTION_RENDERER_HEALTH,
              GHOSTTY_ACTION_CELL_SIZE,
              GHOSTTY_ACTION_RENDER,
              GHOSTTY_ACTION_COLOR_CHANGE,
