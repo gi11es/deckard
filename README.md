@@ -4,7 +4,7 @@ A terminal built for [Claude Code](https://docs.anthropic.com/en/docs/claude-cod
 
 Run multiple sessions side by side in a single window with tabs, projects, and session persistence. Built with Swift and AppKit. Terminal rendering powered by [Ghostty](https://ghostty.org/).
 
-[![Download for macOS](https://img.shields.io/static/v1?label=Download+for+macOS&message=v0.1.8&color=black&style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gi11es/deckard/releases/latest) <!-- x-release-please-version -->
+[![Download for macOS](https://img.shields.io/static/v1?label=Download+for+macOS&message=v0.1.9&color=black&style=for-the-badge&logo=apple&logoColor=white)](https://github.com/gi11es/deckard/releases/latest) <!-- x-release-please-version -->
 
 ![Deckard screenshot](screenshot.jpg)
 
