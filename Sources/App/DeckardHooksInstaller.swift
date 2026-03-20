@@ -43,15 +43,15 @@ enum DeckardHooksInstaller {
     }()
 
     private static let settingsPath: String = {
-        NSHomeDirectory() + "/.claude/settings.local.json"
+        NSHomeDirectory() + "/.claude/settings.json"
     }()
 
-    private static let hookEvents = [
-        "SessionStart": "session-start",
-        "Stop": "stop",
-        "PreToolUse": "pre-tool-use",
-        "Notification": "notification",
-        "UserPromptSubmit": "user-prompt-submit",
+    private static let hookEvents: [(key: String, arg: String)] = [
+        ("SessionStart", "session-start"),
+        ("Stop", "stop"),
+        ("PreToolUse", "pre-tool-use"),
+        ("Notification", "notification"),
+        ("UserPromptSubmit", "user-prompt-submit"),
     ]
 
     /// Install the hook script and merge hooks into Claude Code's settings.
@@ -91,40 +91,42 @@ enum DeckardHooksInstaller {
 
         // Build or merge hooks
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
+        let scriptPath = hookScriptPath
 
         for (eventName, eventArg) in hookEvents {
-            let command = "\(hookScriptPath) \(eventArg)"
-            let deckardHook: [String: Any] = [
-                "type": "command",
-                "command": command,
-                "timeout": 10,
-            ]
-            let deckardEntry: [String: Any] = [
-                "matcher": "",
-                "hooks": [deckardHook],
-            ]
-
+            let command = "\(scriptPath) \(eventArg)"
             var entries = hooks[eventName] as? [[String: Any]] ?? []
 
-            // Check if Deckard's hook is already present
-            let alreadyInstalled = entries.contains { entry in
+            // Remove any existing Deckard hook (so we always update to latest)
+            entries.removeAll { entry in
                 guard let entryHooks = entry["hooks"] as? [[String: Any]] else { return false }
                 return entryHooks.contains { hook in
                     (hook["command"] as? String)?.contains(".deckard/hooks/") == true
                 }
             }
 
-            if !alreadyInstalled {
-                entries.append(deckardEntry)
-            }
+            // Add our hook
+            entries.append([
+                "matcher": "",
+                "hooks": [
+                    [
+                        "type": "command",
+                        "command": command,
+                        "timeout": 10,
+                    ] as [String: Any],
+                ],
+            ] as [String: Any])
 
             hooks[eventName] = entries
         }
 
         settings["hooks"] = hooks
 
-        // Write back
-        if let data = try? JSONSerialization.data(withJSONObject: settings, options: [.prettyPrinted, .sortedKeys]) {
+        // Write back — use .withoutEscapingSlashes to avoid \/ in paths
+        if let data = try? JSONSerialization.data(
+            withJSONObject: settings,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        ) {
             try? data.write(to: URL(fileURLWithPath: settingsPath))
         }
     }
