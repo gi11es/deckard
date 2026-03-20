@@ -24,6 +24,7 @@
 
 		F14F059C3523C8983BFF01FD /* SurfaceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1819508589B0D94AC0310DDB /* SurfaceView.swift */; };
 		AABB0004AABB0004AABB0004 /* ShortcutNames.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABB0005AABB0005AABB0005 /* ShortcutNames.swift */; };
+		AABB0006AABB0006AABB0006 /* DeckardHooksInstaller.swift in Sources */ = {isa = PBXBuildFile; fileRef = AABB0007AABB0007AABB0007 /* DeckardHooksInstaller.swift */; };
 		CC110001CC110001CC110001 /* ThemeColors.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC110002CC110002CC110002 /* ThemeColors.swift */; };
 		CC110003CC110003CC110003 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC110004CC110004CC110004 /* ThemeManager.swift */; };
 		DD220001DD220001DD220001 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD220002DD220002DD220002 /* ProcessMonitor.swift */; };
@@ -49,6 +50,7 @@
 
 		E5FD7F070DDB4216278EFDE6 /* ContextMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextMonitor.swift; sourceTree = "<group>"; };
 		AABB0005AABB0005AABB0005 /* ShortcutNames.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutNames.swift; sourceTree = "<group>"; };
+		AABB0007AABB0007AABB0007 /* DeckardHooksInstaller.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckardHooksInstaller.swift; sourceTree = "<group>"; };
 		CC110002CC110002CC110002 /* ThemeColors.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeColors.swift; sourceTree = "<group>"; };
 		CC110004CC110004CC110004 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		DD220002DD220002DD220002 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
@@ -153,6 +155,7 @@
 				6C2CC70A6932271D0EE46154 /* Deckard-Bridging-Header.h */,
 				88AA91CDBC6DDE958543FB29 /* main.swift */,
 				AABB0005AABB0005AABB0005 /* ShortcutNames.swift */,
+				AABB0007AABB0007AABB0007 /* DeckardHooksInstaller.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -270,6 +273,7 @@
 				F14F059C3523C8983BFF01FD /* SurfaceView.swift in Sources */,
 				432752F9187D2E815F617B96 /* main.swift in Sources */,
 				AABB0004AABB0004AABB0004 /* ShortcutNames.swift in Sources */,
+				AABB0006AABB0006AABB0006 /* DeckardHooksInstaller.swift in Sources */,
 				CC110001CC110001CC110001 /* ThemeColors.swift in Sources */,
 				CC110003CC110003CC110003 /* ThemeManager.swift in Sources */,
 				DD220001DD220001DD220001 /* ProcessMonitor.swift in Sources */,

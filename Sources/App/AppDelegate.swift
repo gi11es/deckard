@@ -78,6 +78,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Install the /deckard feedback skill if gh CLI is available.
         installDeckardSkill()
 
+        // Install Claude Code hooks so Deckard receives session events.
+        DeckardHooksInstaller.installIfNeeded()
+
         // Create and show the main window.
         windowController = DeckardWindowController(ghosttyApp: ghosttyApp)
         hookHandler.windowController = windowController

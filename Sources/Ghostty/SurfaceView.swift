@@ -103,12 +103,6 @@ class TerminalNSView: NSView {
         allEnvVars["DECKARD_TAB_ID"] = tabId.uuidString
         allEnvVars["DECKARD_SOCKET_PATH"] = ControlSocket.shared.path
 
-        // Set our bin/ directory so the shell can prepend it to PATH.
-        // We can't set PATH directly because the login shell resets it.
-        if let binPath = Bundle.main.resourceURL?.appendingPathComponent("bin").path {
-            allEnvVars["DECKARD_BIN_DIR"] = binPath
-        }
-
         // Convert env vars to C representation
         var cEnvVars: [ghostty_env_var_s] = []
         var cEnvStorage: [(UnsafeMutablePointer<CChar>, UnsafeMutablePointer<CChar>)] = []

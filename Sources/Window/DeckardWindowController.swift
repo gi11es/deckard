@@ -563,10 +563,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                     tab.sessionId = nil
                 }
             }
-            // Use Deckard's claude wrapper ($DECKARD_BIN_DIR/claude) which sets up
-            // hooks for badge state, activity detection, and session tracking.
+            // Hooks are pre-configured in ~/.claude/settings.local.json by
+            // DeckardHooksInstaller — no wrapper needed, just call claude directly.
             // clear hides the echoed command; exec replaces the shell.
-            initialInput = "clear && exec \"$DECKARD_BIN_DIR/claude\"\(claudeArgs)\n"
+            initialInput = "clear && exec claude\(claudeArgs)\n"
         } else {
             initialInput = nil
         }
