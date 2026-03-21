@@ -199,7 +199,16 @@ class TerminalNSView: NSView {
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        guard window != nil else { return }
+        guard let surface = self.surface, let window = self.window else { return }
+        // Refresh content scale + size when (re-)added to a window.
+        // This kicks the Metal renderer after the view was detached during
+        // a tab switch (single-active-view model).
+        let scale = window.backingScaleFactor
+        CATransaction.begin()
+        CATransaction.setDisableActions(true)
+        layer?.contentsScale = scale
+        CATransaction.commit()
+        ghostty_surface_set_content_scale(surface, scale, scale)
         updateSurfaceSize()
     }
 

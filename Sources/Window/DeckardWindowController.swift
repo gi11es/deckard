@@ -116,7 +116,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private var processMonitorTimer: Timer?
     private var focusHealthTimer: Timer?
     private var currentTerminalView: TerminalNSView?
-    private var welcomeLabel: NSTextField?
+    /// Opaque overlay shown when a project has no tabs, covering any surfaces underneath.
+    private var emptyStateView: NSView?
 
     private let sidebarDropZone = SidebarDropZone()
     private let openFolderButton = NSButton()
@@ -319,18 +320,27 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         splitView.addArrangedSubview(sidebarView)
         splitView.addArrangedSubview(rightPane)
 
-        // Welcome message for empty state
+        // Opaque empty-state overlay — covers all surfaces when a project has no tabs.
+        let emptyBg = NSView()
+        emptyBg.wantsLayer = true
+        emptyBg.layer?.backgroundColor = currentThemeColors.background.cgColor
+        emptyBg.translatesAutoresizingMaskIntoConstraints = false
         let welcome = NSTextField(labelWithString: "Press \u{2318}O to open a project")
         welcome.font = .systemFont(ofSize: 16, weight: .light)
         welcome.textColor = currentThemeColors.secondaryText
         welcome.alignment = .center
         welcome.translatesAutoresizingMaskIntoConstraints = false
-        terminalContainerView.addSubview(welcome)
+        emptyBg.addSubview(welcome)
+        terminalContainerView.addSubview(emptyBg)
         NSLayoutConstraint.activate([
-            welcome.centerXAnchor.constraint(equalTo: terminalContainerView.centerXAnchor),
-            welcome.centerYAnchor.constraint(equalTo: terminalContainerView.centerYAnchor),
+            emptyBg.topAnchor.constraint(equalTo: terminalContainerView.topAnchor),
+            emptyBg.bottomAnchor.constraint(equalTo: terminalContainerView.bottomAnchor),
+            emptyBg.leadingAnchor.constraint(equalTo: terminalContainerView.leadingAnchor),
+            emptyBg.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
+            welcome.centerXAnchor.constraint(equalTo: emptyBg.centerXAnchor),
+            welcome.centerYAnchor.constraint(equalTo: emptyBg.centerYAnchor),
         ])
-        self.welcomeLabel = welcome
+        self.emptyStateView = emptyBg
 
         NSLayoutConstraint.activate([
         ])
@@ -494,11 +504,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         rebuildTabBar()
 
         if project.tabs.isEmpty {
-            for sub in terminalContainerView.subviews where sub is TerminalNSView {
-                sub.isHidden = true
-            }
             currentTerminalView = nil
-            welcomeLabel?.isHidden = false
+            showEmptyState()
         } else {
             // Always clamp for safe array access, even during restore
             let safeIdx = max(0, min(project.selectedTabIndex, project.tabs.count - 1))
@@ -632,8 +639,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         if project.tabs.isEmpty {
             // Keep the project in the sidebar with just the "+" button
-            currentTerminalView?.isHidden = true
             currentTerminalView = nil
+            showEmptyState()
             rebuildTabBar()
             rebuildSidebar()
         } else {
@@ -669,18 +676,21 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     private func showTab(_ tab: TabItem) {
-        welcomeLabel?.isHidden = true
+        hideEmptyState()
 
         let view = tab.surfaceView
 
-        // Hide ALL terminal surfaces, not just currentTerminalView.
-        // When switching projects, currentTerminalView might not be the
-        // topmost visible view (z-order depends on add order).
-        for sub in terminalContainerView.subviews where sub is TerminalNSView {
-            sub.isHidden = true
+        // Remove the previous surface view from the hierarchy.
+        // Only one Metal surface is in the container at a time — this avoids
+        // wasted GPU rendering for occluded surfaces and resource exhaustion
+        // during session restore with many tabs.
+        if let prev = currentTerminalView, prev !== view {
+            prev.removeFromSuperview()
         }
 
-        // Add to container only once; subsequent switches just unhide
+        // Add the new surface view (or re-add if it was previously removed).
+        // viewDidMoveToWindow fires on add, which calls updateSurfaceSize()
+        // to kick the Metal renderer.
         if view.superview !== terminalContainerView {
             view.translatesAutoresizingMaskIntoConstraints = false
             terminalContainerView.addSubview(view)
@@ -690,11 +700,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 view.leadingAnchor.constraint(equalTo: terminalContainerView.leadingAnchor),
                 view.trailingAnchor.constraint(equalTo: terminalContainerView.trailingAnchor),
             ])
-            // Force layout so the view gets its correct frame before
-            // the ghostty surface reports its size to the renderer.
             terminalContainerView.layoutSubtreeIfNeeded()
         }
-        view.isHidden = false
         currentTerminalView = view
 
         let ok = window?.makeFirstResponder(view) ?? false
@@ -703,6 +710,17 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             " frame=\(view.frame) surfaceAlive=\(view.surface != nil)" +
             " wantsLayer=\(view.wantsLayer) hasLayer=\(view.layer != nil)")
         refreshContextBar(for: tab)
+    }
+
+    /// Show the empty-state overlay (project has no tabs).
+    private func showEmptyState() {
+        currentTerminalView?.removeFromSuperview()
+        emptyStateView?.isHidden = false
+    }
+
+    /// Hide the empty-state overlay (active tab is being shown).
+    private func hideEmptyState() {
+        emptyStateView?.isHidden = true
     }
 
     private var progressWidthConstraint: NSLayoutConstraint?
@@ -868,6 +886,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             ? NSAppearance(named: .darkAqua) : NSAppearance(named: .aqua)
         sidebarView.layer?.backgroundColor = colors.sidebarBackground.cgColor
         tabBar.layer?.backgroundColor = colors.tabBarBackground.cgColor
+        emptyStateView?.layer?.backgroundColor = colors.background.cgColor
         openFolderButton.contentTintColor = colors.secondaryText
         rebuildSidebar()
         rebuildTabBar()
@@ -1490,8 +1509,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         project.tabs.remove(at: idx)
 
         if project.tabs.isEmpty {
-            currentTerminalView?.isHidden = true
             currentTerminalView = nil
+            showEmptyState()
             rebuildTabBar()
             rebuildSidebar()
         } else {
