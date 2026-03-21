@@ -33,6 +33,9 @@ class TerminalNSView: NSView {
     /// Timestamp of the last performKeyEquivalent event that needs redispatch.
     /// Used to handle Cmd+key events that AppKit sends back through doCommand.
     private var lastPerformKeyEvent: TimeInterval?
+    /// When true, suppress the next left mouseUp to avoid sending a release
+    /// without a matching press (focus-only clicks).
+    private var suppressNextLeftMouseUp: Bool = false
 
     var title: String = ""
     var pwd: String?
@@ -261,6 +264,7 @@ class TerminalNSView: NSView {
         let result = super.resignFirstResponder()
         if result {
             surface.map { ghostty_surface_set_focus($0, false) }
+            suppressNextLeftMouseUp = false
         }
         let fr = window?.firstResponder
         DiagnosticLog.shared.log("focus",
@@ -283,44 +287,71 @@ class TerminalNSView: NSView {
 
     override func mouseDown(with event: NSEvent) {
         guard let surface = self.surface else { return }
+
+        // If we're not the first responder, this click is transferring focus.
+        // When the app/window is already active, consume the click entirely.
+        if window?.firstResponder !== self {
+            if NSApp.isActive, window?.isKeyWindow == true {
+                window?.makeFirstResponder(self)
+                suppressNextLeftMouseUp = true
+                return
+            }
+            window?.makeFirstResponder(self)
+        }
+
         let mods = Self.ghosttyMods(from: event)
-        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, mods)
+        ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_LEFT, mods)
     }
 
     override func mouseUp(with event: NSEvent) {
+        if suppressNextLeftMouseUp {
+            suppressNextLeftMouseUp = false
+            return
+        }
         guard let surface = self.surface else { return }
         let mods = Self.ghosttyMods(from: event)
-        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT, mods)
+        ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_LEFT, mods)
+        ghostty_surface_mouse_pressure(surface, 0, 0)
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        guard let surface = self.surface else { return }
+        guard let surface = self.surface else { return super.rightMouseDown(with: event) }
         let mods = Self.ghosttyMods(from: event)
-        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_RIGHT, mods)
+        if !ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_RIGHT, mods) {
+            super.rightMouseDown(with: event)
+        }
     }
 
     override func rightMouseUp(with event: NSEvent) {
-        guard let surface = self.surface else { return }
+        guard let surface = self.surface else { return super.rightMouseUp(with: event) }
         let mods = Self.ghosttyMods(from: event)
-        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_RIGHT, mods)
+        if !ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_RIGHT, mods) {
+            super.rightMouseUp(with: event)
+        }
     }
 
     override func otherMouseDown(with event: NSEvent) {
-        guard event.buttonNumber == 2 else { super.otherMouseDown(with: event); return }
-        guard let surface = self.surface else { return }
+        guard let surface = self.surface,
+              let button = Self.ghosttyMouseButton(from: event.buttonNumber) else {
+            super.otherMouseDown(with: event); return
+        }
         let mods = Self.ghosttyMods(from: event)
-        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, GHOSTTY_MOUSE_MIDDLE, mods)
+        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_PRESS, button, mods)
     }
 
     override func otherMouseUp(with event: NSEvent) {
-        guard event.buttonNumber == 2 else { super.otherMouseUp(with: event); return }
-        guard let surface = self.surface else { return }
+        guard let surface = self.surface,
+              let button = Self.ghosttyMouseButton(from: event.buttonNumber) else {
+            super.otherMouseUp(with: event); return
+        }
         let mods = Self.ghosttyMods(from: event)
-        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, GHOSTTY_MOUSE_MIDDLE, mods)
+        _ = ghostty_surface_mouse_button(surface, GHOSTTY_MOUSE_RELEASE, button, mods)
     }
 
     override func otherMouseDragged(with event: NSEvent) {
-        guard event.buttonNumber == 2 else { super.otherMouseDragged(with: event); return }
+        guard Self.ghosttyMouseButton(from: event.buttonNumber) != nil else {
+            super.otherMouseDragged(with: event); return
+        }
         guard let surface = self.surface else { return }
         let pos = convert(event.locationInWindow, from: nil)
         let mods = Self.ghosttyMods(from: event)
@@ -373,10 +404,22 @@ class TerminalNSView: NSView {
             x *= 2
             y *= 2
         }
+        // Pack scroll mods: precision at bit 0, momentum at bits 1-3.
+        // Matches Ghostty's ScrollMods encoding.
         var mods: ghostty_input_scroll_mods_t = 0
         if precision {
-            mods |= 1 // precision bit
+            mods |= 1
         }
+        let momentum: Int32 = switch event.momentumPhase {
+        case .began: 1
+        case .stationary: 2
+        case .changed: 3
+        case .ended: 4
+        case .cancelled: 5
+        case .mayBegin: 6
+        default: 0
+        }
+        mods |= momentum << 1
         ghostty_surface_mouse_scroll(surface, x, y, mods)
     }
 
@@ -521,11 +564,8 @@ class TerminalNSView: NSView {
 
     override func flagsChanged(with event: NSEvent) {
         guard self.surface != nil else { return }
-
-        // Determine press vs release based on whether the modifier is active.
         if hasMarkedText() { return }
 
-        let mods = Self.ghosttyMods(from: event)
         let mod: UInt32
         switch event.keyCode {
         case 0x39: mod = GHOSTTY_MODS_CAPS.rawValue
@@ -536,9 +576,23 @@ class TerminalNSView: NSView {
         default: return
         }
 
+        let mods = Self.ghosttyMods(from: event)
+
         var action = GHOSTTY_ACTION_RELEASE
         if mods.rawValue & mod != 0 {
-            action = GHOSTTY_ACTION_PRESS
+            // Check if the correct side is pressed. If the opposite side
+            // is held and this side was released, it's still a release.
+            let sidePressed: Bool
+            switch event.keyCode {
+            case 0x3C: sidePressed = event.modifierFlags.rawValue & UInt(NX_DEVICERSHIFTKEYMASK) != 0
+            case 0x3E: sidePressed = event.modifierFlags.rawValue & UInt(NX_DEVICERCTLKEYMASK) != 0
+            case 0x3D: sidePressed = event.modifierFlags.rawValue & UInt(NX_DEVICERALTKEYMASK) != 0
+            case 0x36: sidePressed = event.modifierFlags.rawValue & UInt(NX_DEVICERCMDKEYMASK) != 0
+            default: sidePressed = true
+            }
+            if sidePressed {
+                action = GHOSTTY_ACTION_PRESS
+            }
         }
 
         keyAction(action, event: event)
@@ -546,6 +600,7 @@ class TerminalNSView: NSView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         guard event.type == .keyDown else { return false }
+        guard window?.firstResponder === self else { return false }
         guard let surface = self.surface else { return false }
 
         // Don't intercept during IME composition (unless Cmd is held).
@@ -647,6 +702,18 @@ class TerminalNSView: NSView {
            lastPerformKeyEvent == current.timestamp {
             NSApp.sendEvent(current)
             return
+        }
+
+        guard let surface = self.surface else { return }
+        switch selector {
+        case #selector(moveToBeginningOfDocument(_:)):
+            let action = "scroll_to_top"
+            ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
+        case #selector(moveToEndOfDocument(_:)):
+            let action = "scroll_to_bottom"
+            ghostty_surface_binding_action(surface, action, UInt(action.lengthOfBytes(using: .utf8)))
+        default:
+            break
         }
     }
 
@@ -824,13 +891,40 @@ class TerminalNSView: NSView {
     }
 
     static func ghosttyMods(fromCocoa flags: NSEvent.ModifierFlags) -> ghostty_input_mods_e {
-        var mods = GHOSTTY_MODS_NONE
-        if flags.contains(.shift) { mods = ghostty_input_mods_e(rawValue: mods.rawValue | GHOSTTY_MODS_SHIFT.rawValue) }
-        if flags.contains(.control) { mods = ghostty_input_mods_e(rawValue: mods.rawValue | GHOSTTY_MODS_CTRL.rawValue) }
-        if flags.contains(.option) { mods = ghostty_input_mods_e(rawValue: mods.rawValue | GHOSTTY_MODS_ALT.rawValue) }
-        if flags.contains(.command) { mods = ghostty_input_mods_e(rawValue: mods.rawValue | GHOSTTY_MODS_SUPER.rawValue) }
-        if flags.contains(.capsLock) { mods = ghostty_input_mods_e(rawValue: mods.rawValue | GHOSTTY_MODS_CAPS.rawValue) }
-        return mods
+        var mods: UInt32 = GHOSTTY_MODS_NONE.rawValue
+        if flags.contains(.shift) { mods |= GHOSTTY_MODS_SHIFT.rawValue }
+        if flags.contains(.control) { mods |= GHOSTTY_MODS_CTRL.rawValue }
+        if flags.contains(.option) { mods |= GHOSTTY_MODS_ALT.rawValue }
+        if flags.contains(.command) { mods |= GHOSTTY_MODS_SUPER.rawValue }
+        if flags.contains(.capsLock) { mods |= GHOSTTY_MODS_CAPS.rawValue }
+
+        // Detect right-side modifiers via device-specific masks.
+        let raw = flags.rawValue
+        if raw & UInt(NX_DEVICERSHIFTKEYMASK) != 0 { mods |= GHOSTTY_MODS_SHIFT_RIGHT.rawValue }
+        if raw & UInt(NX_DEVICERCTLKEYMASK) != 0 { mods |= GHOSTTY_MODS_CTRL_RIGHT.rawValue }
+        if raw & UInt(NX_DEVICERALTKEYMASK) != 0 { mods |= GHOSTTY_MODS_ALT_RIGHT.rawValue }
+        if raw & UInt(NX_DEVICERCMDKEYMASK) != 0 { mods |= GHOSTTY_MODS_SUPER_RIGHT.rawValue }
+
+        return ghostty_input_mods_e(mods)
+    }
+
+    /// Map NSEvent buttonNumber to Ghostty mouse button.
+    /// Matches Ghostty's MouseButton.init(fromNSEventButtonNumber:).
+    static func ghosttyMouseButton(from buttonNumber: Int) -> ghostty_input_mouse_button_e? {
+        switch buttonNumber {
+        case 0: return GHOSTTY_MOUSE_LEFT
+        case 1: return GHOSTTY_MOUSE_RIGHT
+        case 2: return GHOSTTY_MOUSE_MIDDLE
+        case 3: return GHOSTTY_MOUSE_EIGHT    // Back
+        case 4: return GHOSTTY_MOUSE_NINE     // Forward
+        case 5: return GHOSTTY_MOUSE_SIX
+        case 6: return GHOSTTY_MOUSE_SEVEN
+        case 7: return GHOSTTY_MOUSE_FOUR
+        case 8: return GHOSTTY_MOUSE_FIVE
+        case 9: return GHOSTTY_MOUSE_TEN
+        case 10: return GHOSTTY_MOUSE_ELEVEN
+        default: return nil
+        }
     }
 
     /// Convert Ghostty modifier flags back to NSEvent.ModifierFlags.
