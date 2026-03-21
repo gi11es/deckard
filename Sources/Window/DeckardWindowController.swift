@@ -1,5 +1,4 @@
 import AppKit
-import GhosttyKit
 import KeyboardShortcuts
 
 /// Format a tooltip with the current shortcut, e.g. "Open Folder (Cmd+O)"
@@ -16,7 +15,7 @@ func shortcutTooltip(_ label: String, for name: KeyboardShortcuts.Name) -> Strin
 /// A horizontal tab within a project (Claude session or terminal).
 class TabItem {
     let id: UUID
-    var surfaceView: TerminalNSView
+    var surface: TerminalSurface
     var name: String
     var isClaude: Bool
     var sessionId: String?
@@ -34,9 +33,9 @@ class TabItem {
         case terminalError    // red - terminal process exited with error
     }
 
-    init(surfaceView: TerminalNSView, name: String, isClaude: Bool) {
-        self.id = surfaceView.surfaceId
-        self.surfaceView = surfaceView
+    init(surface: TerminalSurface, name: String, isClaude: Bool) {
+        self.id = surface.surfaceId
+        self.surface = surface
         self.name = name
         self.isClaude = isClaude
     }
@@ -92,12 +91,11 @@ private class CollapsibleSplitView: NSSplitView {
 }
 
 class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
-    private let ghosttyApp: DeckardGhosttyApp
     private var projects: [ProjectItem] = []
     private var selectedProjectIndex: Int = -1
 
     // Theme
-    private(set) var currentThemeColors: ThemeColors = .default
+    private let colors = ThemeColors.default
 
     // UI
     private let splitView = CollapsibleSplitView()
@@ -114,8 +112,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private var contextProgressFill = NSView()
     private var contextTimer: Timer?
     private var processMonitorTimer: Timer?
-    private var focusHealthTimer: Timer?
-    private var currentTerminalView: TerminalNSView?
+    private var currentTerminalView: NSView?
     /// Opaque overlay shown when a project has no tabs, covering any surfaces underneath.
     private var emptyStateView: NSView?
 
@@ -130,9 +127,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     /// Tabs in the order they were created (for ProcessMonitor PID matching).
     private var tabCreationOrder: [UUID] = []
 
-    init(ghosttyApp: DeckardGhosttyApp) {
-        self.ghosttyApp = ghosttyApp
-
+    init() {
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1100, height: 700),
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -141,9 +136,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         )
         window.title = "Deckard"
         window.minSize = NSSize(width: 600, height: 400)
-        window.backgroundColor = ThemeManager.shared.currentColors.background
+        window.backgroundColor = ThemeColors.default.background
         window.titlebarAppearsTransparent = true
-        window.appearance = ThemeManager.shared.currentColors.isDark
+        window.appearance = ThemeColors.default.isDark
             ? NSAppearance(named: .darkAqua) : NSAppearance(named: .aqua)
         window.tabbingMode = .disallowed
 
@@ -154,13 +149,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             window.center()
         }
 
-        // Apply theme colors BEFORE setupUI so all chrome uses the right colors
-        currentThemeColors = ThemeManager.shared.currentColors
-
         setupUI()
-
-        NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange(_:)),
-                                               name: .deckardThemeChanged, object: nil)
 
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.didWakeNotification,
@@ -176,7 +165,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 let fr = wc.window?.firstResponder
                 DiagnosticLog.shared.log("sleep",
                     "wake recovery: firstResponder=\(type(of: fr)) surfaceId=\(tab.id)")
-                wc.window?.makeFirstResponder(tab.surfaceView)
+                wc.window?.makeFirstResponder(tab.surface.view)
             }
         }
 
@@ -194,12 +183,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // The autosave is started at the end of createTabsProgressively.
 
         // Delay process monitor start to let surfaces finish initializing.
-        // IOSurfaceCreate can re-enter the runloop, and polling during that
-        // window can access partially-initialized state.
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) { [weak self] in
             self?.startProcessMonitor()
         }
-        startFocusHealthCheck()
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -207,7 +193,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     deinit {
         SessionManager.shared.stopAutosave()
         processMonitorTimer?.invalidate()
-        focusHealthTimer?.invalidate()
     }
 
     // MARK: - UI Setup
@@ -231,7 +216,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Sidebar
         sidebarView.translatesAutoresizingMaskIntoConstraints = false
         sidebarView.wantsLayer = true
-        sidebarView.layer?.backgroundColor = currentThemeColors.sidebarBackground.cgColor
+        sidebarView.layer?.backgroundColor = colors.sidebarBackground.cgColor
 
         // Drop zone covers the entire sidebar area below the stack
         sidebarDropZone.translatesAutoresizingMaskIntoConstraints = false
@@ -250,7 +235,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         openFolderButton.action = #selector(openProjectClicked)
         openFolderButton.bezelStyle = .recessed
         openFolderButton.isBordered = false
-        openFolderButton.contentTintColor = currentThemeColors.secondaryText
+        openFolderButton.contentTintColor = colors.secondaryText
         openFolderButton.toolTip = shortcutTooltip("Open Folder", for: .openFolder)
         openFolderButton.translatesAutoresizingMaskIntoConstraints = false
         sidebarView.addSubview(openFolderButton)
@@ -277,7 +262,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         tabBar.spacing = 0
         tabBar.translatesAutoresizingMaskIntoConstraints = false
         tabBar.wantsLayer = true
-        tabBar.layer?.backgroundColor = currentThemeColors.tabBarBackground.cgColor
+        tabBar.layer?.backgroundColor = colors.tabBarBackground.cgColor
         rightPane.addSubview(tabBar)
 
         terminalContainerView.translatesAutoresizingMaskIntoConstraints = false
@@ -323,11 +308,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Opaque empty-state overlay — covers all surfaces when a project has no tabs.
         let emptyBg = NSView()
         emptyBg.wantsLayer = true
-        emptyBg.layer?.backgroundColor = currentThemeColors.background.cgColor
+        emptyBg.layer?.backgroundColor = colors.background.cgColor
         emptyBg.translatesAutoresizingMaskIntoConstraints = false
         let welcome = NSTextField(labelWithString: "Press \u{2318}O to open a project")
         welcome.font = .systemFont(ofSize: 16, weight: .light)
-        welcome.textColor = currentThemeColors.secondaryText
+        welcome.textColor = colors.secondaryText
         welcome.alignment = .center
         welcome.translatesAutoresizingMaskIntoConstraints = false
         emptyBg.addSubview(welcome)
@@ -474,11 +459,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
         }
 
-        // Destroy all surfaces
+        // Terminate all surfaces
         let closedIds = Set(project.tabs.map { $0.id })
         tabCreationOrder.removeAll { closedIds.contains($0) }
         for tab in project.tabs {
-            tab.surfaceView.destroySurface()
+            tab.surface.terminate()
         }
 
         projects.remove(at: index)
@@ -525,9 +510,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     // MARK: - Tab Management (within a project)
 
     private func createTabInProject(_ project: ProjectItem, isClaude: Bool, name: String? = nil, sessionIdToResume: String? = nil) {
-        guard let app = ghosttyApp.app else { return }
-
-        let surfaceView = TerminalNSView()
+        let surface = TerminalSurface()
         let tabName: String
         if let name = name {
             tabName = name
@@ -536,7 +519,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             let base = isClaude ? "Claude" : "Terminal"
             tabName = "\(base) #\(count)"
         }
-        let tab = TabItem(surfaceView: surfaceView, name: tabName, isClaude: isClaude)
+        let tab = TabItem(surface: surface, name: tabName, isClaude: isClaude)
+        surface.tabId = tab.id
         tab.badgeState = isClaude ? .idle : .terminalIdle
         var envVars: [String: String] = [:]
         if isClaude {
@@ -544,18 +528,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             envVars["DECKARD_SESSION_TYPE"] = "claude"
         }
 
-        // Register the shell PID with Deckard via the control socket so
-        // ProcessMonitor can match login PIDs to surfaces. The register-pid
-        // script registers $$, then execs the trailing command (PID preserved).
-        // No /bin/sh -c wrapper needed — avoids shell quoting issues.
-        let socketPath = ControlSocket.shared.path
-        let sid = surfaceView.surfaceId.uuidString
-        let binPath = Bundle.main.resourceURL?.appendingPathComponent("bin").path ?? ""
-
-        // Both tab types start the user's default shell as a login shell.
-        // Claude tabs send the claude command as initial input (like typing it).
-        let userShell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
-        let command = "direct:\(binPath)/register-pid \(sid) \(socketPath) \(userShell) -l"
         let initialInput: String?
         if isClaude {
             let extraArgs = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
@@ -578,27 +550,23 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             initialInput = nil
         }
 
-        DiagnosticLog.shared.log("surface", "createTab: \(isClaude ? "claude" : "terminal") command=\(command)")
+        DiagnosticLog.shared.log("surface", "createTab: \(isClaude ? "claude" : "terminal") surfaceId=\(surface.surfaceId)")
 
-        surfaceView.createSurface(
-            app: app,
-            tabId: tab.id,
+        surface.startShell(
             workingDirectory: project.path,
-            command: command,
             envVars: envVars,
             initialInput: initialInput
         )
+
+        surface.onProcessExit = { [weak self] exitedSurface in
+            self?.handleSurfaceClosedById(exitedSurface.surfaceId)
+        }
 
         project.tabs.append(tab)
         tabCreationOrder.append(tab.id)
     }
 
-    /// Guards against overlapping ghostty_surface_new() calls.
-    /// DispatchQueue.main.async does NOT provide real serialization —
-    /// IOSurfaceCreate re-enters the runloop and processes main-queue blocks.
-    /// A background-thread timer is the only reliable cooldown mechanism.
-    /// Excess requests are dropped (not queued) to avoid creating tabs
-    /// after the user releases the key.
+    /// Guards against rapid duplicate tab creation from key repeat.
     private var isCreatingTab = false
 
     func addTabToCurrentProject(isClaude: Bool) {
@@ -617,12 +585,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         showTab(project.tabs[project.selectedTabIndex])
         saveState()
 
-        // Clear via background thread — can't be triggered by
-        // IOSurface runloop re-entrance (unlike main-queue blocks).
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.3) { [weak self] in
-            DispatchQueue.main.async {
-                self?.isCreatingTab = false
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            self?.isCreatingTab = false
         }
     }
 
@@ -632,7 +596,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         guard idx >= 0, idx < project.tabs.count else { return }
 
         let tab = project.tabs[idx]
-        tab.surfaceView.destroySurface()
+        tab.surface.terminate()
         tabCreationOrder.removeAll { $0 == tab.id }
 
         project.tabs.remove(at: idx)
@@ -678,19 +642,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private func showTab(_ tab: TabItem) {
         hideEmptyState()
 
-        let view = tab.surfaceView
+        let view = tab.surface.view
 
         // Remove the previous surface view from the hierarchy.
-        // Only one Metal surface is in the container at a time — this avoids
-        // wasted GPU rendering for occluded surfaces and resource exhaustion
-        // during session restore with many tabs.
+        // Only one terminal view is in the container at a time.
         if let prev = currentTerminalView, prev !== view {
             prev.removeFromSuperview()
         }
 
         // Add the new surface view (or re-add if it was previously removed).
-        // viewDidMoveToWindow fires on add, which calls updateSurfaceSize()
-        // to kick the Metal renderer.
         if view.superview !== terminalContainerView {
             view.translatesAutoresizingMaskIntoConstraints = false
             terminalContainerView.addSubview(view)
@@ -706,9 +666,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let ok = window?.makeFirstResponder(view) ?? false
         DiagnosticLog.shared.log("focus",
-            "showTab: makeFirstResponder=\(ok) surfaceId=\(view.surfaceId)" +
-            " frame=\(view.frame) surfaceAlive=\(view.surface != nil)" +
-            " wantsLayer=\(view.wantsLayer) hasLayer=\(view.layer != nil)")
+            "showTab: makeFirstResponder=\(ok) surfaceId=\(tab.surface.surfaceId)" +
+            " frame=\(view.frame)")
         refreshContextBar(for: tab)
     }
 
@@ -783,21 +742,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Process Monitor
 
-    private func startFocusHealthCheck() {
-        focusHealthTimer = Timer.scheduledTimer(withTimeInterval: 10, repeats: true) { [weak self] _ in
-            guard let self = self,
-                  let view = self.currentTerminalView,
-                  view.surface != nil,
-                  !view.isHidden,
-                  self.window?.isKeyWindow == true else { return }
-            if self.window?.firstResponder !== view {
-                DiagnosticLog.shared.log("health",
-                    "MISMATCH: expected=\(view.surfaceId) actual=\(type(of: self.window?.firstResponder))")
-                self.window?.makeFirstResponder(view)
-            }
-        }
-    }
-
     private func startProcessMonitor() {
         processMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
@@ -856,57 +800,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    func focusedSurface() -> ghostty_surface_t? {
-        guard let project = currentProject else { return nil }
-        let idx = project.selectedTabIndex
-        guard idx >= 0, idx < project.tabs.count else { return nil }
-        return project.tabs[idx].surfaceView.surface
-    }
-
-    func forEachSurface(_ body: (ghostty_surface_t) -> Void) {
+    func setTitle(_ title: String, forSurfaceId surfaceId: UUID) {
         for project in projects {
-            for tab in project.tabs {
-                if let surface = tab.surfaceView.surface {
-                    body(surface)
-                }
-            }
-        }
-    }
-
-    // MARK: - Theme
-
-    @objc private func themeDidChange(_ notification: Notification) {
-        applyThemeColors(ThemeManager.shared.currentColors)
-    }
-
-    private func applyThemeColors(_ colors: ThemeColors) {
-        currentThemeColors = colors
-        window?.backgroundColor = colors.background
-        window?.appearance = colors.isDark
-            ? NSAppearance(named: .darkAqua) : NSAppearance(named: .aqua)
-        sidebarView.layer?.backgroundColor = colors.sidebarBackground.cgColor
-        tabBar.layer?.backgroundColor = colors.tabBarBackground.cgColor
-        emptyStateView?.layer?.backgroundColor = colors.background.cgColor
-        openFolderButton.contentTintColor = colors.secondaryText
-        rebuildSidebar()
-        rebuildTabBar()
-    }
-
-    func setTitle(_ title: String, forSurface surface: ghostty_surface_t?) {
-        guard let surface = surface else { return }
-        for project in projects {
-            for tab in project.tabs where tab.surfaceView.surface == surface {
-                tab.surfaceView.title = title
-                return
-            }
-        }
-    }
-
-    func setPwd(_ pwd: String, forSurface surface: ghostty_surface_t?) {
-        guard let surface = surface else { return }
-        for project in projects {
-            for tab in project.tabs where tab.surfaceView.surface == surface {
-                tab.surfaceView.pwd = pwd
+            for tab in project.tabs where tab.surface.surfaceId == surfaceId {
+                tab.surface.title = title
+                rebuildTabBar()
                 return
             }
         }
@@ -916,13 +814,13 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for (pi, project) in projects.enumerated() {
             if let ti = project.tabs.firstIndex(where: { $0.id == surfaceId }) {
                 let tab = project.tabs[ti]
-                tab.surfaceView.destroySurface()
+                tab.surface.terminate()
                 tabCreationOrder.removeAll { $0 == tab.id }
 
                 project.tabs.remove(at: ti)
 
                 if project.tabs.isEmpty && pi == selectedProjectIndex {
-                    currentTerminalView?.isHidden = true
+                    currentTerminalView?.removeFromSuperview()
                     currentTerminalView = nil
                     rebuildTabBar()
                     rebuildSidebar()
@@ -1129,8 +1027,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             selectProject(at: selectedIdx)
         }
 
-        // Phase 2: Create remaining surfaces progressively, one per run loop cycle.
-        // Each ghostty_surface_new() takes 3-11ms so the app stays responsive.
+        // Phase 2: Create remaining surfaces progressively with small delays for UX.
         createTabsProgressively(pending)
     }
 
@@ -1178,13 +1075,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             project.tabs.insert(tab, at: min(insertAt, project.tabs.count))
         }
 
-        // Use background-thread timer for genuine serialization.
-        // DispatchQueue.main.async fires during IOSurfaceCreate's runloop
-        // re-entrance, causing all tabs to be created in a single burst.
-        DispatchQueue.global(qos: .userInitiated).asyncAfter(deadline: .now() + 0.15) { [self] in
-            DispatchQueue.main.async {
-                self.createTabsProgressively(Array(remaining.dropFirst()))
-            }
+        // Small delay between tab creations for smoother UX during restore.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [self] in
+            self.createTabsProgressively(Array(remaining.dropFirst()))
         }
     }
 
@@ -1193,10 +1086,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     func rebuildSidebar() {
         let savedFR = window?.firstResponder
         defer {
-            if let terminal = savedFR as? TerminalNSView,
+            if let terminal = currentTerminalView, savedFR === terminal,
                window?.firstResponder !== terminal {
                 DiagnosticLog.shared.log("sidebar",
-                    "rebuildSidebar: focus stolen! restoring surfaceId=\(terminal.surfaceId)")
+                    "rebuildSidebar: focus stolen! restoring terminal view")
                 window?.makeFirstResponder(terminal)
             }
         }
@@ -1392,10 +1285,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         defer {
             isRebuildingTabBar = false
             // Restore focus if the rebuild stole it from the terminal
-            if let terminal = savedFirstResponder as? TerminalNSView,
+            if let terminal = currentTerminalView, savedFirstResponder === terminal,
                window?.firstResponder !== terminal {
                 DiagnosticLog.shared.log("tabbar",
-                    "rebuildTabBar: focus stolen! restoring surfaceId=\(terminal.surfaceId)")
+                    "rebuildTabBar: focus stolen! restoring terminal view")
                 window?.makeFirstResponder(terminal)
             }
             savedFirstResponder = nil
@@ -1503,7 +1396,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         guard idx >= 0, idx < project.tabs.count else { return }
 
         let tab = project.tabs[idx]
-        tab.surfaceView.destroySurface()
+        tab.surface.terminate()
         tabCreationOrder.removeAll { $0 == tab.id }
 
         project.tabs.remove(at: idx)
@@ -1574,7 +1467,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
         label = NSTextField(labelWithString: title)
         label.font = bold ? .boldSystemFont(ofSize: 12) : .systemFont(ofSize: 12)
-        label.textColor = ThemeManager.shared.currentColors.primaryText
+        label.textColor = ThemeColors.default.primaryText
         label.lineBreakMode = .byTruncatingTail
         label.maximumNumberOfLines = 1
 
@@ -1607,7 +1500,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
     override func draw(_ dirtyRect: NSRect) {
         if isSelected {
-            ThemeManager.shared.currentColors.selectedBackground.setFill()
+            ThemeColors.default.selectedBackground.setFill()
             bounds.fill()
         }
     }
@@ -1807,7 +1700,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
         label = NSTextField(labelWithString: displayTitle)
         label.font = .systemFont(ofSize: 12)
-        let tc = ThemeManager.shared.currentColors
+        let tc = ThemeColors.default
         label.textColor = isSelected ? tc.primaryText : tc.secondaryText
         label.lineBreakMode = .byTruncatingTail
         label.setContentHuggingPriority(.defaultHigh, for: .horizontal)
@@ -1858,7 +1751,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
         NSLayoutConstraint.activate(constraints)
 
         if isSelected {
-            layer?.backgroundColor = ThemeManager.shared.currentColors.selectedBackground.cgColor
+            layer?.backgroundColor = ThemeColors.default.selectedBackground.cgColor
         }
 
     }
@@ -1980,7 +1873,7 @@ class AddTabButton: NSView {
         self.rightClickAction = rightClickAction
         label = NSTextField(labelWithString: "  +")
         label.font = .systemFont(ofSize: 12, weight: .medium)
-        label.textColor = ThemeManager.shared.currentColors.secondaryText
+        label.textColor = ThemeColors.default.secondaryText
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         toolTip = shortcutTooltip("New Claude tab", for: .newClaudeTab)
@@ -2020,7 +1913,7 @@ class ReorderableStackView: NSStackView {
     private let dropIndicator: NSView = {
         let v = NSView()
         v.wantsLayer = true
-        v.layer?.backgroundColor = ThemeManager.shared.currentColors.foreground.withAlphaComponent(0.4).cgColor
+        v.layer?.backgroundColor = ThemeColors.default.foreground.withAlphaComponent(0.4).cgColor
         v.isHidden = true
         return v
     }()
@@ -2111,7 +2004,7 @@ class ReorderableHStackView: NSStackView {
     private let dropIndicator: NSView = {
         let v = NSView()
         v.wantsLayer = true
-        v.layer?.backgroundColor = ThemeManager.shared.currentColors.foreground.withAlphaComponent(0.4).cgColor
+        v.layer?.backgroundColor = ThemeColors.default.foreground.withAlphaComponent(0.4).cgColor
         v.isHidden = true
         return v
     }()

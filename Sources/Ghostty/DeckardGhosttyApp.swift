@@ -273,7 +273,8 @@ class DeckardGhosttyApp {
     }
 
     func focusedSurface() -> ghostty_surface_t? {
-        return AppDelegate.shared?.windowController?.focusedSurface()
+        // No longer available after SwiftTerm migration
+        return nil
     }
 
     // MARK: - Theme Colors
@@ -327,20 +328,12 @@ class DeckardGhosttyApp {
         updateDefaultBackground(from: newConfig)
         updateDefaultForeground(from: newConfig)
 
-        // Collect surface pointers on main thread (must access UI state on main)
-        var surfaces: [ghostty_surface_t] = []
-        if let wc = AppDelegate.shared?.windowController {
-            wc.forEachSurface { surfaces.append($0) }
-        }
-
         // Swap config reference immediately so new surfaces use the new config
         let oldConfig = self.config
         self.config = newConfig
 
         ghostty_app_update_config(app, newConfig)
-        for surface in surfaces {
-            ghostty_surface_update_config(surface, newConfig)
-        }
+        // Surface config updates no longer needed after SwiftTerm migration
         if let oldConfig { ghostty_config_free(oldConfig) }
     }
 
