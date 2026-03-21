@@ -188,9 +188,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
         }
 
-        SessionManager.shared.startAutosave { [weak self] in
-            self?.captureState() ?? DeckardState()
-        }
+        // Start autosave AFTER restore completes — if we autosave during
+        // progressive restore, a crash would lose the tabs not yet created.
+        // The autosave is started at the end of createTabsProgressively.
 
         // Delay process monitor start to let surfaces finish initializing.
         // IOSurfaceCreate can re-enter the runloop, and polling during that
@@ -1066,7 +1066,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private func restoreOrCreateInitial() {
         guard let state = SessionManager.shared.load(),
               let projectStates = state.projects, !projectStates.isEmpty else {
-            return  // Nothing to restore — user will use Cmd+T to open projects
+            // Nothing to restore — start autosave immediately
+            SessionManager.shared.startAutosave { [weak self] in
+                self?.captureState() ?? DeckardState()
+            }
+            return
         }
 
         isRestoring = true
@@ -1117,6 +1121,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             rebuildSidebar()
             rebuildTabBar()
             saveState()
+
+            // Start autosave now that restore is complete — autosaving
+            // during progressive restore would lose tabs on crash.
+            SessionManager.shared.startAutosave { [weak self] in
+                self?.captureState() ?? DeckardState()
+            }
 
             // Dump tab creation order → PID mapping for diagnostics
             let mapping = tabCreationOrder.enumerated().map { (i, id) -> String in
