@@ -606,6 +606,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         createTabInProject(project, isClaude: isClaude)
         project.selectedTabIndex = project.tabs.count - 1
         rebuildTabBar()
+        rebuildSidebar()
         showTab(project.tabs[project.selectedTabIndex])
         saveState()
 
