@@ -32,6 +32,19 @@
 		DD220001DD220001DD220001 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD220002DD220002DD220002 /* ProcessMonitor.swift */; };
 		DD330001DD330001DD330001 /* DiagnosticLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD330002DD330002DD330002 /* DiagnosticLog.swift */; };
 		DD440001DD440001DD440001 /* CrashReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD440002DD440002DD440002 /* CrashReporter.swift */; };
+		AA110001AA110001AA110001 /* ThemeColorsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA110002AA110002AA110002 /* ThemeColorsTests.swift */; };
+		AA120001AA120001AA120001 /* TerminalColorSchemeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA120002AA120002AA120002 /* TerminalColorSchemeTests.swift */; };
+		AA130001AA130001AA130001 /* SessionStateTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA130002AA130002AA130002 /* SessionStateTests.swift */; };
+		AA140001AA140001AA140001 /* ThemeManagerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA140002AA140002AA140002 /* ThemeManagerTests.swift */; };
+		AA150001AA150001AA150001 /* ControlMessageTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA150002AA150002AA150002 /* ControlMessageTests.swift */; };
+		AA160001AA160001AA160001 /* DiagnosticLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA160002AA160002AA160002 /* DiagnosticLogTests.swift */; };
+		AA170001AA170001AA170001 /* HookHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA170002AA170002AA170002 /* HookHandlerTests.swift */; };
+		AA180001AA180001AA180001 /* ProcessMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA180002AA180002AA180002 /* ProcessMonitorTests.swift */; };
+		AA190001AA190001AA190001 /* ContextMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA190002AA190002AA190002 /* ContextMonitorTests.swift */; };
+		AA1A0001AA1A0001AA1A0001 /* TerminalSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A0002AA1A0002AA1A0002 /* TerminalSurfaceTests.swift */; };
+		AA1B0001AA1B0001AA1B0001 /* WindowControllerLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B0002AA1B0002AA1B0002 /* WindowControllerLogicTests.swift */; };
+		AA1C0001AA1C0001AA1C0001 /* DeckardHooksInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1C0002AA1C0002AA1C0002 /* DeckardHooksInstallerTests.swift */; };
+		AA1D0001AA1D0001AA1D0001 /* CrashReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1D0002AA1D0002AA1D0002 /* CrashReporterTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -61,6 +74,19 @@
 		ST000005ST000005ST000005 /* TerminalSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSurface.swift; sourceTree = "<group>"; };
 		TE000001TE000001TE000001 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
 		TE000004TE000004TE000004 /* DeckardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeckardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AA110002AA110002AA110002 /* ThemeColorsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeColorsTests.swift; sourceTree = "<group>"; };
+		AA120002AA120002AA120002 /* TerminalColorSchemeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalColorSchemeTests.swift; sourceTree = "<group>"; };
+		AA130002AA130002AA130002 /* SessionStateTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionStateTests.swift; sourceTree = "<group>"; };
+		AA140002AA140002AA140002 /* ThemeManagerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManagerTests.swift; sourceTree = "<group>"; };
+		AA150002AA150002AA150002 /* ControlMessageTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlMessageTests.swift; sourceTree = "<group>"; };
+		AA160002AA160002AA160002 /* DiagnosticLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogTests.swift; sourceTree = "<group>"; };
+		AA170002AA170002AA170002 /* HookHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookHandlerTests.swift; sourceTree = "<group>"; };
+		AA180002AA180002AA180002 /* ProcessMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitorTests.swift; sourceTree = "<group>"; };
+		AA190002AA190002AA190002 /* ContextMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextMonitorTests.swift; sourceTree = "<group>"; };
+		AA1A0002AA1A0002AA1A0002 /* TerminalSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSurfaceTests.swift; sourceTree = "<group>"; };
+		AA1B0002AA1B0002AA1B0002 /* WindowControllerLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowControllerLogicTests.swift; sourceTree = "<group>"; };
+		AA1C0002AA1C0002AA1C0002 /* DeckardHooksInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckardHooksInstallerTests.swift; sourceTree = "<group>"; };
+		AA1D0002AA1D0002AA1D0002 /* CrashReporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashReporterTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -187,7 +213,20 @@
 		TE000003TE000003TE000003 /* Tests */ = {
 			isa = PBXGroup;
 			children = (
+				AA150002AA150002AA150002 /* ControlMessageTests.swift */,
+				AA190002AA190002AA190002 /* ContextMonitorTests.swift */,
+				AA1D0002AA1D0002AA1D0002 /* CrashReporterTests.swift */,
+				AA1C0002AA1C0002AA1C0002 /* DeckardHooksInstallerTests.swift */,
+				AA160002AA160002AA160002 /* DiagnosticLogTests.swift */,
+				AA170002AA170002AA170002 /* HookHandlerTests.swift */,
+				AA180002AA180002AA180002 /* ProcessMonitorTests.swift */,
+				AA130002AA130002AA130002 /* SessionStateTests.swift */,
 				TE000001TE000001TE000001 /* SmokeTests.swift */,
+				AA120002AA120002AA120002 /* TerminalColorSchemeTests.swift */,
+				AA1A0002AA1A0002AA1A0002 /* TerminalSurfaceTests.swift */,
+				AA110002AA110002AA110002 /* ThemeColorsTests.swift */,
+				AA140002AA140002AA140002 /* ThemeManagerTests.swift */,
+				AA1B0002AA1B0002AA1B0002 /* WindowControllerLogicTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -339,6 +378,19 @@
 			buildActionMask = 2147483647;
 			files = (
 				TE000002TE000002TE000002 /* SmokeTests.swift in Sources */,
+				AA110001AA110001AA110001 /* ThemeColorsTests.swift in Sources */,
+				AA120001AA120001AA120001 /* TerminalColorSchemeTests.swift in Sources */,
+				AA130001AA130001AA130001 /* SessionStateTests.swift in Sources */,
+				AA140001AA140001AA140001 /* ThemeManagerTests.swift in Sources */,
+				AA150001AA150001AA150001 /* ControlMessageTests.swift in Sources */,
+				AA160001AA160001AA160001 /* DiagnosticLogTests.swift in Sources */,
+				AA170001AA170001AA170001 /* HookHandlerTests.swift in Sources */,
+				AA180001AA180001AA180001 /* ProcessMonitorTests.swift in Sources */,
+				AA190001AA190001AA190001 /* ContextMonitorTests.swift in Sources */,
+				AA1A0001AA1A0001AA1A0001 /* TerminalSurfaceTests.swift in Sources */,
+				AA1B0001AA1B0001AA1B0001 /* WindowControllerLogicTests.swift in Sources */,
+				AA1C0001AA1C0001AA1C0001 /* DeckardHooksInstallerTests.swift in Sources */,
+				AA1D0001AA1D0001AA1D0001 /* CrashReporterTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
