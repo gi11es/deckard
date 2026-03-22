@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		TE000002TE000002TE000002 /* SmokeTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = TE000001TE000001TE000001 /* SmokeTests.swift */; };
 		0D4C913A8846099ED84D5816 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7F505D5B7348F40C2CBD6F83 /* AppDelegate.swift */; };
 
 		AABB0001AABB0001AABB0001 /* KeyboardShortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = AABB0002AABB0002AABB0002 /* KeyboardShortcuts */; };
@@ -58,6 +59,8 @@
 		DD330002DD330002DD330002 /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
 		DD440002DD440002DD440002 /* CrashReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashReporter.swift; sourceTree = "<group>"; };
 		ST000005ST000005ST000005 /* TerminalSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSurface.swift; sourceTree = "<group>"; };
+		TE000001TE000001TE000001 /* SmokeTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SmokeTests.swift; sourceTree = "<group>"; };
+		TE000004TE000004TE000004 /* DeckardTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DeckardTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -68,6 +71,13 @@
 				AABB0001AABB0001AABB0001 /* KeyboardShortcuts in Frameworks */,
 				FF110001FF110001FF110001 /* Fuse in Frameworks */,
 				ST000001ST000001ST000001 /* SwiftTerm in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		TE000007TE000007TE000007 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -90,6 +100,7 @@
 			isa = PBXGroup;
 			children = (
 				70EC2F52C6EEBDDB320E0421 /* Sources */,
+				TE000003TE000003TE000003 /* Tests */,
 				D8C6C048766D6149A60A67D0 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -156,6 +167,7 @@
 			isa = PBXGroup;
 			children = (
 				A32278396B92132B3CE7A5A4 /* Deckard.app */,
+				TE000004TE000004TE000004 /* DeckardTests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -170,6 +182,14 @@
 				AABB0007AABB0007AABB0007 /* DeckardHooksInstaller.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		TE000003TE000003TE000003 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				TE000001TE000001TE000001 /* SmokeTests.swift */,
+			);
+			path = Tests;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -197,6 +217,23 @@
 			productName = Deckard;
 			productReference = A32278396B92132B3CE7A5A4 /* Deckard.app */;
 			productType = "com.apple.product-type.application";
+		};
+		TE000005TE000005TE000005 /* DeckardTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = TE00000ATE00000ATE00000A /* Build configuration list for PBXNativeTarget "DeckardTests" */;
+			buildPhases = (
+				TE000006TE000006TE000006 /* Sources */,
+				TE000007TE000007TE000007 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				TE00000BTE00000BTE00000B /* PBXTargetDependency */,
+			);
+			name = DeckardTests;
+			productName = DeckardTests;
+			productReference = TE000004TE000004TE000004 /* DeckardTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
 		};
 /* End PBXNativeTarget section */
 
@@ -227,6 +264,7 @@
 			projectRoot = "";
 			targets = (
 				A18E8FFD16387CEF6CAAEF2C /* Deckard */,
+				TE000005TE000005TE000005 /* DeckardTests */,
 			);
 		};
 /* End PBXProject section */
@@ -296,7 +334,33 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		TE000006TE000006TE000006 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				TE000002TE000002TE000002 /* SmokeTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXContainerItemProxy section */
+		TE00000CTE00000CTE00000C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 7377020573550BE72FAC0861 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A18E8FFD16387CEF6CAAEF2C;
+			remoteInfo = Deckard;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXTargetDependency section */
+		TE00000BTE00000BTE00000B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = A18E8FFD16387CEF6CAAEF2C /* Deckard */;
+			targetProxy = TE00000CTE00000CTE00000C /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
 
 /* Begin XCBuildConfiguration section */
 		1078FE7F414E6E83E2E53617 /* Release */ = {
@@ -454,6 +518,44 @@
 			};
 			name = Debug;
 		};
+		TE000008TE000008TE000008 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.deckard.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Deckard.app/Contents/MacOS/Deckard";
+			};
+			name = Debug;
+		};
+		TE000009TE000009TE000009 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				COMBINE_HIDPI_IMAGES = YES;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+					"@loader_path/../Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.deckard.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = macosx;
+				SWIFT_VERSION = 5.0;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Deckard.app/Contents/MacOS/Deckard";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -471,6 +573,15 @@
 			buildConfigurations = (
 				CCF7A007D7B01C55A830074D /* Debug */,
 				2C43A230E33E1F5B268CA887 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		TE00000ATE00000ATE00000A /* Build configuration list for PBXNativeTarget "DeckardTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				TE000008TE000008TE000008 /* Debug */,
+				TE000009TE000009TE000009 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;
