@@ -9,6 +9,7 @@ class ControlSocket {
     private var socketPath: String = ""
     private var listenSource: DispatchSourceRead?
     private var clientSources: [Int32: DispatchSourceRead] = [:]
+    private let socketQueue = DispatchQueue(label: "com.deckard.control-socket")
 
     /// Callback for incoming messages.
     var onMessage: ((ControlMessage, @escaping (ControlResponse) -> Void) -> Void)?
@@ -60,8 +61,8 @@ class ControlSocket {
             return
         }
 
-        // Accept connections on a background queue
-        let source = DispatchSource.makeReadSource(fileDescriptor: serverSocket, queue: .global(qos: .utility))
+        // Accept connections on a serial queue to protect shared state
+        let source = DispatchSource.makeReadSource(fileDescriptor: serverSocket, queue: socketQueue)
         source.setEventHandler { [weak self] in
             self?.acceptConnection()
         }
@@ -102,7 +103,7 @@ class ControlSocket {
         guard clientFd >= 0 else { return }
 
         // Read data from the client
-        let source = DispatchSource.makeReadSource(fileDescriptor: clientFd, queue: .global(qos: .utility))
+        let source = DispatchSource.makeReadSource(fileDescriptor: clientFd, queue: socketQueue)
         source.setEventHandler { [weak self] in
             self?.readFromClient(fd: clientFd)
         }
