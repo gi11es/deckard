@@ -186,6 +186,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
     private var fontSizeField: NSTextField?
     private var fontSizeStepper: NSStepper?
     private var fontPreviewLabel: NSTextField?
+    private var scrollbackField: NSTextField?
 
     /// A flipped NSView so card layout starts from the top.
     private class FlippedCardContainer: NSView {
@@ -329,6 +330,34 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         previewBox.addSubview(previewText)
         self.fontPreviewLabel = previewText
 
+        // --- Scrollback section ---
+        let scrollLabel = NSTextField(labelWithString: "Scrollback:")
+        scrollLabel.font = .systemFont(ofSize: 13, weight: .medium)
+        scrollLabel.translatesAutoresizingMaskIntoConstraints = false
+        pane.addSubview(scrollLabel)
+
+        let savedScrollback = UserDefaults.standard.integer(forKey: "terminalScrollback")
+        let currentScrollback = savedScrollback > 0 ? savedScrollback : TerminalSurface.defaultScrollback
+
+        let scrollField = NSTextField(string: "\(currentScrollback)")
+        scrollField.translatesAutoresizingMaskIntoConstraints = false
+        scrollField.alignment = .right
+        let scrollFormatter = NumberFormatter()
+        scrollFormatter.minimum = 100
+        scrollFormatter.maximum = 100_000
+        scrollFormatter.allowsFloats = false
+        scrollField.formatter = scrollFormatter
+        scrollField.target = self
+        scrollField.action = #selector(scrollbackChanged(_:))
+        self.scrollbackField = scrollField
+        pane.addSubview(scrollField)
+
+        let scrollUnit = NSTextField(labelWithString: "lines")
+        scrollUnit.font = .systemFont(ofSize: 13)
+        scrollUnit.textColor = .secondaryLabelColor
+        scrollUnit.translatesAutoresizingMaskIntoConstraints = false
+        pane.addSubview(scrollUnit)
+
         // --- Badge section ---
         let divider = NSBox()
         divider.boxType = .separator
@@ -393,8 +422,19 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             previewText.leadingAnchor.constraint(equalTo: previewBox.leadingAnchor, constant: 8),
             previewText.trailingAnchor.constraint(equalTo: previewBox.trailingAnchor, constant: -8),
 
+            // Scrollback section
+            scrollLabel.topAnchor.constraint(equalTo: previewBox.bottomAnchor, constant: 12),
+            scrollLabel.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
+
+            scrollField.centerYAnchor.constraint(equalTo: scrollLabel.centerYAnchor),
+            scrollField.leadingAnchor.constraint(equalTo: scrollLabel.trailingAnchor, constant: 8),
+            scrollField.widthAnchor.constraint(equalToConstant: 70),
+
+            scrollUnit.centerYAnchor.constraint(equalTo: scrollLabel.centerYAnchor),
+            scrollUnit.leadingAnchor.constraint(equalTo: scrollField.trailingAnchor, constant: 4),
+
             // Badge section
-            divider.topAnchor.constraint(equalTo: previewBox.bottomAnchor, constant: 16),
+            divider.topAnchor.constraint(equalTo: scrollLabel.bottomAnchor, constant: 16),
             divider.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
             divider.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -20),
 
@@ -501,6 +541,15 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         // Notify terminals to update font
         NotificationCenter.default.post(name: .deckardFontChanged, object: nil,
                                         userInfo: ["font": font])
+    }
+
+    // MARK: - Scrollback Settings
+
+    @objc private func scrollbackChanged(_ sender: NSTextField) {
+        guard let lines = Int(sender.stringValue), lines >= 100, lines <= 100_000 else { return }
+        UserDefaults.standard.set(lines, forKey: "terminalScrollback")
+        NotificationCenter.default.post(name: .deckardScrollbackChanged, object: nil,
+                                        userInfo: ["lines": lines])
     }
 
     // MARK: - Badge Color Grid

@@ -26,11 +26,14 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         terminalView.processDelegate = self
         // Apply current theme colors
         ThemeManager.shared.currentScheme.apply(to: terminalView)
-        // Apply saved font
+        // Apply saved font and scrollback
         applySavedFont()
-        // Observe font changes from settings
+        applySavedScrollback()
+        // Observe settings changes
         NotificationCenter.default.addObserver(self, selector: #selector(fontDidChange(_:)),
                                                name: .deckardFontChanged, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(scrollbackDidChange(_:)),
+                                               name: .deckardScrollbackChanged, object: nil)
     }
 
     /// Apply a color scheme to this terminal.
@@ -110,6 +113,22 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         }
     }
 
+    // MARK: - Scrollback
+
+    static let defaultScrollback = 10_000
+
+    private func applySavedScrollback() {
+        let saved = UserDefaults.standard.integer(forKey: "terminalScrollback")
+        let scrollback = saved > 0 ? saved : Self.defaultScrollback
+        terminalView.getTerminal().buffer.changeHistorySize(scrollback)
+    }
+
+    @objc private func scrollbackDidChange(_ notification: Notification) {
+        if let lines = notification.userInfo?["lines"] as? Int {
+            terminalView.getTerminal().buffer.changeHistorySize(lines)
+        }
+    }
+
     // MARK: - LocalProcessTerminalViewDelegate
 
     func sizeChanged(source: LocalProcessTerminalView, newCols: Int, newRows: Int) {
@@ -145,4 +164,5 @@ extension Notification.Name {
     static let deckardNewTab = Notification.Name("deckardNewTab")
     static let deckardCloseTab = Notification.Name("deckardCloseTab")
     static let deckardFontChanged = Notification.Name("deckardFontChanged")
+    static let deckardScrollbackChanged = Notification.Name("deckardScrollbackChanged")
 }
