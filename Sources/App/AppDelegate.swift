@@ -58,6 +58,20 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         log.log("startup", "Installing Claude Code hooks...")
         DeckardHooksInstaller.installIfNeeded()
 
+        // Clean up orphaned tmux sessions from previous runs
+        if TerminalSurface.tmuxAvailable {
+            let savedState = SessionManager.shared.load()
+            let activeSessions = Set(
+                (savedState?.projects ?? []).flatMap(\.tabs).compactMap(\.tmuxSessionName)
+            )
+            DispatchQueue.global(qos: .utility).async {
+                TerminalSurface.cleanupOrphanedTmuxSessions(activeSessions: activeSessions)
+            }
+            log.log("startup", "tmux available, \(activeSessions.count) saved sessions")
+        } else {
+            log.log("startup", "tmux not available")
+        }
+
         // Create and show the main window.
         log.log("startup", "Creating window controller...")
         windowController = DeckardWindowController()

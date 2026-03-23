@@ -11,10 +11,32 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     var pwd: String?
     var isAlive: Bool { !processExited }
     var onProcessExit: ((TerminalSurface) -> Void)?
+    /// The tmux session name, if this terminal is wrapped in tmux.
+    var tmuxSessionName: String?
 
     private let terminalView: LocalProcessTerminalView
     private var processExited = false
     private var pendingInitialInput: String?
+
+    // MARK: - tmux Detection
+
+    /// Whether tmux is available on this system (cached).
+    static let tmuxPath: String? = {
+        let candidates = ["/opt/homebrew/bin/tmux", "/usr/local/bin/tmux"]
+        for path in candidates {
+            if FileManager.default.isExecutableFile(atPath: path) { return path }
+        }
+        // Search PATH
+        if let pathEnv = ProcessInfo.processInfo.environment["PATH"] {
+            for dir in pathEnv.split(separator: ":") {
+                let full = "\(dir)/tmux"
+                if FileManager.default.isExecutableFile(atPath: full) { return full }
+            }
+        }
+        return nil
+    }()
+
+    static var tmuxAvailable: Bool { tmuxPath != nil }
 
     /// The NSView to add to the view hierarchy.
     var view: NSView { terminalView }
@@ -42,8 +64,11 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     }
 
     /// Start a shell process in the terminal.
+    /// - Parameter tmuxSession: If set, attach to this tmux session (resume). If nil and tmux is
+    ///   available and no initialInput (not a Claude tab), create a new tmux session.
     func startShell(workingDirectory: String? = nil, command: String? = nil,
-                    envVars: [String: String] = [:], initialInput: String? = nil) {
+                    envVars: [String: String] = [:], initialInput: String? = nil,
+                    tmuxSession: String? = nil) {
         let shell = command ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
 
         // Build environment
@@ -56,22 +81,71 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
 
         let envPairs = env.map { "\($0.key)=\($0.value)" }
 
-        terminalView.startProcess(
-            executable: shell,
-            args: ["-l"],
-            environment: envPairs,
-            execName: "-" + (shell as NSString).lastPathComponent,
-            currentDirectory: workingDirectory
-        )
+        // Decide whether to use tmux:
+        // - tmux must be available
+        // - No initialInput (Claude tabs use their own resume mechanism)
+        // - Either resuming an existing session or creating a new terminal tab
+        let tmuxSettingEnabled = UserDefaults.standard.object(forKey: "useTmux") as? Bool ?? true
+        let useTmux = Self.tmuxAvailable && tmuxSettingEnabled && initialInput == nil
+        let tmuxPath = Self.tmuxPath ?? "tmux"
 
-        // Register shell PID with ProcessMonitor directly
-        let pid = terminalView.process.shellPid
-        if pid > 0 {
-            ProcessMonitor.shared.registerShellPid(pid, forSurface: surfaceId.uuidString)
+        if useTmux {
+            let sessionName = tmuxSession ?? "deckard-\(surfaceId.uuidString.prefix(8))"
+            self.tmuxSessionName = sessionName
+
+            // tmux new-session -A: attach if exists, create if not
+            // -s: session name, -c: starting directory (only for new sessions)
+            var args = ["new-session", "-A", "-s", sessionName]
+            if let cwd = workingDirectory { args += ["-c", cwd] }
+
+            terminalView.startProcess(
+                executable: tmuxPath,
+                args: args,
+                environment: envPairs,
+                currentDirectory: workingDirectory
+            )
+
+            // Hide the tmux status bar after attaching. The -f config only
+            // applies on server start; this covers reattach to existing servers.
+            let tmux = tmuxPath
+            let session = sessionName
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.3) {
+                let task = Process()
+                task.executableURL = URL(fileURLWithPath: tmux)
+                task.arguments = ["set-option", "-t", session, "status", "off"]
+                task.standardOutput = FileHandle.nullDevice
+                task.standardError = FileHandle.nullDevice
+                try? task.run()
+            }
+        } else {
+            self.tmuxSessionName = nil
+            terminalView.startProcess(
+                executable: shell,
+                args: ["-l"],
+                environment: envPairs,
+                execName: "-" + (shell as NSString).lastPathComponent,
+                currentDirectory: workingDirectory
+            )
+        }
+
+        // Register shell PID with ProcessMonitor.
+        // For tmux sessions, the client PID isn't useful — query tmux for the
+        // actual shell PID inside the session after it starts.
+        let clientPid = terminalView.process.shellPid
+        if useTmux, let sessionName = self.tmuxSessionName {
+            let sid = surfaceId.uuidString
+            DispatchQueue.global(qos: .utility).asyncAfter(deadline: .now() + 0.5) {
+                if let shellPid = Self.tmuxSessionPid(sessionName: sessionName) {
+                    ProcessMonitor.shared.registerShellPid(shellPid, forSurface: sid)
+                    DiagnosticLog.shared.log("surface", "tmux shell pid: \(shellPid) for session \(sessionName)")
+                }
+            }
+        } else if clientPid > 0 {
+            ProcessMonitor.shared.registerShellPid(clientPid, forSurface: surfaceId.uuidString)
         }
 
         DiagnosticLog.shared.log("surface",
-            "startShell: surfaceId=\(surfaceId) shell=\(shell) pid=\(pid) cwd=\(workingDirectory ?? "(nil)")")
+            "startShell: surfaceId=\(surfaceId) shell=\(shell) pid=\(clientPid) tmux=\(useTmux) cwd=\(workingDirectory ?? "(nil)")")
 
         // Send initial input after a short delay for shell readline to be ready
         if let initialInput {
@@ -90,10 +164,78 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     }
 
     /// Terminate the shell process.
+    /// When closing a tab, also kill the tmux session so it doesn't orphan.
+    /// On app quit, call `detach()` instead to keep the session alive.
     func terminate() {
         guard !processExited else { return }
         processExited = true
         terminalView.process?.terminate()
+        // Kill the tmux session when tab is explicitly closed
+        killTmuxSession()
+    }
+
+    /// Detach from the tmux session without killing it (for app quit).
+    func detach() {
+        guard !processExited else { return }
+        processExited = true
+        // Just kill the local process — tmux session survives
+        terminalView.process?.terminate()
+    }
+
+    private func killTmuxSession() {
+        guard let name = tmuxSessionName, let path = Self.tmuxPath else { return }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: path)
+        task.arguments = ["kill-session", "-t", name]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        try? task.run()
+    }
+
+    /// Get the shell PID running inside a tmux session.
+    private static func tmuxSessionPid(sessionName: String) -> pid_t? {
+        guard let path = tmuxPath else { return nil }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: path)
+        task.arguments = ["list-panes", "-t", sessionName, "-F", "#{pane_pid}"]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+        try? task.run()
+        task.waitUntilExit()
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        if let firstLine = output.split(separator: "\n").first, let pid = pid_t(firstLine) {
+            return pid
+        }
+        return nil
+    }
+
+    /// Clean up orphaned deckard tmux sessions that aren't in the saved state.
+    static func cleanupOrphanedTmuxSessions(activeSessions: Set<String>) {
+        guard let path = tmuxPath else { return }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: path)
+        task.arguments = ["list-sessions", "-F", "#{session_name}"]
+        let pipe = Pipe()
+        task.standardOutput = pipe
+        task.standardError = FileHandle.nullDevice
+        try? task.run()
+        task.waitUntilExit()
+
+        let output = String(data: pipe.fileHandleForReading.readDataToEndOfFile(), encoding: .utf8) ?? ""
+        for line in output.split(separator: "\n") {
+            let name = String(line)
+            if name.hasPrefix("deckard-") && !activeSessions.contains(name) {
+                let kill = Process()
+                kill.executableURL = URL(fileURLWithPath: path)
+                kill.arguments = ["kill-session", "-t", name]
+                kill.standardOutput = FileHandle.nullDevice
+                kill.standardError = FileHandle.nullDevice
+                try? kill.run()
+                kill.waitUntilExit()
+                DiagnosticLog.shared.log("tmux", "cleaned up orphaned session: \(name)")
+            }
+        }
     }
 
     // MARK: - Font

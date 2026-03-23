@@ -39,6 +39,7 @@ struct ProjectTabState: Codable {
     var name: String
     var isClaude: Bool
     var sessionId: String?
+    var tmuxSessionName: String?
 }
 
 /// Manages saving and loading Deckard state.
