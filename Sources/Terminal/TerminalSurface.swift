@@ -24,6 +24,8 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         self.terminalView = LocalProcessTerminalView(frame: NSRect(x: 0, y: 0, width: 800, height: 600))
         super.init()
         terminalView.processDelegate = self
+        // Enable GPU-accelerated Metal renderer (falls back to CoreText if unavailable)
+        try? terminalView.setUseMetal(true)
         // Apply current theme colors
         ThemeManager.shared.currentScheme.apply(to: terminalView)
     }
