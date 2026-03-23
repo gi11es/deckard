@@ -1,0 +1,113 @@
+<h2>Theme Picker Design</h2>
+<p class="subtitle">Each theme shown as a card with its name and a mini terminal preview using the actual colors. Click to select your preferred layout.</p>
+
+<div class="options">
+  <div class="option" data-choice="3col" onclick="toggleSelect(this)">
+    <div class="letter">A</div>
+    <div class="content">
+      <h3>3-Column Grid</h3>
+      <p>Wider cards, more preview detail. ~3 themes visible per row.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="4col" onclick="toggleSelect(this)">
+    <div class="letter">B</div>
+    <div class="content">
+      <h3>4-Column Grid</h3>
+      <p>More themes visible at once, slightly smaller previews. Good balance.</p>
+    </div>
+  </div>
+  <div class="option" data-choice="5col" onclick="toggleSelect(this)">
+    <div class="letter">C</div>
+    <div class="content">
+      <h3>5-Column Grid</h3>
+      <p>Maximum density, compact previews. Best for quickly scanning many themes.</p>
+    </div>
+  </div>
+</div>
+
+<h3 style="margin-top: 32px;">Preview: How the theme cards would look</h3>
+<p class="subtitle">Each card shows the theme name and a mini terminal with colored sample text</p>
+
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 16px;">
+
+  <!-- Dracula -->
+  <div style="border-radius: 8px; overflow: hidden; border: 1px solid #444; cursor: pointer;">
+    <div style="background: #282a36; padding: 8px 10px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; line-height: 1.5;">
+      <span style="color: #50fa7b;">~</span><span style="color: #f8f8f2;"> $ </span><span style="color: #8be9fd;">ls</span><span style="color: #f8f8f2;"> -la</span><br>
+      <span style="color: #6272a4;">drwxr-xr-x</span> <span style="color: #bd93f9;">5</span> <span style="color: #f1fa8c;">user</span> <span style="color: #f8f8f2;">staff</span> <span style="color: #ff79c6;">160</span><br>
+      <span style="color: #ff5555;">error:</span> <span style="color: #f8f8f2;">something went wrong</span><br>
+      <span style="color: #50fa7b;">~</span><span style="color: #f8f8f2;"> $ </span><span style="color: #6272a4;">▌</span>
+    </div>
+    <div style="background: #21222c; padding: 6px 10px; color: #f8f8f2; font-size: 12px; font-weight: 500; border-top: 1px solid #44475a;">
+      Dracula
+    </div>
+  </div>
+
+  <!-- Nord -->
+  <div style="border-radius: 8px; overflow: hidden; border: 1px solid #444; cursor: pointer;">
+    <div style="background: #2e3440; padding: 8px 10px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; line-height: 1.5;">
+      <span style="color: #a3be8c;">~</span><span style="color: #d8dee9;"> $ </span><span style="color: #88c0d0;">ls</span><span style="color: #d8dee9;"> -la</span><br>
+      <span style="color: #4c566a;">drwxr-xr-x</span> <span style="color: #81a1c1;">5</span> <span style="color: #ebcb8b;">user</span> <span style="color: #d8dee9;">staff</span> <span style="color: #b48ead;">160</span><br>
+      <span style="color: #bf616a;">error:</span> <span style="color: #d8dee9;">something went wrong</span><br>
+      <span style="color: #a3be8c;">~</span><span style="color: #d8dee9;"> $ </span><span style="color: #4c566a;">▌</span>
+    </div>
+    <div style="background: #3b4252; padding: 6px 10px; color: #d8dee9; font-size: 12px; font-weight: 500; border-top: 1px solid #434c5e;">
+      Nord
+    </div>
+  </div>
+
+  <!-- Catppuccin Mocha -->
+  <div style="border-radius: 8px; overflow: hidden; border: 1px solid #444; cursor: pointer;">
+    <div style="background: #1e1e2e; padding: 8px 10px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; line-height: 1.5;">
+      <span style="color: #a6e3a1;">~</span><span style="color: #cdd6f4;"> $ </span><span style="color: #94e2d5;">ls</span><span style="color: #cdd6f4;"> -la</span><br>
+      <span style="color: #585b70;">drwxr-xr-x</span> <span style="color: #89b4fa;">5</span> <span style="color: #f9e2af;">user</span> <span style="color: #cdd6f4;">staff</span> <span style="color: #f5c2e7;">160</span><br>
+      <span style="color: #f38ba8;">error:</span> <span style="color: #cdd6f4;">something went wrong</span><br>
+      <span style="color: #a6e3a1;">~</span><span style="color: #cdd6f4;"> $ </span><span style="color: #585b70;">▌</span>
+    </div>
+    <div style="background: #181825; padding: 6px 10px; color: #cdd6f4; font-size: 12px; font-weight: 500; border-top: 1px solid #313244;">
+      Catppuccin Mocha
+    </div>
+  </div>
+
+  <!-- Gruvbox Dark -->
+  <div style="border-radius: 8px; overflow: hidden; border: 1px solid #444; cursor: pointer;">
+    <div style="background: #282828; padding: 8px 10px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; line-height: 1.5;">
+      <span style="color: #98971a;">~</span><span style="color: #ebdbb2;"> $ </span><span style="color: #689d6a;">ls</span><span style="color: #ebdbb2;"> -la</span><br>
+      <span style="color: #504945;">drwxr-xr-x</span> <span style="color: #458588;">5</span> <span style="color: #d79921;">user</span> <span style="color: #ebdbb2;">staff</span> <span style="color: #b16286;">160</span><br>
+      <span style="color: #cc241d;">error:</span> <span style="color: #ebdbb2;">something went wrong</span><br>
+      <span style="color: #98971a;">~</span><span style="color: #ebdbb2;"> $ </span><span style="color: #504945;">▌</span>
+    </div>
+    <div style="background: #1d2021; padding: 6px 10px; color: #ebdbb2; font-size: 12px; font-weight: 500; border-top: 1px solid #3c3836;">
+      Gruvbox Dark
+    </div>
+  </div>
+
+  <!-- Rose Pine -->
+  <div style="border-radius: 8px; overflow: hidden; border: 1px solid #444; cursor: pointer;">
+    <div style="background: #191724; padding: 8px 10px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; line-height: 1.5;">
+      <span style="color: #31748f;">~</span><span style="color: #e0def4;"> $ </span><span style="color: #ebbcba;">ls</span><span style="color: #e0def4;"> -la</span><br>
+      <span style="color: #6e6a86;">drwxr-xr-x</span> <span style="color: #9ccfd8;">5</span> <span style="color: #f6c177;">user</span> <span style="color: #e0def4;">staff</span> <span style="color: #c4a7e7;">160</span><br>
+      <span style="color: #eb6f92;">error:</span> <span style="color: #e0def4;">something went wrong</span><br>
+      <span style="color: #31748f;">~</span><span style="color: #e0def4;"> $ </span><span style="color: #6e6a86;">▌</span>
+    </div>
+    <div style="background: #1f1d2e; padding: 6px 10px; color: #e0def4; font-size: 12px; font-weight: 500; border-top: 1px solid #26233a;">
+      Rose Pine
+    </div>
+  </div>
+
+  <!-- TokyoNight -->
+  <div style="border-radius: 8px; overflow: hidden; border: 1px solid #444; cursor: pointer;">
+    <div style="background: #1a1b26; padding: 8px 10px; font-family: 'SF Mono', 'Menlo', monospace; font-size: 11px; line-height: 1.5;">
+      <span style="color: #9ece6a;">~</span><span style="color: #c0caf5;"> $ </span><span style="color: #7dcfff;">ls</span><span style="color: #c0caf5;"> -la</span><br>
+      <span style="color: #565f89;">drwxr-xr-x</span> <span style="color: #7aa2f7;">5</span> <span style="color: #e0af68;">user</span> <span style="color: #c0caf5;">staff</span> <span style="color: #bb9af7;">160</span><br>
+      <span style="color: #f7768e;">error:</span> <span style="color: #c0caf5;">something went wrong</span><br>
+      <span style="color: #9ece6a;">~</span><span style="color: #c0caf5;"> $ </span><span style="color: #565f89;">▌</span>
+    </div>
+    <div style="background: #15161e; padding: 6px 10px; color: #c0caf5; font-size: 12px; font-weight: 500; border-top: 1px solid #292e42;">
+      TokyoNight
+    </div>
+  </div>
+
+</div>
+
+<p style="margin-top: 16px; color: #888; font-size: 13px;">This shows a 3-column layout. The actual picker would have a search bar at the top and scroll vertically through all 485 themes. Each card is clickable to select the theme.</p>

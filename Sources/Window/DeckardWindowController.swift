@@ -412,7 +412,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             project.name = snapshot.name
             for ts in snapshot.tabs {
                 createTabInProject(project, isClaude: ts.isClaude, name: ts.name,
-                                   sessionIdToResume: ts.isClaude ? ts.sessionId : nil)
+                                   sessionIdToResume: ts.isClaude ? ts.sessionId : nil,
+                                   tmuxSessionToResume: ts.tmuxSessionName)
             }
             project.selectedTabIndex = min(snapshot.selectedTabIndex, project.tabs.count - 1)
         }
@@ -511,7 +512,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Tab Management (within a project)
 
-    private func createTabInProject(_ project: ProjectItem, isClaude: Bool, name: String? = nil, sessionIdToResume: String? = nil) {
+    private func createTabInProject(_ project: ProjectItem, isClaude: Bool, name: String? = nil, sessionIdToResume: String? = nil, tmuxSessionToResume: String? = nil) {
         let surface = TerminalSurface()
         let tabName: String
         if let name = name {
@@ -557,7 +558,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         surface.startShell(
             workingDirectory: project.path,
             envVars: envVars,
-            initialInput: initialInput
+            initialInput: initialInput,
+            tmuxSession: tmuxSessionToResume
         )
 
         surface.onProcessExit = { [weak self] exitedSurface in
@@ -984,7 +986,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                         id: tab.id.uuidString,
                         name: tab.name,
                         isClaude: tab.isClaude,
-                        sessionId: tab.sessionId
+                        sessionId: tab.sessionId,
+                        tmuxSessionName: tab.surface.tmuxSessionName
                     )
                 }
             )
@@ -1024,7 +1027,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 if i == selectedIdx && t == selTab {
                     // Create the active tab's surface synchronously
                     createTabInProject(project, isClaude: ts.isClaude, name: ts.name,
-                                       sessionIdToResume: ts.isClaude ? ts.sessionId : nil)
+                                       sessionIdToResume: ts.isClaude ? ts.sessionId : nil,
+                                       tmuxSessionToResume: ts.tmuxSessionName)
                 } else {
                     pending.append((project: project, tab: ts, originalIndex: t))
                 }
@@ -1082,7 +1086,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Create the tab (appends to project.tabs)
         createTabInProject(project, isClaude: ts.isClaude, name: ts.name,
-                           sessionIdToResume: ts.isClaude ? ts.sessionId : nil)
+                           sessionIdToResume: ts.isClaude ? ts.sessionId : nil,
+                           tmuxSessionToResume: ts.tmuxSessionName)
 
         // Move it from the end to its original position
         if insertAt < project.tabs.count - 1 {

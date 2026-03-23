@@ -98,7 +98,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         // fittingSize from expanding to the full content height (e.g., 485 theme cards).
         let preferredHeight: CGFloat = switch pane {
         case .theme: 580
-        case .terminal: 240
+        case .terminal: 280
         case .general: 160
         case .shortcuts: 340
         case .about: 200
@@ -468,6 +468,17 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         scrollUnit.translatesAutoresizingMaskIntoConstraints = false
         pane.addSubview(scrollUnit)
 
+        // tmux session persistence toggle
+        let tmuxEnabled = UserDefaults.standard.object(forKey: "useTmux") as? Bool ?? true
+        let tmuxCheckbox = NSButton(checkboxWithTitle: "Use tmux for session persistence (if installed)", target: self, action: #selector(tmuxToggleChanged(_:)))
+        tmuxCheckbox.state = tmuxEnabled ? .on : .off
+        tmuxCheckbox.translatesAutoresizingMaskIntoConstraints = false
+        if !TerminalSurface.tmuxAvailable {
+            tmuxCheckbox.isEnabled = false
+            tmuxCheckbox.title = "Use tmux for session persistence (tmux not found)"
+        }
+        pane.addSubview(tmuxCheckbox)
+
         NSLayoutConstraint.activate([
             fontLabel.topAnchor.constraint(equalTo: pane.topAnchor, constant: 20),
             fontLabel.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
@@ -505,7 +516,9 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
             scrollUnit.centerYAnchor.constraint(equalTo: scrollLabel.centerYAnchor),
             scrollUnit.leadingAnchor.constraint(equalTo: scrollField.trailingAnchor, constant: 4),
 
-            scrollLabel.bottomAnchor.constraint(equalTo: pane.bottomAnchor, constant: -20),
+            tmuxCheckbox.topAnchor.constraint(equalTo: scrollLabel.bottomAnchor, constant: 16),
+            tmuxCheckbox.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 20),
+            tmuxCheckbox.bottomAnchor.constraint(equalTo: pane.bottomAnchor, constant: -20),
         ])
 
         return pane
@@ -540,6 +553,12 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate {
         // Notify terminals to update font
         NotificationCenter.default.post(name: .deckardFontChanged, object: nil,
                                         userInfo: ["font": font])
+    }
+
+    // MARK: - tmux Settings
+
+    @objc private func tmuxToggleChanged(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: "useTmux")
     }
 
     // MARK: - Scrollback Settings
