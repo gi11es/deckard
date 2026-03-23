@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.7.0](https://github.com/gi11es/deckard/compare/v0.6.0...v0.7.0) (2026-03-23)
+
+
+### Features
+
+* tmux session persistence for terminal tabs ([4cecd26](https://github.com/gi11es/deckard/commit/4cecd26e7a65fd0f02ae1825d21f7ddb74b23869))
+* tmux session persistence for terminal tabs ([ce45484](https://github.com/gi11es/deckard/commit/ce45484eeae7b048bc70499018f0102c338186cd))
+
+
+### Bug Fixes
+
+* prevent context usage bar from flickering ([e293a40](https://github.com/gi11es/deckard/commit/e293a40a90cec35cabc9cfd1be8713d9bac56da6))
+* prevent context usage bar from flickering in Claude tabs ([2a504a0](https://github.com/gi11es/deckard/commit/2a504a0c75c3f3f6cbb0b4f25fbec0934b7291e7))
+
 ## [0.6.0](https://github.com/gi11es/deckard/compare/v0.5.0...v0.6.0) (2026-03-23)
 
 
