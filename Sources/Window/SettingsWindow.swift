@@ -93,7 +93,10 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextVie
         case .about: newView = makeAboutPane()
         }
 
+        // Force the window to maintain its size — don't let auto layout shrink it
+        let frame = window.frame
         window.contentView = newView
+        window.setFrame(frame, display: true)
     }
 
     // MARK: - General Pane
