@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.8.0](https://github.com/gi11es/deckard/compare/v0.7.1...v0.8.0) (2026-03-24)
+
+
+### Features
+
+* collapsible sidebar folders for organizing projects ([3b824dd](https://github.com/gi11es/deckard/commit/3b824ddc55f0d016b5803cd05fab2cd2aa16a07e))
+* collapsible sidebar folders for organizing projects ([cf93305](https://github.com/gi11es/deckard/commit/cf93305ea4f99a8cc02a03120e5bc4fe0bcb0194))
+
 ## [0.7.1](https://github.com/gi11es/deckard/compare/v0.7.0...v0.7.1) (2026-03-23)
 
 
