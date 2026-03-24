@@ -33,6 +33,8 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextVie
             backing: .buffered,
             defer: false
         )
+        window.contentMinSize = NSSize(width: 720, height: 600)
+        window.contentMaxSize = NSSize(width: 720, height: 600)
         window.center()
 
         super.init(window: window)
