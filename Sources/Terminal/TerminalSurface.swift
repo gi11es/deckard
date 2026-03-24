@@ -115,6 +115,21 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         scheme.apply(to: terminalView)
     }
 
+    /// Exit tmux copy mode if active. Call when switching back to this tab
+    /// so arrow keys go to the shell instead of navigating the buffer.
+    func exitTmuxCopyMode() {
+        guard let name = tmuxSessionName, let path = Self.tmuxPath else { return }
+        DispatchQueue.global(qos: .userInteractive).async {
+            let task = Process()
+            task.executableURL = URL(fileURLWithPath: path)
+            task.arguments = ["send-keys", "-t", name, "-X", "cancel"]
+            task.standardOutput = FileHandle.nullDevice
+            task.standardError = FileHandle.nullDevice
+            try? task.run()
+            // Ignore errors — if not in copy mode, the command is a no-op
+        }
+    }
+
     /// Start a shell process in the terminal.
     /// - Parameter tmuxSession: If set, attach to this tmux session (resume). If nil and tmux is
     ///   available and no initialInput (not a Claude tab), create a new tmux session.

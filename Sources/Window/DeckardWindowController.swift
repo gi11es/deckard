@@ -730,6 +730,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
         currentTerminalView = view
 
+        // Exit tmux copy mode if active, so arrow keys go to the shell
+        tab.surface.exitTmuxCopyMode()
+
         let ok = window?.makeFirstResponder(view) ?? false
         DiagnosticLog.shared.log("focus",
             "showTab: makeFirstResponder=\(ok) surfaceId=\(tab.surface.surfaceId)" +
