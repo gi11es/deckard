@@ -35,22 +35,6 @@ xcodebuild -project Deckard.xcodeproj -scheme Deckard -configuration Debug build
 
 The built app will be in your Xcode DerivedData directory.
 
-## Keyboard Shortcuts
-
-All shortcuts can be customized in Settings → Shortcuts. Defaults:
-
-| Shortcut | Action |
-|---|---|
-| Cmd+T | New Claude tab |
-| Shift+Cmd+T | New terminal tab |
-| Cmd+W | Close tab |
-| Shift+Cmd+W | Close folder |
-| Cmd+1–9 | Jump to tab |
-| Shift+Cmd+[ / ] | Previous / next tab |
-| Cmd+O | Open folder |
-| Ctrl+Cmd+S | Toggle sidebar |
-| Cmd+, | Settings |
-
 ## How It Works
 
 Deckard wraps the `claude` CLI with a thin hook layer. When Claude Code launches inside a Deckard tab, the wrapper injects lifecycle hooks via a Unix domain socket so the app can track session state, detect context usage, and surface notifications, without modifying Claude Code itself.
