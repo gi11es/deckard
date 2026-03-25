@@ -887,6 +887,17 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for (pi, project) in projects.enumerated() {
             if let ti = project.tabs.firstIndex(where: { $0.id == surfaceId }) {
                 let tab = project.tabs[ti]
+
+                // Terminal tabs: restart shell instead of removing the tab.
+                // Reconnects to the tmux session if it still exists, otherwise
+                // starts a fresh shell. Rate-limited to prevent crash loops.
+                if !tab.isClaude && tab.surface.canRestart {
+                    DiagnosticLog.shared.log("surface",
+                        "restarting shell for surfaceId=\(surfaceId)")
+                    tab.surface.restartShell(workingDirectory: project.path)
+                    return
+                }
+
                 tab.surface.terminate()
                 tabCreationOrder.removeAll { $0 == tab.id }
 

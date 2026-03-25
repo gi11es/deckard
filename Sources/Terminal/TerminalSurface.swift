@@ -69,6 +69,9 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     private let terminalView: DeckardTerminalView
     private var processExited = false
     private var pendingInitialInput: String?
+    private var lastRestartTime: Date?
+    /// Minimum interval between automatic restarts to prevent crash loops.
+    private static let minRestartInterval: TimeInterval = 2.0
 
     // MARK: - tmux Detection
 
@@ -246,6 +249,22 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         processExited = true
         // Just kill the local process — tmux session survives
         terminalView.process?.terminate()
+    }
+
+    /// Whether the surface can be restarted (rate-limited to prevent crash loops).
+    var canRestart: Bool {
+        guard let last = lastRestartTime else { return true }
+        return Date().timeIntervalSince(last) >= Self.minRestartInterval
+    }
+
+    /// Restart the shell, reconnecting to the tmux session if it still exists.
+    func restartShell(workingDirectory: String? = nil, envVars: [String: String] = [:]) {
+        lastRestartTime = Date()
+        processExited = false
+        let session = tmuxSessionName  // Preserve for reconnection attempt
+        startShell(workingDirectory: workingDirectory ?? pwd,
+                   envVars: envVars,
+                   tmuxSession: session)
     }
 
     private func killTmuxSession() {
