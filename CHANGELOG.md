@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.11.0](https://github.com/gi11es/deckard/compare/v0.10.0...v0.11.0) (2026-03-26)
+
+
+### Features
+
+* add code signing, notarization, and Sparkle auto-updates ([91ca24a](https://github.com/gi11es/deckard/commit/91ca24a7b965c5126367b7a5cde756361211d469))
+* add optional sidebar vibrancy with translucent blur effect ([b5f31ff](https://github.com/gi11es/deckard/commit/b5f31ff778a7931ce8650e9b028d5180d2f4db82))
+
+
+### Bug Fixes
+
+* show 0% when quota reset time has passed ([a20adde](https://github.com/gi11es/deckard/commit/a20adde7f1c65a2bebca76ad37e69eabf7dd3786))
+
 ## [0.10.0](https://github.com/gi11es/deckard/compare/v0.9.0...v0.10.0) (2026-03-25)
 
 
