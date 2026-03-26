@@ -167,10 +167,12 @@ jobs:
             SIGNATURE=$("$SIGN_UPDATE" "$DMG" --ed-key-file <(echo "$SPARKLE_PRIVATE_KEY") 2>/dev/null || true)
           fi
 
-          # Build signature attribute
-          SIG_ATTR=""
+          # Build enclosure attributes
+          # sign_update outputs complete XML attributes: sparkle:edSignature="..." length="..."
           if [ -n "$SIGNATURE" ]; then
-            SIG_ATTR="sparkle:edSignature=\"${SIGNATURE}\""
+            SIG_ATTR="$SIGNATURE"
+          else
+            SIG_ATTR="length=\"${DMG_SIZE}\""
           fi
 
           cat > appcast.xml << APPCAST_EOF
@@ -186,7 +188,7 @@ jobs:
                 <sparkle:version>${VERSION}</sparkle:version>
                 <sparkle:shortVersionString>${VERSION}</sparkle:shortVersionString>
                 <sparkle:minimumSystemVersion>14.0</sparkle:minimumSystemVersion>
-                <enclosure url="${DMG_URL}" length="${DMG_SIZE}" type="application/octet-stream" ${SIG_ATTR} />
+                <enclosure url="${DMG_URL}" type="application/octet-stream" ${SIG_ATTR} />
               </item>
             </channel>
           </rss>
