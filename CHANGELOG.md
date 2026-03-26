@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.11.2](https://github.com/gi11es/deckard/compare/v0.11.1...v0.11.2) (2026-03-26)
+
+
+### Bug Fixes
+
+* correct malformed sparkle:edSignature in appcast.xml ([df0e8fd](https://github.com/gi11es/deckard/commit/df0e8fd5d24c7fde816db64d1c33cfb9fc5f3c78))
+* keep update feed stable while new release builds ([a4437c9](https://github.com/gi11es/deckard/commit/a4437c9fd321ec13b64d77c7ac5c5e6c5aa7569d))
+* save settings text fields on focus loss and window close ([80983bd](https://github.com/gi11es/deckard/commit/80983bd8711a6fa804f17d01dc13452ac33cf28c))
+* sync CFBundleVersion with marketing version for Sparkle updates ([1121dc9](https://github.com/gi11es/deckard/commit/1121dc98a2896952a50a01af255a7a708b1a63da))
+
 ## [0.11.1](https://github.com/gi11es/deckard/compare/v0.11.0...v0.11.1) (2026-03-26)
 
 
