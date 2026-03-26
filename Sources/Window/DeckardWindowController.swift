@@ -783,6 +783,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
         } else {
             quotaView.updateContext(usage: nil, tabName: nil)
+            // Still show quota/sparkline with last known values on non-Claude tabs
+            quotaView.update(
+                snapshot: QuotaMonitor.shared.latest,
+                tokenRate: QuotaMonitor.shared.tokenRate,
+                sparklineData: QuotaMonitor.shared.sparklineData)
         }
     }
 
@@ -805,7 +810,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 self.quotaView.update(
                     snapshot: QuotaMonitor.shared.latest,
                     tokenRate: rate,
-                    sparklineData: QuotaMonitor.shared.sparklineData)
+                    sparklineData: QuotaMonitor.shared.sparklineData,
+                    alwaysShowRate: true)
             }
         }
     }

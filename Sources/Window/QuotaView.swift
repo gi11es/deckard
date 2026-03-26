@@ -256,7 +256,8 @@ class QuotaView: NSView {
         updateVisibility()
     }
 
-    func update(snapshot: QuotaMonitor.QuotaSnapshot?, tokenRate: QuotaMonitor.TokenRate?, sparklineData: [Double]) {
+    func update(snapshot: QuotaMonitor.QuotaSnapshot?, tokenRate: QuotaMonitor.TokenRate?,
+                sparklineData: [Double], alwaysShowRate: Bool = false) {
         let hasQuota = snapshot != nil
             && (snapshot!.fiveHourUsed > 0 || snapshot!.sevenDayUsed > 0
                 || snapshot!.fiveHourResetsAt != nil || snapshot!.sevenDayResetsAt != nil)
@@ -301,12 +302,11 @@ class QuotaView: NSView {
             sevenDayReset.isHidden = true
         }
 
-        // Show token rate if we have current data OR if there's sparkline history
-        let showRate = hasRate || !sparklineData.isEmpty
+        // Show token rate if we have current data, sparkline history, or forced visible (Claude tabs)
+        let showRate = hasRate || !sparklineData.isEmpty || alwaysShowRate
         if showRate {
-            if hasRate {
-                tokenRateLabel.stringValue = "\(formatTokenRate(tokenRate!.tokensPerMinute)) tok/min"
-            }
+            let rateValue = tokenRate?.tokensPerMinute ?? 0
+            tokenRateLabel.stringValue = "\(formatTokenRate(rateValue)) tok/min"
             separator.isHidden = !(hasQuota || hasContext)
             tokenRateLabel.isHidden = false
             sparklineView.isHidden = false
