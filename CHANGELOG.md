@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.11.3](https://github.com/gi11es/deckard/compare/v0.11.2...v0.11.3) (2026-03-26)
+
+
+### Bug Fixes
+
+* keep update feed stable while new release builds ([5a2a101](https://github.com/gi11es/deckard/commit/5a2a101fe93bbf61c99876c2e7aad144afd996e8))
+
 ## [0.11.2](https://github.com/gi11es/deckard/compare/v0.11.1...v0.11.2) (2026-03-26)
 
 
