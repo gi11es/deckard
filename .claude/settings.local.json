@@ -3,7 +3,22 @@
     "allow": [
       "Bash(/Users/gilles/Library/Developer/Xcode/DerivedData/Deckard-hkgvzqxyznptcubawtorcnhugxer/Build/Products/Debug/Deckard.app/Contents/MacOS/Deckard)",
       "Bash(find /Users/gilles/Documents/trailblaze/deckard/Sources -name \"*.swift\" -exec basename {})",
-      "Bash(xcodebuild -project Deckard.xcodeproj -scheme Deckard -configuration Debug build)"
+      "Bash(xcodebuild -project Deckard.xcodeproj -scheme Deckard -configuration Debug build)",
+      "Bash(gh release:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git stash:*)",
+      "Bash(git pull:*)",
+      "Bash(gh pr:*)",
+      "Bash(git tag:*)",
+      "Bash(gh run:*)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(f\"\"{j[''''name'''']}: {j[''''status'''']} / {j[''''conclusion'''']}\"\"\\) for j in data[''''jobs'''']]\")",
+      "Bash(gh api:*)",
+      "Bash(python3 -c \"import json,sys; data=json.load\\(sys.stdin\\); [print\\(f\"\"{j[''''name'''']}: {j[''''conclusion'''']}\"\"\\) for j in data[''''jobs'''']]\")",
+      "Bash(curl:*)",
+      "Bash(tmux list-sessions:*)",
+      "Bash(printf 'n\\\\nn\\\\ny\\\\n')"
     ]
   }
 }
