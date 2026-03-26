@@ -26,6 +26,15 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # Mark release as draft so /releases/latest keeps serving the previous
+      # version's appcast until the build uploads assets and publishes.
+      # The tag already exists at this point, so the build job can check it out.
+      - name: Mark release as draft
+        if: steps.release.outputs.release_created == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh release edit "${{ steps.release.outputs.tag_name }}" --draft
+
   build:
     name: Build & Release
     if: >-

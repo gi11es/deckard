@@ -3,7 +3,6 @@
     ".": {
       "release-type": "simple",
       "bump-minor-pre-major": true,
-      "draft": true,
       "extra-files": [
         "Resources/Info.plist"
       ]
