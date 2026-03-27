@@ -13,9 +13,6 @@ Run multiple sessions side by side in a single window with tabs, projects, and s
     <img alt="Version" src="https://img.shields.io/github/v/release/gi11es/deckard?style=flat-square&label=latest&color=blue">
   </a>
   <img alt="Platform" src="https://img.shields.io/badge/macOS_14+-grey?style=flat-square">
-  <a href="https://github.com/gi11es/deckard/releases">
-    <img alt="Downloads" src="https://img.shields.io/github/downloads/gi11es/deckard/Deckard.dmg/total?style=flat-square&label=downloads&color=brightgreen">
-  </a>
 </p>
 
 ![Deckard screenshot](screenshot.png)
