@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.0](https://github.com/gi11es/deckard/compare/v0.13.1...v0.14.0) (2026-03-27)
+
+
+### Features
+
+* auto-update Homebrew cask on release ([6eb6bf0](https://github.com/gi11es/deckard/commit/6eb6bf003343fdb1039674f0b7d8d2046e7f4970))
+
 ## [0.13.1](https://github.com/gi11es/deckard/compare/v0.13.0...v0.13.1) (2026-03-27)
 
 
