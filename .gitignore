@@ -9,3 +9,6 @@ DerivedData/
 .DS_Store
 *.swp
 *.swo
+
+# Worktrees
+.worktrees/
