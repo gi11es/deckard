@@ -936,13 +936,25 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         resetButton.bezelStyle = .rounded
         grid.addRow(with: [NSView(), NSView(), NSView(), resetButton])
 
+        let revealCheck = NSButton(checkboxWithTitle: "Show project numbers while holding ⌘",
+                                    target: self, action: #selector(toggleRevealProjectNumbers(_:)))
+        revealCheck.state = UserDefaults.standard.object(forKey: "revealProjectNumbers") as? Bool ?? true ? .on : .off
+
         pane.addSubview(grid)
+        pane.addSubview(revealCheck)
         NSLayoutConstraint.activate([
             grid.topAnchor.constraint(equalTo: pane.topAnchor, constant: 20),
             grid.centerXAnchor.constraint(equalTo: pane.centerXAnchor),
+            revealCheck.topAnchor.constraint(equalTo: grid.bottomAnchor, constant: 16),
+            revealCheck.leadingAnchor.constraint(equalTo: grid.leadingAnchor),
         ])
+        revealCheck.translatesAutoresizingMaskIntoConstraints = false
 
         return pane
+    }
+
+    @objc private func toggleRevealProjectNumbers(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: "revealProjectNumbers")
     }
 
     @objc private func resetShortcuts() {

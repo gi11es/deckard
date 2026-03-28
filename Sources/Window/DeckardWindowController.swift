@@ -219,7 +219,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         restoreOrCreateInitial()
 
         flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            self?.updateShortcutIndicators(commandHeld: event.modifierFlags.contains(.command))
+            let reveal = UserDefaults.standard.object(forKey: "revealProjectNumbers") as? Bool ?? true
+            self?.updateShortcutIndicators(commandHeld: reveal && event.modifierFlags.contains(.command))
             return event
         }
 
