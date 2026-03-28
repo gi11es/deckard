@@ -11,7 +11,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     }
     /// Badge info for each Claude tab in this project, shown as right-aligned dots.
     var badgeInfos: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?)] = [] {
-        didSet { if shortcutBadge == nil { updateBadgeDots() } }
+        didSet { updateBadgeDots() }
     }
     var onRename: ((String) -> Void)?
     var onClearName: (() -> Void)?
@@ -46,7 +46,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
                 badgeContainer.viewWithTag(999)?.isHidden = false
             } else {
                 badgeContainer.viewWithTag(999)?.removeFromSuperview()
-                badgeContainer.arrangedSubviews.forEach { $0.isHidden = false }
+                updateBadgeDots()
             }
         }
     }
@@ -102,6 +102,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
 
     private func updateBadgeDots() {
+        if shortcutBadge != nil { return }
         badgeContainer.arrangedSubviews.forEach {
             $0.layer?.removeAllAnimations()
             $0.removeFromSuperview()
