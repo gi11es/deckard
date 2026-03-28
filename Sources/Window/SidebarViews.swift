@@ -61,7 +61,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         badgeContainer.setContentHuggingPriority(.required, for: .horizontal)
 
         shortcutLabel = NSTextField(labelWithString: "")
-        shortcutLabel.font = .monospacedSystemFont(ofSize: 10, weight: .medium)
+        shortcutLabel.font = .systemFont(ofSize: 12)
         shortcutLabel.textColor = .white
         shortcutLabel.isHidden = true
         shortcutLabel.setContentHuggingPriority(.required, for: .horizontal)
