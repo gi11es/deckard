@@ -31,14 +31,16 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         didSet { leadingConstraint?.constant = 8 + indent }
     }
 
-    /// Show or hide a keyboard shortcut badge (circled digit).
+    /// Show or hide a keyboard shortcut number to the left of the name.
     var shortcutBadge: String? {
         didSet {
             if let badge = shortcutBadge {
                 shortcutLabel.stringValue = badge
                 shortcutLabel.isHidden = false
+                leadingConstraint?.constant = 18 + indent
             } else {
                 shortcutLabel.isHidden = true
+                leadingConstraint?.constant = 8 + indent
             }
         }
     }
@@ -75,8 +77,8 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         label.toolTip = shortcutTooltip("Close Folder", for: .closeFolder)
         badgeContainer.translatesAutoresizingMaskIntoConstraints = false
         shortcutLabel.translatesAutoresizingMaskIntoConstraints = false
-        addSubview(label)
         addSubview(shortcutLabel)
+        addSubview(label)
         addSubview(badgeContainer)
 
         let lc = label.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 8)
@@ -84,10 +86,10 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
         NSLayoutConstraint.activate([
             heightAnchor.constraint(equalToConstant: 28),
+            shortcutLabel.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 4),
+            shortcutLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             lc,
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
-            shortcutLabel.leadingAnchor.constraint(equalTo: label.trailingAnchor, constant: 4),
-            shortcutLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
             label.trailingAnchor.constraint(lessThanOrEqualTo: badgeContainer.leadingAnchor, constant: -4),
             badgeContainer.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -8),
             badgeContainer.centerYAnchor.constraint(equalTo: centerYAnchor),
