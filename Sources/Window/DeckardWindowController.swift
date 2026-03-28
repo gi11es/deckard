@@ -167,8 +167,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     /// Consecutive active poll count per surface — require 2 before showing as active.
     private var terminalActiveStreak: [UUID: Int] = [:]
     private var flagsMonitor: Any?
-    /// True while Cmd is held and shortcut indicators are showing.
-    var isShowingShortcutIndicators = false
 
     init() {
         let window = NSWindow(
@@ -1344,7 +1342,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     func updateShortcutIndicators(commandHeld: Bool) {
-        isShowingShortcutIndicators = commandHeld
         let ordered = commandHeld ? projectIndicesInSidebarOrder() : []
         for view in sidebarStackView.arrangedSubviews {
             guard let row = view as? VerticalTabRowView else { continue }

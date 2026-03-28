@@ -125,6 +125,10 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
             }
             badgeContainer.addArrangedSubview(dot)
         }
+        // Re-assert: if shortcut overlay is active, keep dots invisible
+        if shortcutBadge != nil {
+            badgeContainer.alphaValue = 0
+        }
     }
 
     static func addPulseAnimation(to view: NSView) {

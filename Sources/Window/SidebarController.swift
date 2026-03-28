@@ -61,9 +61,11 @@ extension DeckardWindowController {
         sidebarStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         ensureSidebarOrder()
 
-        // Pre-compute shortcut badges so rows get them before badgeInfos
+        // Check current Cmd state to pre-set shortcut indicators on new rows
+        let reveal = UserDefaults.standard.object(forKey: "revealProjectNumbers") as? Bool ?? true
+        let cmdHeld = reveal && NSEvent.modifierFlags.contains(.command)
         var shortcutForProjectIndex: [Int: String] = [:]
-        if isShowingShortcutIndicators {
+        if cmdHeld {
             for (pos, pi) in projectIndicesInSidebarOrder().prefix(10).enumerated() {
                 shortcutForProjectIndex[pi] = "\((pos + 1) % 10)"
             }
