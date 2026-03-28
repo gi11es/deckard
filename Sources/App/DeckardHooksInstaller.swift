@@ -83,6 +83,10 @@ enum DeckardHooksInstaller {
         NSHomeDirectory() + "/.claude/settings.json"
     }()
 
+    private static let originalStatusLinePath: String = {
+        NSHomeDirectory() + "/.deckard/original-statusline.json"
+    }()
+
     private static let hookEvents: [(key: String, arg: String)] = [
         ("SessionStart", "session-start"),
         ("Stop", "stop"),
@@ -111,18 +115,20 @@ enum DeckardHooksInstaller {
         }
     }
 
-    private static func mergeHooksIntoSettings() {
+    static func mergeHooksIntoSettings(settingsPath: String? = nil, originalStatusLinePath: String? = nil) {
+        let effectiveSettingsPath = settingsPath ?? Self.settingsPath
+        let effectiveOriginalPath = originalStatusLinePath ?? Self.originalStatusLinePath
         let fm = FileManager.default
 
         // Ensure ~/.claude/ exists
-        let claudeDir = NSHomeDirectory() + "/.claude"
+        let claudeDir = (effectiveSettingsPath as NSString).deletingLastPathComponent
         if !fm.fileExists(atPath: claudeDir) {
             try? fm.createDirectory(atPath: claudeDir, withIntermediateDirectories: true)
         }
 
         // Read existing settings (or start fresh)
         var settings: [String: Any] = [:]
-        if let data = fm.contents(atPath: settingsPath),
+        if let data = fm.contents(atPath: effectiveSettingsPath),
            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
             settings = json
         }
@@ -160,6 +166,13 @@ enum DeckardHooksInstaller {
 
         settings["hooks"] = hooks
 
+        // Save original statusLine if it's not ours
+        if let statusLine = settings["statusLine"] as? [String: Any],
+           let cmd = statusLine["command"] as? String,
+           !cmd.contains(".deckard/hooks/") {
+            saveOriginalStatusLine(statusLine, to: effectiveOriginalPath)
+        }
+
         // Configure statusLine command to receive rate_limits from Claude Code.
         // The statusLine receives the full /status JSON on stdin (which includes
         // rate_limits) — unlike regular hooks which only get event-specific data.
@@ -173,7 +186,18 @@ enum DeckardHooksInstaller {
             withJSONObject: settings,
             options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
         ) {
-            try? data.write(to: URL(fileURLWithPath: settingsPath))
+            try? data.write(to: URL(fileURLWithPath: effectiveSettingsPath))
+        }
+    }
+
+    private static func saveOriginalStatusLine(_ config: [String: Any], to path: String) {
+        let dir = (path as NSString).deletingLastPathComponent
+        try? FileManager.default.createDirectory(atPath: dir, withIntermediateDirectories: true)
+        if let data = try? JSONSerialization.data(
+            withJSONObject: config,
+            options: [.prettyPrinted, .sortedKeys, .withoutEscapingSlashes]
+        ) {
+            try? data.write(to: URL(fileURLWithPath: path))
         }
     }
 }

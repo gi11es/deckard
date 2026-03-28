@@ -115,6 +115,94 @@ final class DeckardHooksInstallerTests: XCTestCase {
         XCTAssertTrue(true, "DeckardHooksInstaller is an enum with static methods")
     }
 
+    // MARK: - Save original statusLine
+
+    func testSaveOriginalStatusLine() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let settingsPath = tempDir + "settings.json"
+        let originalSavePath = tempDir + "original-statusline.json"
+
+        // Settings with a non-Deckard statusLine
+        let initial: [String: Any] = [
+            "statusLine": [
+                "type": "command",
+                "command": "/usr/local/bin/cc-statusline",
+            ],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: initial, options: .prettyPrinted)
+        try data.write(to: URL(fileURLWithPath: settingsPath))
+
+        DeckardHooksInstaller.mergeHooksIntoSettings(
+            settingsPath: settingsPath,
+            originalStatusLinePath: originalSavePath
+        )
+
+        // Verify original was saved
+        let savedData = try Data(contentsOf: URL(fileURLWithPath: originalSavePath))
+        let saved = try JSONSerialization.jsonObject(with: savedData) as! [String: Any]
+        XCTAssertEqual(saved["command"] as? String, "/usr/local/bin/cc-statusline")
+        XCTAssertEqual(saved["type"] as? String, "command")
+    }
+
+    func testDoesNotOverwriteSavedOriginalWhenDeckardScript() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let settingsPath = tempDir + "settings.json"
+        let originalSavePath = tempDir + "original-statusline.json"
+
+        // Pre-save an original
+        let originalConfig: [String: Any] = ["type": "command", "command": "/usr/local/bin/cc-statusline"]
+        let origData = try JSONSerialization.data(withJSONObject: originalConfig, options: .prettyPrinted)
+        try origData.write(to: URL(fileURLWithPath: originalSavePath))
+
+        // Settings already have Deckard's script
+        let settings: [String: Any] = [
+            "statusLine": [
+                "type": "command",
+                "command": NSHomeDirectory() + "/.deckard/hooks/statusline.sh",
+            ],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: settings, options: .prettyPrinted)
+        try data.write(to: URL(fileURLWithPath: settingsPath))
+
+        DeckardHooksInstaller.mergeHooksIntoSettings(
+            settingsPath: settingsPath,
+            originalStatusLinePath: originalSavePath
+        )
+
+        // Original should still point to cc-statusline, not overwritten
+        let savedData = try Data(contentsOf: URL(fileURLWithPath: originalSavePath))
+        let saved = try JSONSerialization.jsonObject(with: savedData) as! [String: Any]
+        XCTAssertEqual(saved["command"] as? String, "/usr/local/bin/cc-statusline")
+    }
+
+    func testNoOriginalSavedWhenNoStatusLine() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let settingsPath = tempDir + "settings.json"
+        let originalSavePath = tempDir + "original-statusline.json"
+
+        // Settings with no statusLine
+        let initial: [String: Any] = ["allowedTools": ["Read"]]
+        let data = try JSONSerialization.data(withJSONObject: initial, options: .prettyPrinted)
+        try data.write(to: URL(fileURLWithPath: settingsPath))
+
+        DeckardHooksInstaller.mergeHooksIntoSettings(
+            settingsPath: settingsPath,
+            originalStatusLinePath: originalSavePath
+        )
+
+        // No original should be saved
+        XCTAssertFalse(FileManager.default.fileExists(atPath: originalSavePath))
+    }
+
     // MARK: - Script content markers
 
     func testHookScriptExpectedMarkers() {
