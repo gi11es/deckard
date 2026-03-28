@@ -1296,7 +1296,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Navigation
 
-    /// Projects in visual sidebar order (top-level and inside folders).
+    /// Project indices matching visible sidebar rows (skips collapsed folders).
     private func projectIndicesInSidebarOrder() -> [Int] {
         var indices: [Int] = []
         for item in sidebarOrder {
@@ -1304,6 +1304,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             case .project(let id):
                 if let i = projects.firstIndex(where: { $0.id == id }) { indices.append(i) }
             case .folder(let folder):
+                guard !folder.isCollapsed else { continue }
                 for id in folder.projectIds {
                     if let i = projects.firstIndex(where: { $0.id == id }) { indices.append(i) }
                 }
