@@ -225,6 +225,11 @@ extension DeckardWindowController {
         }
 
         updateSidebarSelection()
+
+        // Re-apply shortcut indicators if Cmd is currently held
+        let cmdHeld = NSEvent.modifierFlags.contains(.command)
+        let reveal = UserDefaults.standard.object(forKey: "revealProjectNumbers") as? Bool ?? true
+        updateShortcutIndicators(commandHeld: reveal && cmdHeld)
     }
 
     func reorderProject(from fromIndex: Int, to toIndex: Int) {

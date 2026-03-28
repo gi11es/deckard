@@ -1341,7 +1341,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         selectProject(at: ordered[n])
     }
 
-    private func updateShortcutIndicators(commandHeld: Bool) {
+    func updateShortcutIndicators(commandHeld: Bool) {
         let ordered = commandHeld ? projectIndicesInSidebarOrder() : []
         for view in sidebarStackView.arrangedSubviews {
             guard let row = view as? VerticalTabRowView else { continue }
