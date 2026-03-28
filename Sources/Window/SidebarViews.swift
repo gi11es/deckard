@@ -62,7 +62,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
         shortcutLabel = NSTextField(labelWithString: "")
         shortcutLabel.font = .monospacedSystemFont(ofSize: 10, weight: .medium)
-        shortcutLabel.textColor = ThemeManager.shared.currentColors.secondaryText
+        shortcutLabel.textColor = .white
         shortcutLabel.isHidden = true
         shortcutLabel.setContentHuggingPriority(.required, for: .horizontal)
         shortcutLabel.setContentCompressionResistancePriority(.required, for: .horizontal)

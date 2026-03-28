@@ -1341,14 +1341,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         selectProject(at: ordered[n])
     }
 
-    private static let circledDigits: [String] = ["①","②","③","④","⑤","⑥","⑦","⑧","⑨","⓪"]
-
     private func updateShortcutIndicators(commandHeld: Bool) {
         let ordered = commandHeld ? projectIndicesInSidebarOrder() : []
         for view in sidebarStackView.arrangedSubviews {
             guard let row = view as? VerticalTabRowView else { continue }
             if let pos = ordered.firstIndex(of: row.index), pos < 10 {
-                row.shortcutBadge = Self.circledDigits[pos]
+                row.shortcutBadge = "\((pos + 1) % 10)"
             } else {
                 row.shortcutBadge = nil
             }
