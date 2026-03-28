@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.14.1](https://github.com/gi11es/deckard/compare/v0.14.0...v0.14.1) (2026-03-28)
+
+
+### Bug Fixes
+
+* override code signing in CI for debug builds ([ee32cef](https://github.com/gi11es/deckard/commit/ee32cef68c9b10e2087be1771f551d01e1ddad9d))
+* preserve user's custom statusLine config ([#39](https://github.com/gi11es/deckard/issues/39)) ([#43](https://github.com/gi11es/deckard/issues/43)) ([2a48e5b](https://github.com/gi11es/deckard/commit/2a48e5be5b663d443bb01419658f51096bbce80f))
+* resolve Cmd+N shortcuts from sidebar order, not array order ([#41](https://github.com/gi11es/deckard/issues/41)) ([663ee39](https://github.com/gi11es/deckard/commit/663ee39307712fd63e0dd6b3f57d9a100105a450))
+* use dedicated tmux socket to preserve TCC permissions across restarts ([#42](https://github.com/gi11es/deckard/issues/42)) ([10cc1eb](https://github.com/gi11es/deckard/commit/10cc1eb29bcf3191f3a340fb29d565c47d3b3ed8))
+* use team signing for debug builds to persist TCC consent ([57abd6e](https://github.com/gi11es/deckard/commit/57abd6e5a0a44b14964b895f4384c17cbf3a82f9))
+
 ## [0.14.0](https://github.com/gi11es/deckard/compare/v0.13.1...v0.14.0) (2026-03-27)
 
 
