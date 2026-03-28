@@ -4,14 +4,14 @@ import AppKit
 
 class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     var title: String {
-        didSet { updateLabelText() }
+        didSet { label.stringValue = title }
     }
     var isSelected: Bool = false {
         didSet { needsDisplay = true }
     }
     /// Badge info for each Claude tab in this project, shown as right-aligned dots.
     var badgeInfos: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?)] = [] {
-        didSet { updateBadgeDots() }
+        didSet { if shortcutBadge == nil { updateBadgeDots() } }
     }
     var onRename: ((String) -> Void)?
     var onClearName: (() -> Void)?
@@ -24,38 +24,36 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     private let action: Selector
     private var dragStartPoint: NSPoint?
     private var leadingConstraint: NSLayoutConstraint?
-    private var isBold: Bool
 
     /// Leading indent (used for projects inside folders).
     var indent: CGFloat = 0 {
         didSet { leadingConstraint?.constant = 8 + indent }
     }
 
-    /// Show or hide a keyboard shortcut number after the name.
+    /// Replace badge dots with a shortcut number, or restore dots when nil.
     var shortcutBadge: String? {
-        didSet { updateLabelText() }
-    }
-
-    private func updateLabelText() {
-        if let badge = shortcutBadge {
-            let str = NSMutableAttributedString(string: title, attributes: [
-                .font: isBold ? NSFont.boldSystemFont(ofSize: 12) : NSFont.systemFont(ofSize: 12),
-                .foregroundColor: ThemeManager.shared.currentColors.primaryText,
-            ])
-            str.append(NSAttributedString(string: " \(badge)", attributes: [
-                .font: NSFont.systemFont(ofSize: 10),
-                .foregroundColor: NSColor.white,
-            ]))
-            label.attributedStringValue = str
-        } else {
-            label.stringValue = title
+        didSet {
+            if let badge = shortcutBadge {
+                badgeContainer.arrangedSubviews.forEach { $0.isHidden = true }
+                if badgeContainer.viewWithTag(999) == nil {
+                    let numLabel = NSTextField(labelWithString: "")
+                    numLabel.tag = 999
+                    numLabel.font = .systemFont(ofSize: 10)
+                    numLabel.textColor = .white
+                    badgeContainer.addArrangedSubview(numLabel)
+                }
+                (badgeContainer.viewWithTag(999) as? NSTextField)?.stringValue = badge
+                badgeContainer.viewWithTag(999)?.isHidden = false
+            } else {
+                badgeContainer.viewWithTag(999)?.removeFromSuperview()
+                badgeContainer.arrangedSubviews.forEach { $0.isHidden = false }
+            }
         }
     }
 
     init(title: String, bold: Bool, index: Int, target: AnyObject, action: Selector) {
         self.title = title
         self.index = index
-        self.isBold = bold
         self.target = target
         self.action = action
 
