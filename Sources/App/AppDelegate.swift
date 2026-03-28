@@ -60,16 +60,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         log.log("startup", "Installing Claude Code hooks...")
         DeckardHooksInstaller.installIfNeeded()
 
-        // Clean up orphaned tmux sessions from previous runs
+        // Kill any stale Deckard tmux server from a previous run (crash recovery).
+        // This ensures the new launch creates a fresh server with valid TCC permissions.
         if TerminalSurface.tmuxAvailable {
-            let savedState = SessionManager.shared.load()
-            let activeSessions = Set(
-                (savedState?.projects ?? []).flatMap(\.tabs).compactMap(\.tmuxSessionName)
-            )
-            DispatchQueue.global(qos: .utility).async {
-                TerminalSurface.cleanupOrphanedTmuxSessions(activeSessions: activeSessions)
-            }
-            log.log("startup", "tmux available, \(activeSessions.count) saved sessions")
+            TerminalSurface.killTmuxServer()
+            log.log("startup", "tmux available, killed stale server (if any)")
         } else {
             log.log("startup", "tmux not available")
         }
@@ -94,6 +89,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationWillTerminate(_ notification: Notification) {
         windowController?.saveState()
         ControlSocket.shared.stop()
+        // Kill the Deckard tmux server so the next launch creates a fresh one
+        // with valid TCC permissions inherited from the new process.
+        TerminalSurface.killTmuxServer()
     }
 
     // MARK: - Notification Handlers

@@ -66,6 +66,10 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     /// The tmux session name, if this terminal is wrapped in tmux.
     var tmuxSessionName: String?
 
+    /// Dedicated tmux socket so Deckard's server is isolated from the user's.
+    /// A fresh server (with valid TCC permissions) is created on each launch.
+    static let tmuxSocket = "deckard"
+
     private let terminalView: DeckardTerminalView
     private var processExited = false
     private var pendingInitialInput: String?
@@ -125,7 +129,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         DispatchQueue.global(qos: .userInteractive).async {
             let task = Process()
             task.executableURL = URL(fileURLWithPath: path)
-            task.arguments = ["send-keys", "-t", name, "-X", "cancel"]
+            task.arguments = ["-L", Self.tmuxSocket, "send-keys", "-t", name, "-X", "cancel"]
             task.standardOutput = FileHandle.nullDevice
             task.standardError = FileHandle.nullDevice
             try? task.run()
@@ -170,7 +174,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             // tmux new-session -A: attach if exists, create if not
             // -s: session name, -c: starting directory (only for new sessions)
             // -u: force UTF-8 mode for proper emoji/wide character handling
-            var args = ["-u", "new-session", "-A", "-s", sessionName]
+            var args = ["-L", Self.tmuxSocket, "-u", "new-session", "-A", "-s", sessionName]
             if let cwd = workingDirectory { args += ["-c", cwd] }
 
             terminalView.startProcess(
@@ -232,23 +236,26 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         terminalView.send(txt: text)
     }
 
-    /// Terminate the shell process.
-    /// When closing a tab, also kill the tmux session so it doesn't orphan.
-    /// On app quit, call `detach()` instead to keep the session alive.
+    /// Terminate the shell process and kill its tmux session.
     func terminate() {
         guard !processExited else { return }
         processExited = true
         terminalView.process?.terminate()
-        // Kill the tmux session when tab is explicitly closed
         killTmuxSession()
     }
 
-    /// Detach from the tmux session without killing it (for app quit).
-    func detach() {
-        guard !processExited else { return }
-        processExited = true
-        // Just kill the local process — tmux session survives
-        terminalView.process?.terminate()
+    /// Kill the Deckard-specific tmux server.
+    /// Call on app quit so the next launch gets a fresh server whose process
+    /// inherits Deckard's current TCC permissions (Full Disk Access, etc.).
+    static func killTmuxServer() {
+        guard let path = tmuxPath else { return }
+        let task = Process()
+        task.executableURL = URL(fileURLWithPath: path)
+        task.arguments = ["-L", tmuxSocket, "kill-server"]
+        task.standardOutput = FileHandle.nullDevice
+        task.standardError = FileHandle.nullDevice
+        try? task.run()
+        task.waitUntilExit()
     }
 
     /// Whether the surface can be restarted (rate-limited to prevent crash loops).
@@ -271,7 +278,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         guard let name = tmuxSessionName, let path = Self.tmuxPath else { return }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: path)
-        task.arguments = ["kill-session", "-t", name]
+        task.arguments = ["-L", Self.tmuxSocket, "kill-session", "-t", name]
         task.standardOutput = FileHandle.nullDevice
         task.standardError = FileHandle.nullDevice
         try? task.run()
@@ -313,7 +320,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             }
             let task = Process()
             task.executableURL = URL(fileURLWithPath: tmuxPath)
-            task.arguments = args
+            task.arguments = ["-L", tmuxSocket] + args
             task.standardOutput = FileHandle.nullDevice
             task.standardError = FileHandle.nullDevice
             try? task.run()
@@ -326,7 +333,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         guard let path = tmuxPath else { return nil }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: path)
-        task.arguments = ["list-panes", "-t", sessionName, "-F", "#{pane_pid}"]
+        task.arguments = ["-L", tmuxSocket, "list-panes", "-t", sessionName, "-F", "#{pane_pid}"]
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
@@ -344,7 +351,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         guard let path = tmuxPath else { return }
         let task = Process()
         task.executableURL = URL(fileURLWithPath: path)
-        task.arguments = ["list-sessions", "-F", "#{session_name}"]
+        task.arguments = ["-L", tmuxSocket, "list-sessions", "-F", "#{session_name}"]
         let pipe = Pipe()
         task.standardOutput = pipe
         task.standardError = FileHandle.nullDevice
@@ -357,7 +364,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             if name.hasPrefix("deckard-") && !activeSessions.contains(name) {
                 let kill = Process()
                 kill.executableURL = URL(fileURLWithPath: path)
-                kill.arguments = ["kill-session", "-t", name]
+                kill.arguments = ["-L", tmuxSocket, "kill-session", "-t", name]
                 kill.standardOutput = FileHandle.nullDevice
                 kill.standardError = FileHandle.nullDevice
                 try? kill.run()
