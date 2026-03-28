@@ -968,7 +968,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         for entry in configurableShortcuts {
             KeyboardShortcuts.reset(entry.name)
         }
-        UserDefaults.standard.removeObject(forKey: "revealProjectNumbers")
+        UserDefaults.standard.removeObject(forKey: revealModifiersKey)
         // Rebuild the pane to reflect reset values
         switchToPane(.shortcuts)
     }
@@ -1046,11 +1046,25 @@ private var settingsKeyAssoc: UInt8 = 0
 
 // MARK: - Reveal Shortcut Toggle
 
-/// An NSSearchField styled identically to KeyboardShortcuts.RecorderCocoa but for a
-/// bare-modifier toggle ("⌘"). The cancel ⊗ button clears it; clicking restores it.
+/// Modifier-key recorder styled like KeyboardShortcuts.RecorderCocoa.
+/// Captures bare modifier combinations (⌘, ⌘⇧, ⌥, etc.) for the reveal-numbers feature.
+private let revealModifiersKey = "revealProjectNumbersModifiers"
+private let revealDefaultModifiers: NSEvent.ModifierFlags = .command
+
+/// Returns the configured modifier flags for the reveal-numbers feature.
+/// Defaults to .command. Returns [] if the user cleared the setting.
+func revealNumbersModifiers() -> NSEvent.ModifierFlags {
+    if let raw = UserDefaults.standard.object(forKey: revealModifiersKey) as? UInt {
+        return NSEvent.ModifierFlags(rawValue: raw)
+    }
+    return revealDefaultModifiers
+}
+
 private class RevealShortcutView: NSSearchField, NSSearchFieldDelegate {
     private let minimumWidth = 130.0
     private var cancelButtonCell: NSButtonCell?
+    private var isRecording = false
+    private var monitor: Any?
 
     init() {
         super.init(frame: NSRect(x: 0, y: 0, width: 130, height: 24))
@@ -1062,7 +1076,7 @@ private class RevealShortcutView: NSSearchField, NSSearchFieldDelegate {
         setContentHuggingPriority(.defaultHigh, for: .vertical)
         setContentHuggingPriority(.defaultHigh, for: .horizontal)
         self.cancelButtonCell = (cell as? NSSearchFieldCell)?.cancelButtonCell
-        updateValue()
+        refreshDisplay()
     }
 
     @available(*, unavailable)
@@ -1074,26 +1088,68 @@ private class RevealShortcutView: NSSearchField, NSSearchFieldDelegate {
         return size
     }
 
-    private var revealEnabled: Bool {
-        UserDefaults.standard.object(forKey: "revealProjectNumbers") as? Bool ?? true
-    }
-
-    private func updateValue() {
-        stringValue = revealEnabled ? "⌘" : ""
+    private func refreshDisplay() {
+        let mods = revealNumbersModifiers()
+        stringValue = mods.isEmpty ? "" : Self.symbolString(for: mods)
         (cell as? NSSearchFieldCell)?.cancelButtonCell = stringValue.isEmpty ? nil : cancelButtonCell
     }
 
     func controlTextDidChange(_ obj: Notification) {
         if stringValue.isEmpty {
-            UserDefaults.standard.set(false, forKey: "revealProjectNumbers")
+            UserDefaults.standard.set(UInt(0), forKey: revealModifiersKey)
         }
         (cell as? NSSearchFieldCell)?.cancelButtonCell = stringValue.isEmpty ? nil : cancelButtonCell
     }
 
-    override func mouseDown(with event: NSEvent) {
-        if !revealEnabled {
-            UserDefaults.standard.set(true, forKey: "revealProjectNumbers")
-            updateValue()
+    override func becomeFirstResponder() -> Bool {
+        guard window != nil else { return false }
+        let ok = super.becomeFirstResponder()
+        guard ok else { return false }
+        isRecording = true
+        placeholderString = "Press modifier…"
+        stringValue = ""
+        (cell as? NSSearchFieldCell)?.cancelButtonCell = cancelButtonCell
+
+        monitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
+            guard let self, self.isRecording else { return event }
+            let mods = event.modifierFlags.intersection([.command, .shift, .option, .control])
+            if !mods.isEmpty {
+                UserDefaults.standard.set(mods.rawValue, forKey: revealModifiersKey)
+                self.endRecording()
+            }
+            return event
         }
+        return true
+    }
+
+    override func resignFirstResponder() -> Bool {
+        endRecording()
+        return super.resignFirstResponder()
+    }
+
+    private func endRecording() {
+        isRecording = false
+        if let m = monitor { NSEvent.removeMonitor(m); monitor = nil }
+        placeholderString = "Record Shortcut"
+        refreshDisplay()
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        if revealNumbersModifiers().isEmpty {
+            // Restore default on click when cleared
+            UserDefaults.standard.set(revealDefaultModifiers.rawValue, forKey: revealModifiersKey)
+            refreshDisplay()
+        } else {
+            super.mouseDown(with: event)
+        }
+    }
+
+    static func symbolString(for flags: NSEvent.ModifierFlags) -> String {
+        var s = ""
+        if flags.contains(.control) { s += "⌃" }
+        if flags.contains(.option) { s += "⌥" }
+        if flags.contains(.shift) { s += "⇧" }
+        if flags.contains(.command) { s += "⌘" }
+        return s
     }
 }

@@ -61,9 +61,9 @@ extension DeckardWindowController {
         sidebarStackView.arrangedSubviews.forEach { $0.removeFromSuperview() }
         ensureSidebarOrder()
 
-        // Check current Cmd state to pre-set shortcut indicators on new rows
-        let reveal = UserDefaults.standard.object(forKey: "revealProjectNumbers") as? Bool ?? true
-        let cmdHeld = reveal && NSEvent.modifierFlags.contains(.command)
+        // Check current modifier state to pre-set shortcut indicators on new rows
+        let revealMods = revealNumbersModifiers()
+        let cmdHeld = !revealMods.isEmpty && NSEvent.modifierFlags.contains(revealMods)
         var shortcutForProjectIndex: [Int: String] = [:]
         if cmdHeld {
             for (pos, pi) in projectIndicesInSidebarOrder().prefix(10).enumerated() {

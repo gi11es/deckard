@@ -219,8 +219,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         restoreOrCreateInitial()
 
         flagsMonitor = NSEvent.addLocalMonitorForEvents(matching: .flagsChanged) { [weak self] event in
-            let reveal = UserDefaults.standard.object(forKey: "revealProjectNumbers") as? Bool ?? true
-            self?.updateShortcutIndicators(commandHeld: reveal && event.modifierFlags.contains(.command))
+            let mods = revealNumbersModifiers()
+            let active = !mods.isEmpty && event.modifierFlags.contains(mods)
+            self?.updateShortcutIndicators(commandHeld: active)
             return event
         }
 
@@ -1305,7 +1306,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     // MARK: - Navigation
 
     /// Project indices matching visible sidebar rows (skips collapsed folders).
-    private func projectIndicesInSidebarOrder() -> [Int] {
+    func projectIndicesInSidebarOrder() -> [Int] {
         var indices: [Int] = []
         for item in sidebarOrder {
             switch item {
