@@ -1296,33 +1296,40 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Navigation
 
+    /// Projects in visual sidebar order (top-level and inside folders).
+    private func projectIndicesInSidebarOrder() -> [Int] {
+        var indices: [Int] = []
+        for item in sidebarOrder {
+            switch item {
+            case .project(let id):
+                if let i = projects.firstIndex(where: { $0.id == id }) { indices.append(i) }
+            case .folder(let folder):
+                for id in folder.projectIds {
+                    if let i = projects.firstIndex(where: { $0.id == id }) { indices.append(i) }
+                }
+            }
+        }
+        return indices
+    }
+
     func selectNextProject() {
-        guard !projects.isEmpty else { return }
-        selectProject(at: (selectedProjectIndex + 1) % projects.count)
+        let ordered = projectIndicesInSidebarOrder()
+        guard !ordered.isEmpty else { return }
+        let cur = ordered.firstIndex(of: selectedProjectIndex) ?? -1
+        selectProject(at: ordered[(cur + 1) % ordered.count])
     }
 
     func selectPrevProject() {
-        guard !projects.isEmpty else { return }
-        selectProject(at: (selectedProjectIndex - 1 + projects.count) % projects.count)
+        let ordered = projectIndicesInSidebarOrder()
+        guard !ordered.isEmpty else { return }
+        let cur = ordered.firstIndex(of: selectedProjectIndex) ?? ordered.count
+        selectProject(at: ordered[(cur - 1 + ordered.count) % ordered.count])
     }
 
     func selectProject(byNumber n: Int) {
-        // Resolve the Nth project in sidebar (visual) order, not array order.
-        var count = 0
-        for item in sidebarOrder {
-            let ids: [UUID]
-            switch item {
-            case .project(let id): ids = [id]
-            case .folder(let folder): ids = folder.projectIds
-            }
-            for id in ids {
-                if count == n, let index = projects.firstIndex(where: { $0.id == id }) {
-                    selectProject(at: index)
-                    return
-                }
-                count += 1
-            }
-        }
+        let ordered = projectIndicesInSidebarOrder()
+        guard n >= 0, n < ordered.count else { return }
+        selectProject(at: ordered[n])
     }
 }
 
