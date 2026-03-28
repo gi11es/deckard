@@ -31,11 +31,11 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         didSet { leadingConstraint?.constant = 8 + indent }
     }
 
-    /// Show or hide a keyboard shortcut number badge (1-9).
-    var shortcutNumber: Int? {
+    /// Show or hide a keyboard shortcut badge (circled digit).
+    var shortcutBadge: String? {
         didSet {
-            if let n = shortcutNumber {
-                shortcutLabel.stringValue = "\(n)"
+            if let badge = shortcutBadge {
+                shortcutLabel.stringValue = badge
                 shortcutLabel.isHidden = false
             } else {
                 shortcutLabel.isHidden = true
