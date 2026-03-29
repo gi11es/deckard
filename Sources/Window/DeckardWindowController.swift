@@ -574,7 +574,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let displayPath = project.path.hasPrefix(home)
             ? "~" + project.path.dropFirst(home.count)
             : project.path
+        #if DEBUG
+        window?.title = "\(displayPath) [DEV]"
+        #else
         window?.title = displayPath
+        #endif
 
         updateSidebarSelection()
     }

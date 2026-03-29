@@ -368,7 +368,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin\"\ncp -f \"${PROJECT_DIR}/Resources/AppIcon.icns\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppIcon.icns\"\ncp -f \"${PROJECT_DIR}/Resources/Credits.html\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Credits.html\"\ncp -f \"${PROJECT_DIR}/Resources/bin/claude\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude\"\ncp -f \"${PROJECT_DIR}/Resources/bin/register-pid\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/register-pid\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/register-pid\"\ncp -R \"${PROJECT_DIR}/Resources/themes\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/themes\"\n";
+			shellScript = "mkdir -p \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin\"\nif [ \"${CONFIGURATION}\" = \"Debug\" ] && [ -f \"${PROJECT_DIR}/Resources/AppIcon-Dev.icns\" ]; then\n  cp -f \"${PROJECT_DIR}/Resources/AppIcon-Dev.icns\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppIcon.icns\"\nelse\n  cp -f \"${PROJECT_DIR}/Resources/AppIcon.icns\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/AppIcon.icns\"\nfi\ncp -f \"${PROJECT_DIR}/Resources/Credits.html\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/Credits.html\"\ncp -f \"${PROJECT_DIR}/Resources/bin/claude\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/claude\"\ncp -f \"${PROJECT_DIR}/Resources/bin/register-pid\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/register-pid\"\nchmod +x \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/bin/register-pid\"\ncp -R \"${PROJECT_DIR}/Resources/themes\" \"${BUILT_PRODUCTS_DIR}/${UNLOCALIZED_RESOURCES_FOLDER_PATH}/themes\"\n";
 		};
 		5F4D41CAC0165B5C0FC120FE /* Set App Icon */ = {
 			isa = PBXShellScriptBuildPhase;
@@ -627,7 +627,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.deckard.app.dev;
-				PRODUCT_NAME = Deckard;
+				PRODUCT_NAME = "Deckard Dev";
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/App/Deckard-Bridging-Header.h";
 			};
@@ -648,7 +648,7 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SDKROOT = macosx;
 				SWIFT_VERSION = 5.0;
-				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Deckard.app/Contents/MacOS/Deckard";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Deckard Dev.app/Contents/MacOS/Deckard Dev";
 			};
 			name = Debug;
 		};
