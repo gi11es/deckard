@@ -581,7 +581,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Tab Management (within a project)
 
-    func createTabInProject(_ project: ProjectItem, isClaude: Bool, name: String? = nil, sessionIdToResume: String? = nil, tmuxSessionToResume: String? = nil) {
+    func createTabInProject(_ project: ProjectItem, isClaude: Bool, name: String? = nil, sessionIdToResume: String? = nil, tmuxSessionToResume: String? = nil, extraArgs: String? = nil) {
         let surface = TerminalSurface()
         let tabName: String
         if let name = name {
@@ -610,8 +610,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let initialInput: String?
         if isClaude {
-            let extraArgs = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
-            let extraArgsSuffix = extraArgs.isEmpty ? "" : " \(extraArgs)"
+            let resolvedArgs = extraArgs ?? UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
+            let extraArgsSuffix = resolvedArgs.isEmpty ? "" : " \(resolvedArgs)"
             var claudeArgs = extraArgsSuffix
             if let sessionIdToResume {
                 let encoded = project.path.replacingOccurrences(of: "/", with: "-")
@@ -661,7 +661,29 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             return
         }
         let project = projects[selectedProjectIndex]
-        createTabInProject(project, isClaude: isClaude)
+
+        if isClaude && UserDefaults.standard.bool(forKey: "promptForSessionArgs") {
+            promptForClaudeArgs { [weak self] args in
+                guard let self else { return }
+                guard let args else {
+                    // User cancelled
+                    self.isCreatingTab = false
+                    return
+                }
+                guard self.projects.contains(where: { $0 === project }) else {
+                    self.isCreatingTab = false
+                    return
+                }
+                self.createTabInProject(project, isClaude: true, extraArgs: args)
+                self.finalizeTabCreation(in: project)
+            }
+        } else {
+            createTabInProject(project, isClaude: isClaude)
+            finalizeTabCreation(in: project)
+        }
+    }
+
+    private func finalizeTabCreation(in project: ProjectItem) {
         project.selectedTabIndex = project.tabs.count - 1
         rebuildTabBar()
         rebuildSidebar()
@@ -670,6 +692,33 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
             self?.isCreatingTab = false
+        }
+    }
+
+    private func promptForClaudeArgs(completion: @escaping (String?) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Claude Code Arguments"
+        alert.informativeText = "Arguments passed to this session:"
+        alert.addButton(withTitle: "Start")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
+        field.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        field.stringValue = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
+        field.placeholderString = "--permission-mode auto"
+        alert.accessoryView = field
+
+        guard let window else {
+            completion(nil)
+            return
+        }
+
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn {
+                completion(field.stringValue)
+            } else {
+                completion(nil)
+            }
         }
     }
 
