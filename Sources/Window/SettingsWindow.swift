@@ -140,6 +140,16 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         extraArgsHelp.textColor = .secondaryLabelColor
         grid.addRow(with: [NSGridCell.emptyContentView, extraArgsHelp])
 
+        // Per-session args checkbox
+        let perSessionCheck = NSButton(checkboxWithTitle: "Customize arguments per session", target: self, action: #selector(perSessionArgsToggled(_:)))
+        perSessionCheck.state = UserDefaults.standard.bool(forKey: "promptForSessionArgs") ? .on : .off
+        grid.addRow(with: [NSGridCell.emptyContentView, perSessionCheck])
+
+        let perSessionHelp = NSTextField(labelWithString: "Show a dialog to set arguments when creating a new Claude tab.")
+        perSessionHelp.font = .systemFont(ofSize: 11)
+        perSessionHelp.textColor = .secondaryLabelColor
+        grid.addRow(with: [NSGridCell.emptyContentView, perSessionHelp])
+
         // Spacer
         let spacer = NSView()
         spacer.translatesAutoresizingMaskIntoConstraints = false
@@ -178,6 +188,10 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         ])
 
         return pane
+    }
+
+    @objc private func perSessionArgsToggled(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: "promptForSessionArgs")
     }
 
     @objc private func vibrancyToggled(_ sender: NSButton) {
