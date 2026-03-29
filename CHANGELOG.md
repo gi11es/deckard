@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.0](https://github.com/gi11es/deckard/compare/v0.14.1...v0.15.0) (2026-03-29)
+
+
+### Features
+
+* add FullDiskAccessChecker to probe FDA-protected paths ([c51c3bf](https://github.com/gi11es/deckard/commit/c51c3bf1e295b52dac7efcc0f34227906dc0d119))
+* prompt user to enable Full Disk Access on launch ([e3085f4](https://github.com/gi11es/deckard/commit/e3085f4bdf44d839ca1511728eedb6e1fa4aefad))
+
+
+### Bug Fixes
+
+* use subprocess probe for FDA detection and sheet modal for prompt ([56c6523](https://github.com/gi11es/deckard/commit/56c65235ff2d00f23d0c7981ad5f58aef95f81cd))
+
 ## [0.14.1](https://github.com/gi11es/deckard/compare/v0.14.0...v0.14.1) (2026-03-28)
 
 
