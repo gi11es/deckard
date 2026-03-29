@@ -81,6 +81,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         log.log("startup", "Showing main window...")
         windowController?.showWindow(nil)
         log.log("startup", "=== Startup complete ===")
+
+        // Check Full Disk Access and prompt if needed.
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
+            guard !FullDiskAccessChecker.hasFullDiskAccess() else { return }
+            guard !UserDefaults.standard.bool(forKey: "suppressFullDiskAccessPrompt") else { return }
+
+            let alert = NSAlert()
+            alert.alertStyle = .informational
+            alert.messageText = "Full Disk Access"
+            alert.informativeText = "Deckard is a terminal emulator. Like Terminal and iTerm2, it needs Full Disk Access so that commands running inside it can access all of your files.\n\nYou can grant this in System Settings > Privacy & Security > Full Disk Access."
+            alert.addButton(withTitle: "Open System Settings")
+            alert.addButton(withTitle: "Not Now")
+            alert.addButton(withTitle: "Don't Ask Again")
+
+            let response = alert.runModal()
+            switch response {
+            case .alertFirstButtonReturn:
+                FullDiskAccessChecker.openSettings()
+            case .alertThirdButtonReturn:
+                UserDefaults.standard.set(true, forKey: "suppressFullDiskAccessPrompt")
+            default:
+                break
+            }
+        }
     }
 
     func applicationShouldTerminate(_ sender: NSApplication) -> NSApplication.TerminateReply {
