@@ -247,6 +247,10 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         msgField.font = .systemFont(ofSize: 12)
         msgField.textColor = .labelColor
         msgField.lineBreakMode = .byTruncatingTail
+        msgField.maximumNumberOfLines = 5
+        msgField.cell?.wraps = true
+        msgField.cell?.isScrollable = false
+        msgField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         msgField.toolTip = entry.message
         msgField.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(msgField)
