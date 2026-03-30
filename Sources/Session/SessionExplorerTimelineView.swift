@@ -5,6 +5,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
 
     private let containerView: NSView
     private var headerView: NSView?
+    private var headerTitleField: NSTextField?
     private let scrollView = NSScrollView()
     private let tableView = NSTableView()
 
@@ -90,6 +91,11 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         }
     }
 
+    /// Updates the header title with a new summary.
+    func updateHeaderSummary(_ summary: String) {
+        headerTitleField?.stringValue = summary
+    }
+
     /// Marks turns as currently generating (shows spinner on each row).
     func setGeneratingTurns(_ turnIndices: Set<Int>) {
         generatingTurnIndices = turnIndices
@@ -132,7 +138,12 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         title.font = .systemFont(ofSize: 15, weight: .semibold)
         title.textColor = .labelColor
         title.lineBreakMode = .byTruncatingTail
+        title.maximumNumberOfLines = 5
+        title.cell?.wraps = true
+        title.cell?.isScrollable = false
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         title.translatesAutoresizingMaskIntoConstraints = false
+        self.headerTitleField = title
 
         let timeStr = RelativeDateTimeFormatter().localizedString(for: session.modificationDate, relativeTo: Date())
         let subtitle = NSTextField(labelWithString: "\(session.messageCount) messages \u{00B7} \(timeStr)")

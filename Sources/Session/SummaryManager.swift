@@ -17,6 +17,7 @@ class SummaryManager {
     struct CachedSummary: Codable {
         let summary: String
         let generatedAt: Date
+        var turnCount: Int?
     }
 
     /// Returns a cached summary for the session, or nil if not yet generated.
@@ -25,17 +26,27 @@ class SummaryManager {
         return all[sessionId]?.summary
     }
 
+    /// Returns the cached turn count for a session summary, or 0 if unknown.
+    func cachedSummaryTurnCount(forSessionId sessionId: String) -> Int {
+        let all = loadAll()
+        return all[sessionId]?.turnCount ?? 0
+    }
+
     /// Returns true if a summary generation is currently in progress for this session.
     func isGenerating(sessionId: String) -> Bool {
         inFlightSessionIds.contains(sessionId)
     }
 
-    /// Generates a summary asynchronously. Calls `completion` on the main thread with the result.
-    /// Does nothing if a summary is already cached or generation is in flight.
-    func generateSummary(sessionId: String, projectPath: String, completion: @escaping (String?) -> Void) {
-        // Already cached?
-        if let existing = cachedSummary(forSessionId: sessionId) {
-            completion(existing)
+    /// Generates a session summary. If a cached summary exists but the session has more
+    /// turns than when it was generated, the summary is regenerated.
+    /// Calls `completion` on the main thread with the result.
+    func generateSummary(sessionId: String, projectPath: String, currentTurnCount: Int, completion: @escaping (String?) -> Void) {
+        let all = loadAll()
+        let cached = all[sessionId]
+
+        // Return cached if it covers all current turns
+        if let cached, (cached.turnCount ?? 0) >= currentTurnCount {
+            completion(cached.summary)
             return
         }
 
@@ -47,12 +58,12 @@ class SummaryManager {
         let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath)
         guard !entries.isEmpty else {
             inFlightSessionIds.remove(sessionId)
-            completion(nil)
+            completion(cached?.summary)
             return
         }
 
         let userMessages = entries.map { $0.message }.joined(separator: "\n---\n")
-        let prompt = "Summarize this Claude Code session in one concise sentence, focusing on what was accomplished. Only output the summary, nothing else.\n\nUser messages:\n\(userMessages)"
+        let prompt = "Summarize this Claude Code session in 1-2 concise sentences, focusing on what was accomplished. Only output the summary, nothing else.\n\nUser messages:\n\(userMessages)"
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let result = self?.runClaudePrint(prompt: prompt)
@@ -61,10 +72,10 @@ class SummaryManager {
                 self?.inFlightSessionIds.remove(sessionId)
 
                 if let summary = result, !summary.isEmpty {
-                    self?.saveSummary(sessionId: sessionId, summary: summary)
+                    self?.saveSummary(sessionId: sessionId, summary: summary, turnCount: entries.count)
                     completion(summary)
                 } else {
-                    completion(nil)
+                    completion(cached?.summary)
                 }
             }
         }
@@ -244,9 +255,9 @@ class SummaryManager {
         return dict
     }
 
-    private func saveSummary(sessionId: String, summary: String) {
+    private func saveSummary(sessionId: String, summary: String, turnCount: Int) {
         var all = loadAll()
-        all[sessionId] = CachedSummary(summary: summary, generatedAt: Date())
+        all[sessionId] = CachedSummary(summary: summary, generatedAt: Date(), turnCount: turnCount)
         cache = all
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

@@ -317,23 +317,28 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         selectedSessionId = sessionId
         guard let session = allSessions.first(where: { $0.sessionId == sessionId }) else { return }
 
-        // Trigger summary generation if needed
-        if session.summary == nil {
-            SummaryManager.shared.generateSummary(sessionId: sessionId, projectPath: projectPath) { [weak self] summary in
+        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath)
+        let turnCount = entries.count
+
+        // Update message count now that we've parsed the full file
+        if let idx = allSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+            allSessions[idx].messageCount = turnCount
+        }
+
+        // Generate or regenerate session summary if session has new turns
+        let cachedTurnCount = SummaryManager.shared.cachedSummaryTurnCount(forSessionId: sessionId)
+        if cachedTurnCount < turnCount || session.summary == nil {
+            SummaryManager.shared.generateSummary(sessionId: sessionId, projectPath: projectPath, currentTurnCount: turnCount) { [weak self] summary in
                 guard let self else { return }
                 if let idx = self.allSessions.firstIndex(where: { $0.sessionId == sessionId }), let summary {
                     self.allSessions[idx].summary = summary
                     self.applyFilter()
+                    // Also update the timeline header
+                    if self.selectedSessionId == sessionId {
+                        self.timelineController?.updateHeaderSummary(summary)
+                    }
                 }
             }
-        }
-
-        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath)
-
-        // Update message count now that we've parsed the full file
-        if let idx = allSessions.firstIndex(where: { $0.sessionId == sessionId }), allSessions[idx].messageCount == 0 {
-            allSessions[idx].messageCount = entries.count
-            applyFilter()
         }
 
         // Use the session with updated messageCount for the timeline header
@@ -502,7 +507,8 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
     private func makeSessionCell(session: ExplorerSessionInfo) -> NSView {
         let cell = NSTableCellView()
 
-        let title = NSTextField(labelWithString: session.summary ?? session.firstUserMessage)
+        // First user message as title
+        let title = NSTextField(labelWithString: session.firstUserMessage)
         title.font = .systemFont(ofSize: 13, weight: session.sessionId == selectedSessionId ? .semibold : .regular)
         title.textColor = .labelColor
         title.lineBreakMode = .byTruncatingTail
@@ -513,12 +519,30 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         title.translatesAutoresizingMaskIntoConstraints = false
         title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
+        // AI-generated summary below the title
+        let summaryField: NSTextField?
+        if let summary = session.summary {
+            let field = NSTextField(labelWithString: summary)
+            field.font = .systemFont(ofSize: 11)
+            field.textColor = .secondaryLabelColor
+            field.lineBreakMode = .byTruncatingTail
+            field.maximumNumberOfLines = 5
+            field.cell?.wraps = true
+            field.cell?.isScrollable = false
+            field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+            field.translatesAutoresizingMaskIntoConstraints = false
+            summaryField = field
+        } else {
+            summaryField = nil
+        }
+
+        // Timestamp + message count
         let timeStr = relativeFormatter.localizedString(for: session.modificationDate, relativeTo: Date())
-        let subtitleText = session.messageCount > 0 ? "\(timeStr) \u{00B7} \(session.messageCount) msgs" : timeStr
-        let subtitle = NSTextField(labelWithString: subtitleText)
-        subtitle.font = .systemFont(ofSize: 11)
-        subtitle.textColor = .secondaryLabelColor
-        subtitle.translatesAutoresizingMaskIntoConstraints = false
+        let metaText = session.messageCount > 0 ? "\(timeStr) \u{00B7} \(session.messageCount) msgs" : timeStr
+        let metaField = NSTextField(labelWithString: metaText)
+        metaField.font = .systemFont(ofSize: 10)
+        metaField.textColor = .tertiaryLabelColor
+        metaField.translatesAutoresizingMaskIntoConstraints = false
 
         // Spinner for summary generation
         let spinner = NSProgressIndicator()
@@ -529,24 +553,37 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         if !spinner.isHidden { spinner.startAnimation(nil) }
 
         cell.addSubview(title)
-        cell.addSubview(subtitle)
+        cell.addSubview(metaField)
+        if let summaryField { cell.addSubview(summaryField) }
         cell.addSubview(spinner)
+
+        // Bottom anchor: summary if present, otherwise meta
+        let bottomView: NSView = summaryField ?? metaField
 
         NSLayoutConstraint.activate([
             title.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 12),
             title.trailingAnchor.constraint(equalTo: spinner.leadingAnchor, constant: -4),
             title.topAnchor.constraint(equalTo: cell.topAnchor, constant: 8),
 
-            subtitle.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-            subtitle.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
-            subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
-            subtitle.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -8),
+            metaField.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+            metaField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
+            metaField.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
+
+            bottomView.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -8),
 
             spinner.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
             spinner.topAnchor.constraint(equalTo: cell.topAnchor, constant: 8),
             spinner.widthAnchor.constraint(equalToConstant: 16),
             spinner.heightAnchor.constraint(equalToConstant: 16),
         ])
+
+        if let summaryField {
+            NSLayoutConstraint.activate([
+                summaryField.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+                summaryField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
+                summaryField.topAnchor.constraint(equalTo: metaField.bottomAnchor, constant: 2),
+            ])
+        }
 
         return cell
     }
