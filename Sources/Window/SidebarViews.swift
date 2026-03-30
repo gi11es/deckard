@@ -154,6 +154,8 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         case .terminalIdle: return "Idle"
         case .terminalActive: return activity?.description ?? "Running"
         case .terminalError: return "Error"
+        case .completedUnseen: return "Done (unvisited)"
+        case .terminalCompletedUnseen: return "Done (unvisited)"
         }
     }
 
@@ -166,6 +168,8 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         .terminalIdle: NSColor(red: 0.35, green: 0.55, blue: 0.54, alpha: 1.0),
         .terminalActive: NSColor(red: 0.45, green: 0.72, blue: 0.71, alpha: 1.0),
         .terminalError: NSColor(red: 0.85, green: 0.3, blue: 0.3, alpha: 1.0),
+        .completedUnseen: NSColor(red: 0.75, green: 0.45, blue: 1.0, alpha: 1.0),
+        .terminalCompletedUnseen: NSColor(red: 0.3, green: 0.75, blue: 0.73, alpha: 1.0),
     ]
 
     static func colorForBadge(_ state: TabItem.BadgeState) -> NSColor {
