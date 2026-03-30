@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.16.0](https://github.com/gi11es/deckard/compare/v0.15.0...v0.16.0) (2026-03-30)
+
+
+### Features
+
+* add completed-unseen badge states for tabs ([064ec44](https://github.com/gi11es/deckard/commit/064ec44b22816e929fa0fc5661cf4590227d2a40))
+* add distinct visual identity for debug/dev builds ([#49](https://github.com/gi11es/deckard/issues/49)) ([b27177a](https://github.com/gi11es/deckard/commit/b27177a6abc91d86c9ceb48aeb084d084caca8ed))
+* add per-session Claude Code argument customization ([40702e7](https://github.com/gi11es/deckard/commit/40702e781bb560c992e3a71d20331c1d39547075))
+* add Session Explorer window with timeline, fork, bookmarks, and AI summaries ([#55](https://github.com/gi11es/deckard/issues/55)) ([64dd588](https://github.com/gi11es/deckard/commit/64dd588c7b30663e4dcf7080eb89afed889a6c7a)), closes [#52](https://github.com/gi11es/deckard/issues/52)
+
+
+### Bug Fixes
+
+* don't mark the currently visible tab as completed-unseen ([c4d593a](https://github.com/gi11es/deckard/commit/c4d593a4b18011f94e8ea97498c6b0e3389f0df6))
+* preserve tmuxSessionName in closeProject snapshot ([#58](https://github.com/gi11es/deckard/issues/58)) ([6921492](https://github.com/gi11es/deckard/commit/6921492cc510ddbdfdd586e610cc128881857f3b))
+* remove NSEvent monitor on ProjectPicker close ([#59](https://github.com/gi11es/deckard/issues/59)) ([70875fa](https://github.com/gi11es/deckard/commit/70875fa96ca1f09f17a3e1a1c0241278f86fa841))
+* resolve symlinks in ProjectItem to fix session resume on restart ([#54](https://github.com/gi11es/deckard/issues/54)) ([100ddd4](https://github.com/gi11es/deckard/commit/100ddd46febe6d5ad4e6e8df2e470f937b0c27ce))
+* resolve symlinks when looking up Claude session files ([#51](https://github.com/gi11es/deckard/issues/51)) ([f9e648e](https://github.com/gi11es/deckard/commit/f9e648e9cb92c586e23c4e513798b2269c0edf82))
+* set PRODUCT_MODULE_NAME so dev build keeps stable module name ([8c50e6a](https://github.com/gi11es/deckard/commit/8c50e6a1d4b706cc5cee8c0f9b3780cd17eb9fe8))
+
 ## [0.15.0](https://github.com/gi11es/deckard/compare/v0.14.1...v0.15.0) (2026-03-29)
 
 
