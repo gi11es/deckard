@@ -503,7 +503,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             selectedTabIndex: project.selectedTabIndex,
             tabs: project.tabs.map { tab in
                 ProjectTabState(id: tab.id.uuidString, name: tab.name,
-                                isClaude: tab.isClaude, sessionId: tab.sessionId)
+                                isClaude: tab.isClaude, sessionId: tab.sessionId,
+                                tmuxSessionName: tab.surface.tmuxSessionName)
             }
         )
         recentlyClosedProjects.removeAll { $0.path == project.path }
