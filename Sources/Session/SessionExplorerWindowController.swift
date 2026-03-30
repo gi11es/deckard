@@ -357,6 +357,14 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         filteredSessions.count
     }
 
+    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
+        guard row < filteredSessions.count, filteredSessions[row].isBookmarked else { return nil }
+        let rowView = NSTableRowView()
+        rowView.wantsLayer = true
+        rowView.layer?.backgroundColor = NSColor(red: 1.0, green: 0.85, blue: 0.2, alpha: 0.06).cgColor
+        return rowView
+    }
+
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         guard row < filteredSessions.count else { return nil }
         return makeSessionCell(session: filteredSessions[row], row: row)
@@ -364,11 +372,6 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
 
     private func makeSessionCell(session: ExplorerSessionInfo, row: Int) -> NSView {
         let cell = NSTableCellView()
-
-        if session.isBookmarked {
-            cell.wantsLayer = true
-            cell.layer?.backgroundColor = NSColor(red: 1.0, green: 0.85, blue: 0.2, alpha: 0.06).cgColor
-        }
 
         // Star toggle
         let starBtn = NSButton(title: session.isBookmarked ? "\u{2605}" : "\u{2606}", target: self, action: #selector(starClicked(_:)))
