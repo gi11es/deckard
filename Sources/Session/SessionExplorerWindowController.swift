@@ -362,8 +362,7 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
     func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
         guard row < filteredSessions.count, filteredSessions[row].isBookmarked else { return nil }
         let rowView = NSTableRowView()
-        rowView.wantsLayer = true
-        rowView.layer?.backgroundColor = NSColor(red: 1.0, green: 0.85, blue: 0.2, alpha: 0.06).cgColor
+        rowView.backgroundColor = NSColor(red: 1.0, green: 0.85, blue: 0.2, alpha: 0.06)
         return rowView
     }
 
