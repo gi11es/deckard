@@ -307,7 +307,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
             return !turnActions.isEmpty && cachedActionSummaries[entry.index] == nil
         }
         let cachedTurnCount = SummaryManager.shared.cachedSummaryTurnCount(forSessionId: sessionId)
-        let needsSessionSummary = session.summary == nil || cachedTurnCount < entries.count
+        let needsSessionSummary = updatedSession.summary == nil || cachedTurnCount < entries.count
         let summarizeEnabled = needsSessionSummary || hasUncachedActions
 
         timelineController?.showTimeline(
