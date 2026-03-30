@@ -65,7 +65,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         session: ExplorerSessionInfo,
         entries: [TimelineEntry],
         cachedActionSummaries: [Int: String],
-        showSummarizeButton: Bool,
+        summarizeEnabled: Bool,
         scrollToIndex: Int?
     ) {
         self.currentSession = session
@@ -79,7 +79,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         containerView.subviews.forEach { $0.removeFromSuperview() }
 
         // Header
-        let header = makeHeader(session: session, showSummarizeButton: showSummarizeButton)
+        let header = makeHeader(session: session, summarizeEnabled: summarizeEnabled)
         self.headerView = header
         header.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(header)
@@ -111,6 +111,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
     func updateHeaderSummary(_ summary: String) {
         if let existing = headerSummaryField {
             existing.stringValue = summary
+            headerView?.layoutSubtreeIfNeeded()
             return
         }
 
@@ -128,24 +129,19 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         header.addSubview(field)
         headerSummaryField = field
 
-        // Find the subtitle (second text field after title)
+        // Find the subtitle field
         let subtitleField = header.subviews.compactMap { $0 as? NSTextField }.first(where: { $0 !== titleField && $0 !== field })
 
+        // Replace bottom constraint — summary is now the bottom element
+        headerSummaryBottomConstraint?.isActive = false
         NSLayoutConstraint.activate([
             field.leadingAnchor.constraint(equalTo: titleField.leadingAnchor),
             field.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -16),
             field.topAnchor.constraint(equalTo: (subtitleField ?? titleField).bottomAnchor, constant: 4),
         ])
-
-        // Update bottom constraint
-        headerSummaryBottomConstraint?.isActive = false
-        if let btn = summarizeBtn, !btn.isHidden {
-            // Button still visible — it goes below summary
-            headerSummaryBottomConstraint = btn.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
-        } else {
-            headerSummaryBottomConstraint = field.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
-        }
+        headerSummaryBottomConstraint = field.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
         headerSummaryBottomConstraint?.isActive = true
+        header.layoutSubtreeIfNeeded()
     }
 
     /// Transitions the button to a "generating" state: disabled, label changes, spinner appears.
@@ -167,7 +163,8 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
             ])
             summarizeSpinner = spinner
         } else {
-            btn.isHidden = true
+            btn.title = "Summarize with Haiku"
+            btn.isEnabled = false
             summarizeSpinner?.removeFromSuperview()
             summarizeSpinner = nil
         }
@@ -199,7 +196,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
 
     // MARK: - Header
 
-    private func makeHeader(session: ExplorerSessionInfo, showSummarizeButton: Bool) -> NSView {
+    private func makeHeader(session: ExplorerSessionInfo, summarizeEnabled: Bool) -> NSView {
         let header = NSView()
         header.wantsLayer = true
         header.layer?.backgroundColor = NSColor(white: 0, alpha: 0.1).cgColor
@@ -278,24 +275,20 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
             bottomAnchorView = field
         }
 
-        // Summarize button
-        if showSummarizeButton {
-            let btn = NSButton(title: "Summarize with Haiku", target: self, action: #selector(summarizeClicked))
-            btn.bezelStyle = .rounded
-            btn.controlSize = .small
-            btn.translatesAutoresizingMaskIntoConstraints = false
-            self.summarizeBtn = btn
-            header.addSubview(btn)
+        // Summarize button — always present, disabled when nothing to summarize
+        let btn = NSButton(title: "Summarize with Haiku", target: self, action: #selector(summarizeClicked))
+        btn.bezelStyle = .rounded
+        btn.controlSize = .small
+        btn.isEnabled = summarizeEnabled
+        btn.translatesAutoresizingMaskIntoConstraints = false
+        self.summarizeBtn = btn
+        header.addSubview(btn)
 
-            NSLayoutConstraint.activate([
-                btn.topAnchor.constraint(equalTo: bottomAnchorView.bottomAnchor, constant: 8),
-                btn.leadingAnchor.constraint(equalTo: title.leadingAnchor),
-            ])
-            headerSummaryBottomConstraint = btn.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
-        } else {
-            self.summarizeBtn = nil
-            headerSummaryBottomConstraint = bottomAnchorView.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
-        }
+        NSLayoutConstraint.activate([
+            btn.topAnchor.constraint(equalTo: bottomAnchorView.bottomAnchor, constant: 8),
+            btn.leadingAnchor.constraint(equalTo: title.leadingAnchor),
+        ])
+        headerSummaryBottomConstraint = btn.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
 
         headerSummaryBottomConstraint?.isActive = true
 

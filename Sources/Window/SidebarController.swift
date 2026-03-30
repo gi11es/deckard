@@ -658,6 +658,16 @@ extension DeckardWindowController {
     @objc func exploreSessionsMenuAction(_ sender: NSMenuItem) {
         guard let project = sender.representedObject as? ProjectItem else { return }
 
+        // If an explorer window already exists for this project, bring it to front
+        let expectedTitle = "Sessions — \(project.name)"
+        for window in NSApp.windows {
+            if window.title == expectedTitle,
+               let controller = objc_getAssociatedObject(window, "explorerController") as? SessionExplorerWindowController {
+                window.makeKeyAndOrderFront(nil)
+                return
+            }
+        }
+
         let explorer = SessionExplorerWindowController(
             projectPath: project.path,
             projectName: project.name
@@ -673,7 +683,6 @@ extension DeckardWindowController {
             self.saveState()
         }
 
-        // Retain the controller via the window
         explorer.showWindow(nil)
         explorer.window?.makeKeyAndOrderFront(nil)
 

@@ -362,13 +362,13 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         }
         let cachedTurnCount = SummaryManager.shared.cachedSummaryTurnCount(forSessionId: sessionId)
         let needsSessionSummary = session.summary == nil || cachedTurnCount < entries.count
-        let needsSummarization = needsSessionSummary || hasUncachedActions
+        let summarizeEnabled = needsSessionSummary || hasUncachedActions
 
         timelineController?.showTimeline(
             session: updatedSession,
             entries: enrichedEntries,
             cachedActionSummaries: cachedActionSummaries,
-            showSummarizeButton: needsSummarization,
+            summarizeEnabled: summarizeEnabled,
             scrollToIndex: scrollToMessageIndex
         )
 
