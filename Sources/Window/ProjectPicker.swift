@@ -17,6 +17,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
     private var filteredProjects: [(path: String, lastUsed: Date)] = []
     private var spotlightSearch: Process?
     private var spotlightPipe: Pipe?
+    private var keyMonitor: Any?
     private var excludePaths: Set<String> = []
     private let fuse = Fuse(threshold: 0.4)
 
@@ -116,8 +117,12 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
         panel.makeKeyAndOrderFront(nil)
         panel.makeFirstResponder(searchField)
 
-        // Monitor for Escape key
-        NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+        // Monitor for Escape key — remove any prior monitor to avoid leaks
+        if let existing = keyMonitor {
+            NSEvent.removeMonitor(existing)
+            keyMonitor = nil
+        }
+        keyMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
             guard let self = self, self.panel.isVisible else { return event }
 
             if event.keyCode == 53 { // Escape
@@ -148,6 +153,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
     private func cancel() {
         cancelSpotlightSearch()
+        removeKeyMonitor()
         panel.orderOut(nil)
         completion?(nil)
         completion = nil
@@ -155,6 +161,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
     private func confirm() {
         cancelSpotlightSearch()
+        removeKeyMonitor()
         let row = tableView.selectedRow
         let path: String
         if row >= 0, row < filteredProjects.count {
@@ -202,6 +209,13 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
     @objc private func searchFieldAction() {
         confirm()
+    }
+
+    private func removeKeyMonitor() {
+        if let monitor = keyMonitor {
+            NSEvent.removeMonitor(monitor)
+            keyMonitor = nil
+        }
     }
 
     /// Safely terminate the spotlight search, clearing the readability handler
