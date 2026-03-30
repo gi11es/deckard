@@ -262,8 +262,12 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         }
         if let fIdx = filteredSessions.firstIndex(where: { $0.sessionId == sessionId }) {
             filteredSessions[fIdx].isBookmarked = newState
-            listTableView.reloadData(forRowIndexes: IndexSet(integer: fIdx), columnIndexes: IndexSet(integer: 0))
         }
+        // Update only the button itself — no row reload
+        sender.title = newState ? "\u{2605}" : "\u{2606}"
+        sender.contentTintColor = newState
+            ? NSColor(red: 1.0, green: 0.8, blue: 0.2, alpha: 0.7)
+            : NSColor.tertiaryLabelColor
     }
 
     // MARK: - Search
@@ -357,13 +361,6 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
 
     func numberOfRows(in tableView: NSTableView) -> Int {
         filteredSessions.count
-    }
-
-    func tableView(_ tableView: NSTableView, rowViewForRow row: Int) -> NSTableRowView? {
-        guard row < filteredSessions.count, filteredSessions[row].isBookmarked else { return nil }
-        let rowView = NSTableRowView()
-        rowView.backgroundColor = NSColor(red: 1.0, green: 0.85, blue: 0.2, alpha: 0.06)
-        return rowView
     }
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
