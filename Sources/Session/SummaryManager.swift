@@ -96,7 +96,7 @@ class SummaryManager {
         guard let resolvedPath = claudePath else { return nil }
 
         process.executableURL = URL(fileURLWithPath: resolvedPath)
-        process.arguments = ["--print", "-p", prompt]
+        process.arguments = ["--print", "--model", "haiku", "-p", prompt]
 
         let stdout = Pipe()
         let stderr = Pipe()

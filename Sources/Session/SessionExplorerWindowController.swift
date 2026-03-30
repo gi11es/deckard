@@ -195,7 +195,22 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
                 $0.label.lowercased().contains(query)
             }
         }
+        // Preserve selection across reload
+        let previousSelection = selectedSessionId
         listTableView.reloadData()
+        if let prevId = previousSelection {
+            restoreListSelection(sessionId: prevId)
+        }
+    }
+
+    /// Restores the list selection to match the given sessionId.
+    private func restoreListSelection(sessionId: String) {
+        let bookmarkCount = filteredBookmarks.count
+        let hasDivider = bookmarkCount > 0
+        let offset = bookmarkCount + (hasDivider ? 1 : 0)
+        if let idx = filteredSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+            listTableView.selectRowIndexes(IndexSet(integer: offset + idx), byExtendingSelection: false)
+        }
     }
 
     // MARK: - Actions
