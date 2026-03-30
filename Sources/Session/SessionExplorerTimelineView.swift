@@ -10,7 +10,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
 
     private var currentSession: ExplorerSessionInfo?
     private var entries: [TimelineEntry] = []
-    private var generatingTurnIndex: Int? // which turn is currently being summarized
+    private var generatingTurnIndices = Set<Int>() // turns currently being summarized
 
     // Callbacks
     var onResume: ((String) -> Void)?
@@ -90,16 +90,17 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         }
     }
 
-    /// Marks a specific turn as currently generating (shows spinner on that row).
-    func setGeneratingTurn(_ turnIndex: Int?) {
-        generatingTurnIndex = turnIndex
+    /// Marks turns as currently generating (shows spinner on each row).
+    func setGeneratingTurns(_ turnIndices: Set<Int>) {
+        generatingTurnIndices = turnIndices
         tableView.reloadData()
     }
 
-    /// Updates a single turn's action summary and refreshes the table.
-    func updateActionSummary(turnIndex: Int, summary: String?) {
-        if let i = entries.firstIndex(where: { $0.index == turnIndex }) {
-            entries[i].actionSummary = summary
+    /// Updates all action summaries at once and clears generating state.
+    func updateActionSummaries(_ summaries: [Int: String]) {
+        generatingTurnIndices.removeAll()
+        for i in 0..<entries.count {
+            entries[i].actionSummary = summaries[entries[i].index]
         }
         tableView.reloadData()
     }
@@ -215,7 +216,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
         guard row < entries.count else { return 60 }
         let entry = entries[row]
-        let hasExtra = entry.actionSummary != nil || generatingTurnIndex == entry.index
+        let hasExtra = entry.actionSummary != nil || generatingTurnIndices.contains(entry.index)
         return hasExtra ? 76 : 60
     }
 
@@ -279,7 +280,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
             cell.addSubview(field)
             actionField = field
             actionSpinner = nil
-        } else if generatingTurnIndex == entry.index {
+        } else if generatingTurnIndices.contains(entry.index) {
             let spinner = NSProgressIndicator()
             spinner.style = .spinning
             spinner.controlSize = .small

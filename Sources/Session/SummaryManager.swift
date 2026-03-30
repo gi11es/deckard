@@ -70,41 +70,61 @@ class SummaryManager {
         }
     }
 
-    /// Generates a concise action summary for a single turn.
-    /// Calls `completion` on the main thread with the summary string (or nil on failure).
-    func generateSingleTurnSummary(sessionId: String, turnIndex: Int, actions: [String], completion: @escaping (String?) -> Void) {
-        let cacheKey = "\(sessionId)-\(turnIndex)"
+    /// Generates concise action summaries for all turns in one batch haiku call.
+    /// `actions` maps turn index to a list of raw action descriptions.
+    /// Calls `completion` on the main thread with a dictionary of turn index → summary.
+    func generateTurnSummaries(sessionId: String, actions: [Int: [String]], completion: @escaping ([Int: String]) -> Void) {
+        let key = "turns-\(sessionId)"
+        guard !inFlightSessionIds.contains(key) else { return }
 
         // Check cache
-        if let cached = cachedTurnSummaries[cacheKey] {
+        if let cached = cachedTurnSummaries[sessionId] {
             completion(cached)
             return
         }
 
-        guard !actions.isEmpty else {
-            completion(nil)
+        let nonEmpty = actions.filter { !$0.value.isEmpty }
+        guard !nonEmpty.isEmpty else {
+            completion([:])
             return
         }
 
-        let actionList = actions.joined(separator: ", ")
-        let prompt = "Summarize these Claude Code actions in one short sentence (max 10 words). Only output the summary, nothing else.\n\nActions: \(actionList)"
+        inFlightSessionIds.insert(key)
+
+        var promptLines = ["For each numbered turn below, write a single short sentence (max 10 words) summarizing what was done. Output one line per turn in the format \"N: summary\". No other text.\n"]
+        for turnIndex in nonEmpty.keys.sorted() {
+            let actionList = nonEmpty[turnIndex]!.joined(separator: ", ")
+            promptLines.append("\(turnIndex): \(actionList)")
+        }
+        let prompt = promptLines.joined(separator: "\n")
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let result = self?.runClaudePrint(prompt: prompt)
 
             DispatchQueue.main.async {
-                let summary = result?.trimmingCharacters(in: .whitespacesAndNewlines)
-                if let summary, !summary.isEmpty {
-                    self?.cachedTurnSummaries[cacheKey] = summary
-                    completion(summary)
-                } else {
-                    completion(nil)
+                self?.inFlightSessionIds.remove(key)
+
+                var summaries: [Int: String] = [:]
+                if let output = result {
+                    for line in output.components(separatedBy: "\n") {
+                        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard let colonIdx = trimmed.firstIndex(of: ":") else { continue }
+                        let numStr = trimmed[trimmed.startIndex..<colonIdx].trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard let turnIdx = Int(numStr) else { continue }
+                        let summary = trimmed[trimmed.index(after: colonIdx)...].trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !summary.isEmpty {
+                            summaries[turnIdx] = summary
+                        }
+                    }
                 }
+
+                self?.cachedTurnSummaries[sessionId] = summaries
+                completion(summaries)
             }
         }
     }
 
-    private var cachedTurnSummaries: [String: String] = [:]
+    private var cachedTurnSummaries: [String: [Int: String]] = [:]
 
     // MARK: - Private
 
