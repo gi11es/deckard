@@ -343,10 +343,8 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
             if let summary = sessionSummary,
                let idx = self.allSessions.firstIndex(where: { $0.sessionId == sessionId }) {
                 self.allSessions[idx].summary = summary
-                // Update just this row in the left sidebar without resetting scroll
                 if let fIdx = self.filteredSessions.firstIndex(where: { $0.sessionId == sessionId }) {
                     self.filteredSessions[fIdx].summary = summary
-                    self.listTableView.reloadData(forRowIndexes: IndexSet(integer: fIdx), columnIndexes: IndexSet(integer: 0))
                 }
             }
 
@@ -406,19 +404,8 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         metaField.font = .systemFont(ofSize: 10)
         metaField.textColor = .tertiaryLabelColor
 
-        // Text stack (title + meta + optional summary)
-        var textViews: [NSView] = [title, metaField]
-
-        if let summary = session.summary {
-            let field = NSTextField(labelWithString: summary)
-            field.font = .systemFont(ofSize: 11)
-            field.textColor = .secondaryLabelColor
-            field.lineBreakMode = .byTruncatingTail
-            field.maximumNumberOfLines = 2
-            textViews.append(field)
-        }
-
-        let textStack = NSStackView(views: textViews)
+        // Text stack (title + meta)
+        let textStack = NSStackView(views: [title, metaField])
         textStack.orientation = .vertical
         textStack.alignment = .leading
         textStack.spacing = 2
