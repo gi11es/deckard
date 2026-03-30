@@ -207,8 +207,11 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
 
         filteredSessions = sessions
 
+        // Preserve scroll position and selection across reload
+        let scrollPosition = listScrollView.contentView.bounds.origin
         let previousSelection = selectedSessionId
         listTableView.reloadData()
+        listScrollView.contentView.scroll(to: scrollPosition)
         if let prevId = previousSelection {
             restoreListSelection(sessionId: prevId)
         }
