@@ -627,6 +627,7 @@
 					"@executable_path/../Frameworks",
 				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.deckard.app.dev;
+				PRODUCT_MODULE_NAME = Deckard;
 				PRODUCT_NAME = "Deckard Dev";
 				SDKROOT = macosx;
 				SWIFT_OBJC_BRIDGING_HEADER = "Sources/App/Deckard-Bridging-Header.h";
