@@ -941,9 +941,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 if confirmedActive {
                     newBadge = .terminalActive
                 } else if tab.badgeState == .terminalActive {
-                    // Transitioning from active to idle — check focus
-                    let focused = isTabFocused(tab.id.uuidString)
-                    newBadge = focused ? .terminalIdle : .terminalCompletedUnseen
+                    // Transitioning from active to idle — check if tab is currently visible
+                    let visible = isTabVisible(tab.id.uuidString)
+                    newBadge = visible ? .terminalIdle : .terminalCompletedUnseen
                 } else if tab.badgeState == .terminalCompletedUnseen {
                     // Stay unseen until tab is visited (cleared elsewhere)
                     newBadge = .terminalCompletedUnseen
@@ -1044,6 +1044,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         return project.tabs[idx].id == surfaceId && (window?.isKeyWindow ?? false)
     }
 
+    /// Whether the tab is currently visible (selected tab in the active project),
+    /// regardless of whether the Deckard window is in the foreground.
+    func isTabVisible(_ surfaceIdStr: String) -> Bool {
+        guard let surfaceId = UUID(uuidString: surfaceIdStr) else { return false }
+        guard let project = currentProject else { return false }
+        let idx = project.selectedTabIndex
+        guard idx >= 0, idx < project.tabs.count else { return false }
+        return project.tabs[idx].id == surfaceId
+    }
+
     func focusTabById(_ tabId: UUID) {
         for (pi, project) in projects.enumerated() {
             if let ti = project.tabs.firstIndex(where: { $0.id == tabId }) {
@@ -1091,12 +1101,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let wasBusy = isClaude
             ? (tab.badgeState == .thinking || tab.badgeState == .needsPermission)
             : (tab.badgeState == .terminalActive)
-        let focused = isTabFocused(surfaceIdStr)
+        let visible = isTabVisible(surfaceIdStr)
         let idleState: TabItem.BadgeState = isClaude ? .waitingForInput : .terminalIdle
         let unseenState: TabItem.BadgeState = isClaude ? .completedUnseen : .terminalCompletedUnseen
-        let newState = (wasBusy && !focused) ? unseenState : idleState
+        let newState = (wasBusy && !visible) ? unseenState : idleState
         DiagnosticLog.shared.log("badge",
-            "updateBadgeToIdleOrUnseen: surfaceId=\(surfaceIdStr) wasBusy=\(wasBusy) focused=\(focused) -> \(newState)")
+            "updateBadgeToIdleOrUnseen: surfaceId=\(surfaceIdStr) wasBusy=\(wasBusy) visible=\(visible) -> \(newState)")
         tab.badgeState = newState
         rebuildSidebar()
         rebuildTabBar()
