@@ -8,8 +8,8 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
     private let projectName: String
 
     /// Callback invoked when the user picks an action (resume/fork).
-    /// Parameters: sessionId, forkSession flag.
-    var onSessionAction: ((String, Bool) -> Void)?
+    /// Parameters: sessionId, forkSession flag, tab name.
+    var onSessionAction: ((String, Bool, String?) -> Void)?
 
     // --- Data ---
     private var allSessions: [ExplorerSessionInfo] = []
@@ -215,19 +215,28 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
 
     // MARK: - Actions
 
+    private func sessionDisplayName(for sessionId: String) -> String? {
+        guard let session = allSessions.first(where: { $0.sessionId == sessionId }) else { return nil }
+        // Prefer summary, fall back to first user message truncated
+        if let summary = session.summary { return summary }
+        let msg = session.firstUserMessage
+        return msg.isEmpty ? nil : String(msg.prefix(60))
+    }
+
     private func performAction(sessionId: String, fork: Bool) {
-        onSessionAction?(sessionId, fork)
+        onSessionAction?(sessionId, fork, sessionDisplayName(for: sessionId))
         close()
     }
 
     private func performForkAtPoint(sessionId: String, turnIndex: Int) {
+        let name = sessionDisplayName(for: sessionId)
         guard let newSessionId = ContextMonitor.shared.truncateSession(
             sessionId: sessionId,
             projectPath: projectPath,
             afterTurnIndex: turnIndex
         ) else { return }
 
-        onSessionAction?(newSessionId, true)
+        onSessionAction?(newSessionId, true, name)
         close()
     }
 

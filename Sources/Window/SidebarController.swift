@@ -662,9 +662,9 @@ extension DeckardWindowController {
             projectPath: project.path,
             projectName: project.name
         )
-        explorer.onSessionAction = { [weak self] sessionId, fork in
+        explorer.onSessionAction = { [weak self] sessionId, fork, tabName in
             guard let self else { return }
-            self.createTabInProject(project, isClaude: true, sessionIdToResume: sessionId, forkSession: fork)
+            self.createTabInProject(project, isClaude: true, name: tabName, sessionIdToResume: sessionId, forkSession: fork)
             project.selectedTabIndex = project.tabs.count - 1
             if let idx = self.projects.firstIndex(where: { $0 === project }) {
                 self.selectProject(at: idx)
