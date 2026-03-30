@@ -31,6 +31,8 @@ class TabItem {
         case terminalIdle     // muted teal - terminal at prompt
         case terminalActive   // teal pulsing - terminal foreground process has activity
         case terminalError    // red - terminal process exited with error
+        case completedUnseen        // vivid purple - Claude finished while tab unfocused
+        case terminalCompletedUnseen // vivid teal - terminal finished while tab unfocused
     }
 
     init(surface: TerminalSurface, name: String, isClaude: Bool) {
