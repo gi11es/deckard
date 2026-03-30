@@ -568,6 +568,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         } else {
             // Always clamp for safe array access, even during restore
             let safeIdx = max(0, min(project.selectedTabIndex, project.tabs.count - 1))
+            clearUnseenIfNeeded(project.tabs[safeIdx])
             showTab(project.tabs[safeIdx])
         }
 
@@ -754,10 +755,27 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         saveState()
     }
 
+    /// If the tab is in a completedUnseen state, revert to the normal idle state.
+    private func clearUnseenIfNeeded(_ tab: TabItem) {
+        switch tab.badgeState {
+        case .completedUnseen:
+            tab.badgeState = .waitingForInput
+            rebuildSidebar()
+            rebuildTabBar()
+        case .terminalCompletedUnseen:
+            tab.badgeState = .terminalIdle
+            rebuildSidebar()
+            rebuildTabBar()
+        default:
+            break
+        }
+    }
+
     func selectTabInProject(at tabIndex: Int) {
         guard let project = currentProject else { return }
         guard tabIndex >= 0, tabIndex < project.tabs.count else { return }
         project.selectedTabIndex = tabIndex
+        clearUnseenIfNeeded(project.tabs[tabIndex])
         rebuildTabBar()
         showTab(project.tabs[tabIndex])
     }
@@ -770,6 +788,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         guard tabIndex >= 0, tabIndex < project.tabs.count else { return }
         guard tabIndex != project.selectedTabIndex else { return }
         project.selectedTabIndex = tabIndex
+        clearUnseenIfNeeded(project.tabs[tabIndex])
         showTab(project.tabs[tabIndex])
     }
 
