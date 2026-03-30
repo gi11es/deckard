@@ -588,47 +588,10 @@ extension DeckardWindowController {
     func buildProjectContextMenu(for project: ProjectItem) -> NSMenu {
         let menu = NSMenu()
 
-        let resumeItem = NSMenuItem(title: "Resume Session", action: nil, keyEquivalent: "")
-        let resumeSubmenu = NSMenu()
-
-        let sessions = ContextMonitor.shared.listSessions(forProjectPath: project.path)
-        let openSessionIds = Set(project.tabs.compactMap { $0.sessionId })
-        let resumable = sessions.filter { !openSessionIds.contains($0.sessionId) }
-
-        if resumable.isEmpty {
-            let emptyItem = NSMenuItem(title: "No sessions to resume", action: nil, keyEquivalent: "")
-            emptyItem.isEnabled = false
-            resumeSubmenu.addItem(emptyItem)
-        } else {
-            let savedNames = SessionManager.shared.loadSessionNames()
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .abbreviated
-
-            for session in resumable.prefix(50) {
-                let timeStr = formatter.localizedString(for: session.modificationDate, relativeTo: Date())
-                let savedName = savedNames[session.sessionId]
-
-                let title: String
-                if let name = savedName, !name.isEmpty {
-                    title = "\(timeStr) \u{2014} \(name)"
-                } else if !session.firstUserMessage.isEmpty {
-                    let msg = session.firstUserMessage.count > 60
-                        ? String(session.firstUserMessage.prefix(60)) + "\u{2026}"
-                        : session.firstUserMessage
-                    title = "\(timeStr) \u{2014} \(msg)"
-                } else {
-                    title = timeStr
-                }
-
-                let item = NSMenuItem(title: title, action: #selector(resumeSessionMenuAction(_:)), keyEquivalent: "")
-                item.target = self
-                item.representedObject = ResumeSessionInfo(project: project, sessionId: session.sessionId, tabName: savedName)
-                resumeSubmenu.addItem(item)
-            }
-        }
-
-        resumeItem.submenu = resumeSubmenu
-        menu.addItem(resumeItem)
+        let exploreItem = NSMenuItem(title: "Explore Sessions", action: #selector(exploreSessionsMenuAction(_:)), keyEquivalent: "")
+        exploreItem.target = self
+        exploreItem.representedObject = project
+        menu.addItem(exploreItem)
 
         menu.addItem(.separator())
 
@@ -715,6 +678,32 @@ extension DeckardWindowController {
             }
         }
         saveState()
+    }
+
+    @objc func exploreSessionsMenuAction(_ sender: NSMenuItem) {
+        guard let project = sender.representedObject as? ProjectItem else { return }
+
+        let explorer = SessionExplorerWindowController(
+            projectPath: project.path,
+            projectName: project.name
+        )
+        explorer.onSessionAction = { [weak self] sessionId, fork in
+            guard let self else { return }
+            self.createTabInProject(project, isClaude: true, sessionIdToResume: sessionId, forkSession: fork)
+            project.selectedTabIndex = project.tabs.count - 1
+            if let idx = self.projects.firstIndex(where: { $0 === project }) {
+                self.selectProject(at: idx)
+            }
+            self.rebuildTabBar()
+            self.saveState()
+        }
+
+        // Retain the controller via the window
+        explorer.showWindow(nil)
+        explorer.window?.makeKeyAndOrderFront(nil)
+
+        // Keep a strong reference so the window isn't deallocated
+        objc_setAssociatedObject(explorer.window!, "explorerController", explorer, .OBJC_ASSOCIATION_RETAIN)
     }
 
     // MARK: - Sidebar Selection
