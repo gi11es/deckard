@@ -216,9 +216,10 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
     // MARK: - Actions
 
     private func sessionDisplayName(for sessionId: String) -> String? {
+        // Prefer saved session name (from tab rename), then first user message
+        let savedNames = SessionManager.shared.loadSessionNames()
+        if let name = savedNames[sessionId], !name.isEmpty { return name }
         guard let session = allSessions.first(where: { $0.sessionId == sessionId }) else { return nil }
-        // Prefer summary, fall back to first user message truncated
-        if let summary = session.summary { return summary }
         let msg = session.firstUserMessage
         return msg.isEmpty ? nil : String(msg.prefix(60))
     }
