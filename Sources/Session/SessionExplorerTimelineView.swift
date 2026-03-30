@@ -62,6 +62,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         entries: [TimelineEntry],
         cachedActionSummaries: [Int: String],
         summarizeEnabled: Bool,
+        resumeEnabled: Bool,
         scrollToIndex: Int?
     ) {
         self.currentSession = session
@@ -75,7 +76,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         containerView.subviews.forEach { $0.removeFromSuperview() }
 
         // Header
-        let header = makeHeader(session: session, summarizeEnabled: summarizeEnabled)
+        let header = makeHeader(session: session, summarizeEnabled: summarizeEnabled, resumeEnabled: resumeEnabled)
         self.headerView = header
         header.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(header)
@@ -130,7 +131,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
 
     // MARK: - Header
 
-    private func makeHeader(session: ExplorerSessionInfo, summarizeEnabled: Bool) -> NSView {
+    private func makeHeader(session: ExplorerSessionInfo, summarizeEnabled: Bool, resumeEnabled: Bool) -> NSView {
         let header = NSView()
         header.wantsLayer = true
         header.layer?.backgroundColor = NSColor(white: 0, alpha: 0.1).cgColor
@@ -155,6 +156,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         // Action buttons (top right)
         let resumeBtn = NSButton(title: "Resume", target: self, action: #selector(resumeClicked))
         resumeBtn.bezelStyle = .rounded
+        resumeBtn.isEnabled = resumeEnabled
         resumeBtn.translatesAutoresizingMaskIntoConstraints = false
 
         let forkBtn = NSButton(title: "Fork", target: self, action: #selector(forkClicked))

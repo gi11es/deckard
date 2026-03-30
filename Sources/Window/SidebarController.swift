@@ -673,6 +673,7 @@ extension DeckardWindowController {
             projectPath: project.path,
             projectName: project.name
         )
+        explorer.openSessionIds = Set(project.tabs.compactMap { $0.sessionId })
         explorer.onSessionAction = { [weak self] sessionId, fork, tabName in
             guard let self else { return }
             self.createTabInProject(project, isClaude: true, name: tabName, sessionIdToResume: sessionId, forkSession: fork)

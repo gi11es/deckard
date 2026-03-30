@@ -11,6 +11,9 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
     /// Parameters: sessionId, forkSession flag, tab name.
     var onSessionAction: ((String, Bool, String?) -> Void)?
 
+    /// Session IDs currently open in the project's tabs.
+    var openSessionIds = Set<String>()
+
     // --- Data ---
     private var allSessions: [ExplorerSessionInfo] = []
     private var filteredSessions: [ExplorerSessionInfo] = []
@@ -310,11 +313,14 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         let needsSessionSummary = updatedSession.summary == nil || cachedTurnCount < entries.count
         let summarizeEnabled = needsSessionSummary || hasUncachedActions
 
+        let isOpen = openSessionIds.contains(sessionId)
+
         timelineController?.showTimeline(
             session: updatedSession,
             entries: entries,
             cachedActionSummaries: cachedActionSummaries,
             summarizeEnabled: summarizeEnabled,
+            resumeEnabled: !isOpen,
             scrollToIndex: scrollToMessageIndex
         )
 
