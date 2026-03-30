@@ -23,6 +23,7 @@ Run multiple sessions side by side in a single window with tabs, projects, and s
 - **Project sidebar**: Each open directory gets its own set of tabs, persisted across restarts. Group related projects into collapsible sidebar folders for organization (e.g., by client).
 - **Context & quota tracking**: A progress bar shows context window usage. A sparkline visualizes token rate over time, and rate limit indicators show 5-hour and 7-day quota consumption.
 - **Session state detection**: Tab badges show whether Claude is thinking, waiting for input, needs tool permission, or has errored. Terminal tabs show real-time CPU and disk activity for the foreground process.
+- **Session explorer**: Right-click a project and choose "Explore Sessions" (or press Cmd+Shift+E) to browse all past Claude sessions. View the full conversation timeline, resume or fork from any point, and bookmark favorite sessions with a star toggle. Optionally summarize sessions and per-turn actions with Haiku — summaries are cached and incrementally updated when sessions are continued.
 - **Session persistence**: Claude sessions resume via `--resume`. Tab structure and working directories are preserved across restarts.
 - **486 color themes**: Ships with 486 built-in themes (Ghostty format) and loads custom themes from `~/.config/ghostty/themes`. Search and preview in Settings.
 - **Customizable shortcuts**: All keyboard shortcuts are rebindable in Settings > Shortcuts.
