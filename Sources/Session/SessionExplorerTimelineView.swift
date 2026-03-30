@@ -111,7 +111,8 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
     func updateHeaderSummary(_ summary: String) {
         if let existing = headerSummaryField {
             existing.stringValue = summary
-            headerView?.layoutSubtreeIfNeeded()
+            containerView.needsLayout = true
+            containerView.layoutSubtreeIfNeeded()
             return
         }
 
@@ -141,7 +142,8 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         ])
         headerSummaryBottomConstraint = field.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
         headerSummaryBottomConstraint?.isActive = true
-        header.layoutSubtreeIfNeeded()
+        containerView.needsLayout = true
+        containerView.layoutSubtreeIfNeeded()
     }
 
     /// Transitions the button to a "generating" state: disabled, label changes, spinner appears.

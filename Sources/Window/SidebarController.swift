@@ -662,7 +662,8 @@ extension DeckardWindowController {
         let expectedTitle = "Sessions — \(project.name)"
         for window in NSApp.windows {
             if window.title == expectedTitle,
-               let controller = objc_getAssociatedObject(window, "explorerController") as? SessionExplorerWindowController {
+               objc_getAssociatedObject(window, "explorerController") is SessionExplorerWindowController {
+                NSApp.activate(ignoringOtherApps: true)
                 window.makeKeyAndOrderFront(nil)
                 return
             }
@@ -683,6 +684,7 @@ extension DeckardWindowController {
             self.saveState()
         }
 
+        NSApp.activate(ignoringOtherApps: true)
         explorer.showWindow(nil)
         explorer.window?.makeKeyAndOrderFront(nil)
 
