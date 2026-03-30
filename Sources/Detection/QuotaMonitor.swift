@@ -112,7 +112,8 @@ class QuotaMonitor {
         var bestDate: Date = .distantPast
 
         for projectPath in projectPaths {
-            let encoded = projectPath.replacingOccurrences(of: "/", with: "-")
+            let resolved = (projectPath as NSString).resolvingSymlinksInPath
+            let encoded = resolved.replacingOccurrences(of: "/", with: "-")
             let dir = NSHomeDirectory() + "/.claude/projects/\(encoded)"
 
             guard let files = try? fm.contentsOfDirectory(atPath: dir) else { continue }

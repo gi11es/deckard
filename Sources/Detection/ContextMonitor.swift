@@ -34,7 +34,8 @@ class ContextMonitor {
 
     /// Lists all Claude sessions for a project, sorted by most recent first.
     func listSessions(forProjectPath projectPath: String) -> [SessionInfo] {
-        let encoded = projectPath.replacingOccurrences(of: "/", with: "-")
+        let resolved = (projectPath as NSString).resolvingSymlinksInPath
+        let encoded = resolved.replacingOccurrences(of: "/", with: "-")
         let dir = NSHomeDirectory() + "/.claude/projects/\(encoded)"
         let fm = FileManager.default
 
@@ -93,7 +94,8 @@ class ContextMonitor {
     /// Get context usage for a session by reading its JSONL file.
     /// Only reads the tail of the file to find the most recent usage entry.
     func getUsage(sessionId: String, projectPath: String) -> ContextUsage? {
-        let encoded = projectPath.replacingOccurrences(of: "/", with: "-")
+        let resolved = (projectPath as NSString).resolvingSymlinksInPath
+        let encoded = resolved.replacingOccurrences(of: "/", with: "-")
         let jsonlPath = NSHomeDirectory() + "/.claude/projects/\(encoded)/\(sessionId).jsonl"
 
         guard let fh = FileHandle(forReadingAtPath: jsonlPath) else { return nil }
