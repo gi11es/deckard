@@ -326,27 +326,10 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         guard let session = allSessions.first(where: { $0.sessionId == sessionId }) else { return }
 
         let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath)
-        let turnCount = entries.count
 
         // Update message count now that we've parsed the full file
         if let idx = allSessions.firstIndex(where: { $0.sessionId == sessionId }) {
-            allSessions[idx].messageCount = turnCount
-        }
-
-        // Generate or regenerate session summary if session has new turns
-        let cachedTurnCount = SummaryManager.shared.cachedSummaryTurnCount(forSessionId: sessionId)
-        if cachedTurnCount < turnCount || session.summary == nil {
-            SummaryManager.shared.generateSummary(sessionId: sessionId, projectPath: projectPath, currentTurnCount: turnCount) { [weak self] summary in
-                guard let self else { return }
-                if let idx = self.allSessions.firstIndex(where: { $0.sessionId == sessionId }), let summary {
-                    self.allSessions[idx].summary = summary
-                    self.applyFilter()
-                    // Also update the timeline header
-                    if self.selectedSessionId == sessionId {
-                        self.timelineController?.updateHeaderSummary(summary)
-                    }
-                }
-            }
+            allSessions[idx].messageCount = entries.count
         }
 
         // Use the session with updated messageCount for the timeline header
@@ -368,14 +351,55 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
             return e
         }
 
+        // Load cached action summaries (no AI call — just what we already have)
+        let cachedActionSummaries = SummaryManager.shared.cachedTurnSummaries(forSessionId: sessionId)
+
+        // Check if there are uncached turns that could be summarized
+        let actions = ContextMonitor.shared.parseActions(sessionId: sessionId, projectPath: projectPath)
+        let hasUncachedActions = entries.contains { entry in
+            let turnActions = actions[entry.index] ?? []
+            return !turnActions.isEmpty && cachedActionSummaries[entry.index] == nil
+        }
+
+        // Check if session summary needs (re)generation
+        let cachedTurnCount = SummaryManager.shared.cachedSummaryTurnCount(forSessionId: sessionId)
+        let needsSessionSummary = session.summary == nil || cachedTurnCount < entries.count
+
         timelineController?.showTimeline(
             session: updatedSession,
             entries: enrichedEntries,
+            cachedActionSummaries: cachedActionSummaries,
+            showSummarizeButton: needsSessionSummary,
+            showSummarizeActionsButton: hasUncachedActions,
             scrollToIndex: scrollToMessageIndex
         )
 
-        // Generate action summaries — cached turns load instantly, only new ones hit haiku
-        let actions = ContextMonitor.shared.parseActions(sessionId: sessionId, projectPath: projectPath)
+        timelineController?.onSummarizeSession = { [weak self] in
+            self?.summarizeSession(sessionId: sessionId)
+        }
+        timelineController?.onSummarizeActions = { [weak self] in
+            self?.summarizeActions(sessionId: sessionId, entries: entries, actions: actions)
+        }
+    }
+
+    private func summarizeSession(sessionId: String) {
+        guard let session = allSessions.first(where: { $0.sessionId == sessionId }) else { return }
+        let turnCount = session.messageCount
+
+        SummaryManager.shared.generateSummary(sessionId: sessionId, projectPath: projectPath, currentTurnCount: turnCount) { [weak self] summary in
+            guard let self else { return }
+            if let idx = self.allSessions.firstIndex(where: { $0.sessionId == sessionId }), let summary {
+                self.allSessions[idx].summary = summary
+                self.applyFilter()
+                if self.selectedSessionId == sessionId {
+                    self.timelineController?.updateHeaderSummary(summary)
+                    self.timelineController?.hideSummarizeSessionButton()
+                }
+            }
+        }
+    }
+
+    private func summarizeActions(sessionId: String, entries: [TimelineEntry], actions: [Int: [String]]) {
         let cached = SummaryManager.shared.cachedTurnSummaries(forSessionId: sessionId)
         let uncachedTurns = Set(entries.map { $0.index }.filter {
             actions[$0] != nil && !actions[$0]!.isEmpty && cached[$0] == nil
@@ -386,6 +410,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         SummaryManager.shared.generateTurnSummaries(sessionId: sessionId, actions: actions) { [weak self] summaries in
             guard let self, self.selectedSessionId == sessionId else { return }
             self.timelineController?.updateActionSummaries(summaries)
+            self.timelineController?.hideSummarizeActionsButton()
         }
     }
 
