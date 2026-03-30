@@ -1051,6 +1051,22 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         rebuildTabBar()
     }
 
+    /// Like updateBadge, but substitutes completedUnseen/terminalCompletedUnseen
+    /// when the tab transitions to an idle state while unfocused.
+    func updateBadgeToIdleOrUnseen(forSurfaceId surfaceIdStr: String, isClaude: Bool) {
+        guard let tab = tabForSurfaceId(surfaceIdStr) else { return }
+        let wasBusy = isClaude ? (tab.badgeState == .thinking) : (tab.badgeState == .terminalActive)
+        let focused = isTabFocused(surfaceIdStr)
+        let idleState: TabItem.BadgeState = isClaude ? .waitingForInput : .terminalIdle
+        let unseenState: TabItem.BadgeState = isClaude ? .completedUnseen : .terminalCompletedUnseen
+        let newState = (wasBusy && !focused) ? unseenState : idleState
+        DiagnosticLog.shared.log("badge",
+            "updateBadgeToIdleOrUnseen: surfaceId=\(surfaceIdStr) wasBusy=\(wasBusy) focused=\(focused) -> \(newState)")
+        tab.badgeState = newState
+        rebuildSidebar()
+        rebuildTabBar()
+    }
+
     func listTabInfo() -> [TabInfo] {
         var result: [TabInfo] = []
         for project in projects {
