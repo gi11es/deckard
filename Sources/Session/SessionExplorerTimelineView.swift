@@ -5,9 +5,6 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
 
     private let containerView: NSView
     private var headerView: NSView?
-    private var headerTitleField: NSTextField?
-    private var headerSummaryField: NSTextField?
-    private var headerSummaryBottomConstraint: NSLayoutConstraint?
     private let scrollView = NSScrollView()
     private let tableView = NSTableView()
 
@@ -107,52 +104,13 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         }
     }
 
-    /// Adds or updates the AI summary below the subtitle in the header.
-    func updateHeaderSummary(_ summary: String) {
-        if let existing = headerSummaryField {
-            existing.stringValue = summary
-            containerView.needsLayout = true
-            containerView.layoutSubtreeIfNeeded()
-            return
-        }
-
-        guard let header = headerView, let titleField = headerTitleField else { return }
-
-        let field = NSTextField(labelWithString: summary)
-        field.font = .systemFont(ofSize: 12)
-        field.textColor = .secondaryLabelColor
-        field.lineBreakMode = .byTruncatingTail
-        field.maximumNumberOfLines = 5
-        field.cell?.wraps = true
-        field.cell?.isScrollable = false
-        field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        field.translatesAutoresizingMaskIntoConstraints = false
-        header.addSubview(field)
-        headerSummaryField = field
-
-        // Find the subtitle field
-        let subtitleField = header.subviews.compactMap { $0 as? NSTextField }.first(where: { $0 !== titleField && $0 !== field })
-
-        // Replace bottom constraint — summary is now the bottom element
-        headerSummaryBottomConstraint?.isActive = false
-        NSLayoutConstraint.activate([
-            field.leadingAnchor.constraint(equalTo: titleField.leadingAnchor),
-            field.trailingAnchor.constraint(equalTo: header.trailingAnchor, constant: -16),
-            field.topAnchor.constraint(equalTo: (subtitleField ?? titleField).bottomAnchor, constant: 4),
-        ])
-        headerSummaryBottomConstraint = field.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
-        headerSummaryBottomConstraint?.isActive = true
-        containerView.needsLayout = true
-        containerView.layoutSubtreeIfNeeded()
-    }
-
     /// Transitions the button to a "generating" state: disabled, label changes, spinner appears.
     func setSummarizing(_ active: Bool) {
         guard let btn = summarizeBtn else { return }
-        if active {
-            btn.title = "Summarizing..."
-            btn.isEnabled = false
+        btn.title = active ? "Summarizing..." : "Summarize with Haiku"
+        btn.isEnabled = !active
 
+        if active {
             let spinner = NSProgressIndicator()
             spinner.style = .spinning
             spinner.controlSize = .small
@@ -165,17 +123,8 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
             ])
             summarizeSpinner = spinner
         } else {
-            btn.title = "Summarize with Haiku"
-            btn.isEnabled = false
             summarizeSpinner?.removeFromSuperview()
             summarizeSpinner = nil
-        }
-    }
-
-    /// Updates all action summaries at once.
-    func updateActionSummaries(_ summaries: [Int: String]) {
-        for i in 0..<entries.count {
-            entries[i].actionSummary = summaries[entries[i].index]
         }
         tableView.reloadData()
     }
@@ -213,8 +162,6 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         title.cell?.isScrollable = false
         title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         title.translatesAutoresizingMaskIntoConstraints = false
-        self.headerTitleField = title
-        self.headerSummaryField = nil
 
         let timeStr = RelativeDateTimeFormatter().localizedString(for: session.modificationDate, relativeTo: Date())
         let subtitle = NSTextField(labelWithString: "\(session.messageCount) messages \u{00B7} \(timeStr)")
@@ -267,7 +214,6 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
             field.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
             field.translatesAutoresizingMaskIntoConstraints = false
             header.addSubview(field)
-            headerSummaryField = field
 
             NSLayoutConstraint.activate([
                 field.leadingAnchor.constraint(equalTo: title.leadingAnchor),
@@ -290,9 +236,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
             btn.topAnchor.constraint(equalTo: bottomAnchorView.bottomAnchor, constant: 8),
             btn.leadingAnchor.constraint(equalTo: title.leadingAnchor),
         ])
-        headerSummaryBottomConstraint = btn.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12)
-
-        headerSummaryBottomConstraint?.isActive = true
+        btn.bottomAnchor.constraint(equalTo: header.bottomAnchor, constant: -12).isActive = true
 
         return header
     }

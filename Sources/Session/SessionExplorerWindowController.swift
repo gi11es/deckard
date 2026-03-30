@@ -392,11 +392,10 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
                let idx = self.allSessions.firstIndex(where: { $0.sessionId == sessionId }) {
                 self.allSessions[idx].summary = summary
                 self.applyFilter()
-                self.timelineController?.updateHeaderSummary(summary)
             }
 
-            self.timelineController?.updateActionSummaries(actionSummaries)
-            self.timelineController?.setSummarizing(false)
+            // Rebuild the entire right pane with updated data
+            self.selectSession(sessionId: sessionId, scrollToMessageIndex: nil)
         }
     }
 
