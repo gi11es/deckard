@@ -517,11 +517,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
         }
 
-        // Terminate all surfaces
+        // Detach terminal tabs so their tmux sessions survive for re-open;
+        // terminate Claude tabs (they use their own resume mechanism).
         let closedIds = Set(project.tabs.map { $0.id })
         tabCreationOrder.removeAll { closedIds.contains($0) }
         for tab in project.tabs {
-            tab.surface.terminate()
+            if !tab.isClaude && tab.surface.tmuxSessionName != nil {
+                tab.surface.detach()
+            } else {
+                tab.surface.terminate()
+            }
         }
 
         projects.remove(at: index)
@@ -1292,14 +1297,13 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private func restoreSidebarFolders(from state: DeckardState) {
         // During restore, ProjectItem gets a new UUID. Build a map from saved-id -> live ProjectItem.
+        // Match by index (projects are created in the same order as projectStates) rather than
+        // by path, because multiple projects can share the same path (e.g. ~/Downloads).
         guard let projectStates = state.projects else { return }
         var savedIdToProject: [String: ProjectItem] = [:]
-        for ps in projectStates {
-            // Resolve symlinks so old state.json entries (pre-fix) still match.
-            let resolvedPsPath = (ps.path as NSString).resolvingSymlinksInPath
-            if let project = projects.first(where: { $0.path == resolvedPsPath }) {
-                savedIdToProject[ps.id] = project
-            }
+        for (i, ps) in projectStates.enumerated() {
+            guard i < projects.count else { continue }
+            savedIdToProject[ps.id] = projects[i]
         }
 
         // Restore folders
