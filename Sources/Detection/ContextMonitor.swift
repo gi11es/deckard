@@ -180,8 +180,9 @@ class ContextMonitor {
                !seenPromptIds.contains(promptId) {
                 let msg = json["message"] as? [String: Any]
                 var text = ""
-                if let c = msg?["content"] as? String { text = c }
-                else if let arr = msg?["content"] as? [[String: Any]] {
+                if let c = msg?["content"] as? String {
+                    text = c
+                } else if let arr = msg?["content"] as? [[String: Any]] {
                     text = arr.first(where: { $0["type"] as? String == "text" })?["text"] as? String ?? ""
                 }
                 guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
