@@ -112,7 +112,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         listTableView.headerView = nil
         listTableView.dataSource = self
         listTableView.delegate = self
-        listTableView.rowHeight = 64
+        listTableView.usesAutomaticRowHeights = true
         listTableView.backgroundColor = .clear
         listTableView.selectionHighlightStyle = .regular
         listTableView.target = self
@@ -360,6 +360,13 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
             entries: enrichedEntries,
             scrollToIndex: scrollToMessageIndex
         )
+
+        // Generate action summaries for each turn
+        let actions = ContextMonitor.shared.parseActions(sessionId: sessionId, projectPath: projectPath)
+        SummaryManager.shared.generateTurnSummaries(sessionId: sessionId, actions: actions) { [weak self] summaries in
+            guard let self, self.selectedSessionId == sessionId else { return }
+            self.timelineController?.updateActionSummaries(summaries)
+        }
     }
 
     // MARK: - NSSplitViewDelegate
@@ -465,6 +472,7 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
             subtitle.leadingAnchor.constraint(equalTo: title.leadingAnchor),
             subtitle.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
             subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
+            subtitle.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -8),
         ])
 
         return cell
@@ -490,8 +498,8 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         let title = NSTextField(labelWithString: session.summary ?? session.firstUserMessage)
         title.font = .systemFont(ofSize: 13, weight: session.sessionId == selectedSessionId ? .semibold : .regular)
         title.textColor = .labelColor
-        title.lineBreakMode = .byWordWrapping
-        title.maximumNumberOfLines = 2
+        title.lineBreakMode = .byTruncatingTail
+        title.maximumNumberOfLines = 5
         title.preferredMaxLayoutWidth = 200
         title.cell?.wraps = true
         title.cell?.isScrollable = false
@@ -525,9 +533,10 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
             subtitle.leadingAnchor.constraint(equalTo: title.leadingAnchor),
             subtitle.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
             subtitle.topAnchor.constraint(equalTo: title.bottomAnchor, constant: 2),
+            subtitle.bottomAnchor.constraint(equalTo: cell.bottomAnchor, constant: -8),
 
             spinner.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -12),
-            spinner.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            spinner.topAnchor.constraint(equalTo: cell.topAnchor, constant: 8),
             spinner.widthAnchor.constraint(equalToConstant: 16),
             spinner.heightAnchor.constraint(equalToConstant: 16),
         ])

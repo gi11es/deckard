@@ -89,6 +89,13 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         }
     }
 
+    func updateActionSummaries(_ summaries: [Int: String]) {
+        for i in 0..<entries.count {
+            entries[i].actionSummary = summaries[entries[i].index]
+        }
+        tableView.reloadData()
+    }
+
     func reloadBookmarkState(projectPath: String, sessionId: String) {
         for i in 0..<entries.count {
             entries[i].isBookmarked = BookmarkManager.shared.isBookmarked(
@@ -198,7 +205,8 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
     }
 
     func tableView(_ tableView: NSTableView, heightOfRow row: Int) -> CGFloat {
-        60
+        guard row < entries.count else { return 60 }
+        return entries[row].actionSummary != nil ? 76 : 60
     }
 
     // MARK: - Timeline Cell
@@ -237,7 +245,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         msgField.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(msgField)
 
-        // Timestamp + actions
+        // Timestamp
         var metaParts: [String] = []
         if let ts = entry.timestamp {
             metaParts.append(timeFormatter.string(from: ts))
@@ -249,11 +257,26 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         metaField.translatesAutoresizingMaskIntoConstraints = false
         cell.addSubview(metaField)
 
+        // Action summary (what Claude did in response)
+        let actionField: NSTextField?
+        if let summary = entry.actionSummary {
+            let field = NSTextField(labelWithString: "\u{2192} \(summary)")
+            field.font = .systemFont(ofSize: 11)
+            field.textColor = .secondaryLabelColor
+            field.lineBreakMode = .byTruncatingTail
+            field.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(field)
+            actionField = field
+        } else {
+            actionField = nil
+        }
+
         // Fork here button
-        let forkBtn = NSButton(title: "Fork here", target: nil, action: nil)
+        let forkBtn = NSButton(title: "", target: nil, action: nil)
+        forkBtn.image = NSImage(systemSymbolName: "arrow.branch", accessibilityDescription: "Fork here")
         forkBtn.bezelStyle = .inline
-        forkBtn.font = .systemFont(ofSize: 11)
         forkBtn.isBordered = false
+        forkBtn.toolTip = "Fork here"
         forkBtn.contentTintColor = NSColor(red: 0.4, green: 0.6, blue: 0.9, alpha: 0.8)
         forkBtn.tag = entry.index
         forkBtn.target = self
@@ -303,9 +326,17 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
 
             // Star
             starBtn.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -16),
-            starBtn.centerYAnchor.constraint(equalTo: cell.centerYAnchor),
+            starBtn.topAnchor.constraint(equalTo: cell.topAnchor, constant: 12),
             starBtn.widthAnchor.constraint(equalToConstant: 24),
         ])
+
+        if let actionField {
+            NSLayoutConstraint.activate([
+                actionField.leadingAnchor.constraint(equalTo: msgField.leadingAnchor),
+                actionField.trailingAnchor.constraint(equalTo: starBtn.leadingAnchor, constant: -8),
+                actionField.topAnchor.constraint(equalTo: metaField.bottomAnchor, constant: 1),
+            ])
+        }
 
         return cell
     }

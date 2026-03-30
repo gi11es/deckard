@@ -18,6 +18,7 @@ struct TimelineEntry {
     let timestamp: Date?
     var isBookmarked: Bool
     var bookmarkLabel: String?
+    var actionSummary: String?
 }
 
 /// A starred point in a conversation, persisted to disk.
