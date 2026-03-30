@@ -143,7 +143,8 @@ final class ContextMonitorTests: XCTestCase {
         let info = ContextMonitor.SessionInfo(
             sessionId: "sess-123",
             modificationDate: date,
-            firstUserMessage: "Hello Claude"
+            firstUserMessage: "Hello Claude",
+            messageCount: 5
         )
 
         XCTAssertEqual(info.sessionId, "sess-123")
