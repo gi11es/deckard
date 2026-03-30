@@ -687,12 +687,14 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         (.waitingForInput, "Ready"),
         (.needsPermission, "Needs Permission"),
         (.error, "Error"),
+        (.completedUnseen, "Done (Unvisited)"),
     ]
 
     private static let terminalBadgeEntries: [(state: TabItem.BadgeState, label: String)] = [
         (.terminalIdle, "Idle"),
         (.terminalActive, "Busy"),
         (.terminalError, "Error"),
+        (.terminalCompletedUnseen, "Done (Unvisited)"),
     ]
 
     /// Default animation settings per state.
