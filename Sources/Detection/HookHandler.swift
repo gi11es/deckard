@@ -35,7 +35,11 @@ class HookHandler {
                 if type.contains("permission") {
                     windowController?.updateBadge(forSurfaceId: surfaceId, state: .needsPermission)
                 } else {
-                    windowController?.updateBadge(forSurfaceId: surfaceId, state: .waitingForInput)
+                    // Don't overwrite completedUnseen — the tab hasn't been visited yet
+                    if let tab = windowController?.tabForSurfaceId(surfaceId),
+                       tab.badgeState != .completedUnseen {
+                        windowController?.updateBadge(forSurfaceId: surfaceId, state: .waitingForInput)
+                    }
                 }
             }
             reply(ControlResponse(ok: true))

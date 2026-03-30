@@ -145,6 +145,7 @@ extension DeckardWindowController {
             project.selectedTabIndex = min(idx, project.tabs.count - 1)
             rebuildTabBar()
             rebuildSidebar()
+            clearUnseenIfNeeded(project.tabs[project.selectedTabIndex])
             showTab(project.tabs[project.selectedTabIndex])
         }
         saveState()

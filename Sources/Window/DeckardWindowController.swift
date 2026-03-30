@@ -750,13 +750,14 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             project.selectedTabIndex = min(idx, project.tabs.count - 1)
             rebuildTabBar()
             rebuildSidebar()
+            clearUnseenIfNeeded(project.tabs[project.selectedTabIndex])
             showTab(project.tabs[project.selectedTabIndex])
         }
         saveState()
     }
 
     /// If the tab is in a completedUnseen state, revert to the normal idle state.
-    private func clearUnseenIfNeeded(_ tab: TabItem) {
+    func clearUnseenIfNeeded(_ tab: TabItem) {
         switch tab.badgeState {
         case .completedUnseen:
             tab.badgeState = .waitingForInput
