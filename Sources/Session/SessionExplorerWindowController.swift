@@ -392,7 +392,6 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         title.textColor = .labelColor
         title.lineBreakMode = .byTruncatingTail
         title.maximumNumberOfLines = 5
-        title.preferredMaxLayoutWidth = 200
         title.cell?.wraps = true
         title.cell?.isScrollable = false
         title.translatesAutoresizingMaskIntoConstraints = false
