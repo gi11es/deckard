@@ -55,28 +55,28 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         scrollView.drawsBackground = false
     }
 
+    struct TimelineOptions {
+        let cachedActionSummaries: [Int: String]
+        let summarizeEnabled: Bool
+        let resumeEnabled: Bool
+        let scrollToIndex: Int?
+    }
+
     // MARK: - Public
 
-    func showTimeline(
-        session: ExplorerSessionInfo,
-        entries: [TimelineEntry],
-        cachedActionSummaries: [Int: String],
-        summarizeEnabled: Bool,
-        resumeEnabled: Bool,
-        scrollToIndex: Int?
-    ) {
+    func showTimeline(session: ExplorerSessionInfo, entries: [TimelineEntry], options: TimelineOptions) {
         self.currentSession = session
         self.entries = entries
 
         // Apply cached action summaries
         for i in 0..<self.entries.count {
-            self.entries[i].actionSummary = cachedActionSummaries[self.entries[i].index]
+            self.entries[i].actionSummary = options.cachedActionSummaries[self.entries[i].index]
         }
 
         containerView.subviews.forEach { $0.removeFromSuperview() }
 
         // Header
-        let header = makeHeader(session: session, summarizeEnabled: summarizeEnabled, resumeEnabled: resumeEnabled)
+        let header = makeHeader(session: session, summarizeEnabled: options.summarizeEnabled, resumeEnabled: options.resumeEnabled)
         self.headerView = header
         header.translatesAutoresizingMaskIntoConstraints = false
         containerView.addSubview(header)
@@ -98,7 +98,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
 
         tableView.reloadData()
 
-        if let idx = scrollToIndex, idx < entries.count {
+        if let idx = options.scrollToIndex, idx < entries.count {
             tableView.scrollRowToVisible(idx)
             tableView.selectRowIndexes(IndexSet(integer: idx), byExtendingSelection: false)
         }

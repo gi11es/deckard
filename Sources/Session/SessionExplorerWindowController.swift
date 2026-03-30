@@ -318,10 +318,12 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         timelineController?.showTimeline(
             session: updatedSession,
             entries: entries,
-            cachedActionSummaries: cachedActionSummaries,
-            summarizeEnabled: summarizeEnabled,
-            resumeEnabled: !isOpen,
-            scrollToIndex: scrollToMessageIndex
+            options: .init(
+                cachedActionSummaries: cachedActionSummaries,
+                summarizeEnabled: summarizeEnabled,
+                resumeEnabled: !isOpen,
+                scrollToIndex: scrollToMessageIndex
+            )
         )
 
         timelineController?.onSummarize = { [weak self] in
