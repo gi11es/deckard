@@ -3,7 +3,7 @@ import Fuse
 
 /// A Spotlight-style project picker that appears when creating a new Claude tab.
 /// Shows recent projects from ~/.claude/projects/, sorted by recency.
-class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate {
+class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate, NSWindowDelegate {
 
     typealias Completion = (String?) -> Void  // nil = cancelled, String = chosen path
 
@@ -62,6 +62,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
         super.init()
 
+        panel.delegate = self
         tableView.dataSource = self
         tableView.delegate = self
         tableView.target = self
@@ -216,6 +217,12 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
             NSEvent.removeMonitor(monitor)
             keyMonitor = nil
         }
+    }
+
+    // MARK: - NSWindowDelegate
+
+    func windowWillClose(_ notification: Notification) {
+        cancel()
     }
 
     /// Safely terminate the spotlight search, clearing the readability handler
