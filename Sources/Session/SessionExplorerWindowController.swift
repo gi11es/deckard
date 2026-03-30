@@ -110,7 +110,9 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("session"))
         column.title = ""
+        column.resizingMask = .autoresizingMask
         listTableView.addTableColumn(column)
+        listTableView.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         listTableView.headerView = nil
         listTableView.dataSource = self
         listTableView.delegate = self
