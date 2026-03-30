@@ -917,7 +917,20 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 terminalActiveStreak[tab.id] = newStreak
                 let confirmedActive = newStreak >= 2
 
-                let newBadge: TabItem.BadgeState = confirmedActive ? .terminalActive : .terminalIdle
+                let newBadge: TabItem.BadgeState
+                if confirmedActive {
+                    newBadge = .terminalActive
+                } else if tab.badgeState == .terminalActive {
+                    // Transitioning from active to idle — check focus
+                    let focused = isTabFocused(tab.id.uuidString)
+                    newBadge = focused ? .terminalIdle : .terminalCompletedUnseen
+                } else if tab.badgeState == .terminalCompletedUnseen {
+                    // Stay unseen until tab is visited (cleared elsewhere)
+                    newBadge = .terminalCompletedUnseen
+                } else {
+                    newBadge = .terminalIdle
+                }
+
                 terminalActivity[tab.id] = activity
                 if tab.badgeState != newBadge {
                     if newBadge == .terminalActive {
