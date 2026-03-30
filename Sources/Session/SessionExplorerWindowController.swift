@@ -112,7 +112,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         listTableView.headerView = nil
         listTableView.dataSource = self
         listTableView.delegate = self
-        listTableView.rowHeight = 52
+        listTableView.rowHeight = 64
         listTableView.backgroundColor = .clear
         listTableView.selectionHighlightStyle = .regular
         listTableView.target = self
@@ -409,7 +409,7 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         let bookmarkCount = filteredBookmarks.count
         let hasDivider = bookmarkCount > 0
         if hasDivider && row == bookmarkCount { return 16 }  // divider
-        return 52
+        return 64
     }
 
     func tableView(_ tableView: NSTableView, shouldSelectRow row: Int) -> Bool {
@@ -436,8 +436,13 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         let title = NSTextField(labelWithString: bookmark.label)
         title.font = .systemFont(ofSize: 13, weight: .semibold)
         title.textColor = .labelColor
-        title.lineBreakMode = .byTruncatingTail
+        title.lineBreakMode = .byWordWrapping
+        title.maximumNumberOfLines = 2
+        title.preferredMaxLayoutWidth = 200
+        title.cell?.wraps = true
+        title.cell?.isScrollable = false
         title.translatesAutoresizingMaskIntoConstraints = false
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let subtitle = NSTextField(labelWithString: "\(sessionSummary) \u{00B7} msg \(bookmark.messageIndex + 1)")
         subtitle.font = .systemFont(ofSize: 11)
@@ -485,8 +490,13 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
         let title = NSTextField(labelWithString: session.summary ?? session.firstUserMessage)
         title.font = .systemFont(ofSize: 13, weight: session.sessionId == selectedSessionId ? .semibold : .regular)
         title.textColor = .labelColor
-        title.lineBreakMode = .byTruncatingTail
+        title.lineBreakMode = .byWordWrapping
+        title.maximumNumberOfLines = 2
+        title.preferredMaxLayoutWidth = 200
+        title.cell?.wraps = true
+        title.cell?.isScrollable = false
         title.translatesAutoresizingMaskIntoConstraints = false
+        title.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
         let timeStr = relativeFormatter.localizedString(for: session.modificationDate, relativeTo: Date())
         let subtitleText = session.messageCount > 0 ? "\(timeStr) \u{00B7} \(session.messageCount) msgs" : timeStr
