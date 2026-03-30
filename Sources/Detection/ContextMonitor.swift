@@ -38,6 +38,7 @@ class ContextMonitor {
         let sessionId: String
         let modificationDate: Date
         let firstUserMessage: String
+        let messageCount: Int
     }
 
     /// Lists all Claude sessions for a project, sorted by most recent first.
@@ -58,44 +59,165 @@ class ContextMonitor {
                   let modDate = attrs[.modificationDate] as? Date else { continue }
 
             var firstMessage = ""
+            var uniqueUserTurns = 0
 
-            if let fh = FileHandle(forReadingAtPath: filePath) {
-                let headData = fh.readData(ofLength: 8192)
-                try? fh.close()
+            if let data = try? Data(contentsOf: URL(fileURLWithPath: filePath)),
+               let fileContent = String(data: data, encoding: .utf8) {
+                var seenPromptIds = Set<String>()
+                let lines = fileContent.components(separatedBy: "\n")
+                for line in lines where !line.isEmpty {
+                    guard let ld = line.data(using: .utf8),
+                          let json = try? JSONSerialization.jsonObject(with: ld) as? [String: Any] else { continue }
 
-                if let headStr = String(data: headData, encoding: .utf8) {
-                    let lines = headStr.components(separatedBy: "\n")
-                    for line in lines where !line.isEmpty {
-                        guard let ld = line.data(using: .utf8),
-                              let json = try? JSONSerialization.jsonObject(with: ld) as? [String: Any] else { continue }
-
-                        let type = json["type"] as? String ?? ""
-                        if type == "user" && firstMessage.isEmpty {
-                            if let msg = json["message"] as? [String: Any] {
-                                if let content = msg["content"] as? String {
-                                    firstMessage = content
-                                } else if let contentArr = msg["content"] as? [[String: Any]] {
-                                    firstMessage = contentArr.first(where: { $0["type"] as? String == "text" })?["text"] as? String ?? ""
-                                }
-                            }
-                            break
+                    let type = json["type"] as? String ?? ""
+                    if type == "user", let promptId = json["promptId"] as? String, !seenPromptIds.contains(promptId) {
+                        let msg = json["message"] as? [String: Any]
+                        var text = ""
+                        if let content = msg?["content"] as? String {
+                            text = content
+                        } else if let contentArr = msg?["content"] as? [[String: Any]] {
+                            text = contentArr.first(where: { $0["type"] as? String == "text" })?["text"] as? String ?? ""
+                        }
+                        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else {
+                            seenPromptIds.insert(promptId)
+                            continue
+                        }
+                        seenPromptIds.insert(promptId)
+                        uniqueUserTurns += 1
+                        if firstMessage.isEmpty {
+                            firstMessage = trimmed.components(separatedBy: "\n").first ?? ""
                         }
                     }
                 }
             }
 
-            firstMessage = firstMessage.components(separatedBy: "\n").first ?? ""
-            firstMessage = firstMessage.trimmingCharacters(in: .whitespacesAndNewlines)
-
             results.append(SessionInfo(
                 sessionId: sessionId,
                 modificationDate: modDate,
-                firstUserMessage: firstMessage
+                firstUserMessage: firstMessage,
+                messageCount: uniqueUserTurns
             ))
         }
 
         results.sort { $0.modificationDate > $1.modificationDate }
         return results
+    }
+
+    /// Parses a session JSONL file and returns an ordered list of user turns.
+    /// Deduplicates by promptId — only the first occurrence with non-empty content is kept.
+    func parseTimeline(sessionId: String, projectPath: String) -> [TimelineEntry] {
+        let encoded = projectPath.claudeProjectDirName
+        let jsonlPath = NSHomeDirectory() + "/.claude/projects/\(encoded)/\(sessionId).jsonl"
+
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: jsonlPath)),
+              let content = String(data: data, encoding: .utf8) else { return [] }
+
+        var entries: [TimelineEntry] = []
+        var seenPromptIds = Set<String>()
+        let iso8601 = ISO8601DateFormatter()
+        iso8601.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        for line in content.components(separatedBy: "\n") where !line.isEmpty {
+            guard let lineData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  let type = json["type"] as? String, type == "user",
+                  let promptId = json["promptId"] as? String,
+                  !seenPromptIds.contains(promptId) else { continue }
+
+            let msg = json["message"] as? [String: Any]
+            var text = ""
+            if let content = msg?["content"] as? String {
+                text = content
+            } else if let contentArr = msg?["content"] as? [[String: Any]] {
+                text = contentArr.first(where: { $0["type"] as? String == "text" })?["text"] as? String ?? ""
+            }
+
+            // Skip empty continuation messages (same promptId, no content)
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                seenPromptIds.insert(promptId)
+                continue
+            }
+
+            seenPromptIds.insert(promptId)
+
+            let timestamp: Date?
+            if let ts = json["timestamp"] as? String {
+                timestamp = iso8601.date(from: ts)
+            } else {
+                timestamp = nil
+            }
+
+            entries.append(TimelineEntry(
+                index: entries.count,
+                promptId: promptId,
+                message: text.trimmingCharacters(in: .whitespacesAndNewlines),
+                timestamp: timestamp,
+                isBookmarked: false,
+                bookmarkLabel: nil
+            ))
+        }
+
+        return entries
+    }
+
+    /// Creates a truncated copy of a session JSONL, keeping everything up to (and including
+    /// the full response for) the Nth unique user turn. Returns the new session ID.
+    func truncateSession(sessionId: String, projectPath: String, afterTurnIndex: Int) -> String? {
+        let encoded = projectPath.claudeProjectDirName
+        let dir = NSHomeDirectory() + "/.claude/projects/\(encoded)"
+        let jsonlPath = dir + "/\(sessionId).jsonl"
+
+        guard let data = try? Data(contentsOf: URL(fileURLWithPath: jsonlPath)),
+              let content = String(data: data, encoding: .utf8) else { return nil }
+
+        let lines = content.components(separatedBy: "\n")
+        var seenPromptIds = Set<String>()
+        var uniqueTurnCount = -1  // will be incremented to 0 on first user turn
+        var cutoffLineIndex = lines.count
+
+        for (i, line) in lines.enumerated() where !line.isEmpty {
+            guard let lineData = line.data(using: .utf8),
+                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
+                  let type = json["type"] as? String, type == "user",
+                  let promptId = json["promptId"] as? String,
+                  !seenPromptIds.contains(promptId) else { continue }
+
+            // Check if this user message has actual content (not a continuation)
+            let msg = json["message"] as? [String: Any]
+            var text = ""
+            if let c = msg?["content"] as? String { text = c }
+            else if let arr = msg?["content"] as? [[String: Any]] {
+                text = arr.first(where: { $0["type"] as? String == "text" })?["text"] as? String ?? ""
+            }
+            guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                seenPromptIds.insert(promptId)
+                continue
+            }
+
+            seenPromptIds.insert(promptId)
+            uniqueTurnCount += 1
+
+            // When we hit the turn AFTER the one we want, cut here
+            if uniqueTurnCount > afterTurnIndex {
+                cutoffLineIndex = i
+                break
+            }
+        }
+
+        let truncatedLines = lines.prefix(cutoffLineIndex).filter { !$0.isEmpty }
+        let truncatedContent = truncatedLines.joined(separator: "\n") + "\n"
+
+        let newSessionId = UUID().uuidString.lowercased()
+        let newPath = dir + "/\(newSessionId).jsonl"
+
+        guard let writeData = truncatedContent.data(using: .utf8) else { return nil }
+        do {
+            try writeData.write(to: URL(fileURLWithPath: newPath), options: .atomic)
+            return newSessionId
+        } catch {
+            return nil
+        }
     }
 
     /// Get context usage for a session by reading its JSONL file.
