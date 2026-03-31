@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.17.1](https://github.com/gi11es/deckard/compare/v0.17.0...v0.17.1) (2026-03-31)
+
+
+### Bug Fixes
+
+* context usage bar flickering and thread safety in monitors ([dcfbd49](https://github.com/gi11es/deckard/commit/dcfbd493c3d211e6e466bde406d98cadcdd1f259))
+
 ## [0.17.0](https://github.com/gi11es/deckard/compare/v0.16.0...v0.17.0) (2026-03-31)
 
 
