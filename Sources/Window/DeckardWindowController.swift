@@ -748,10 +748,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         alert.addButton(withTitle: "Start")
         alert.addButton(withTitle: "Cancel")
 
-        let field = NSTextField(frame: NSRect(x: 0, y: 0, width: 300, height: 24))
-        field.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
+        let field = ClaudeArgsField(frame: NSRect(x: 0, y: 0, width: 400, height: 60))
         field.stringValue = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
-        field.placeholderString = "--permission-mode auto"
         alert.accessoryView = field
 
         guard let window else {
