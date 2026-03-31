@@ -15,7 +15,22 @@ Run multiple sessions side by side in a single window with tabs, projects, and s
   <img alt="Platform" src="https://img.shields.io/badge/macOS_14+-grey?style=flat-square">
 </p>
 
-![Deckard screenshot](screenshot.png)
+![Deckard screenshot](docs/images/screenshot.png)
+
+<table>
+<tr>
+<td><strong>Multi-tab sessions</strong><br><img src="docs/images/screenshot-tabs.webp" alt="Tab bar with Claude and terminal tabs" width="400"></td>
+<td><strong>Project sidebar</strong><br><img src="docs/images/screenshot-sidebar.webp" alt="Project sidebar with folders" width="230"></td>
+<td><strong>Status indicators</strong><br><img src="docs/images/screenshot-status-indicators.webp" alt="Customizable status indicator dots" width="400"></td>
+</tr>
+</table>
+
+<table>
+<tr>
+<td><strong>Session explorer</strong> — browse, search, resume, and fork past sessions<br><img src="docs/images/screenshot-session-explorer.webp" alt="Session explorer window" width="540"></td>
+<td><strong>486 themes</strong> — with customizable status indicator shapes, colors, and blink<br><img src="docs/images/screenshot-themes.webp" alt="Theme settings with status indicators" width="350"></td>
+</tr>
+</table>
 
 ## Features
 
