@@ -35,7 +35,7 @@ Each open directory gets its own set of tabs, persisted across restarts. Group r
 
 Tab badges show whether Claude is thinking, waiting for input, needs tool permission, or has errored. Terminal tabs show real-time CPU and disk activity for the foreground process.
 
-<img src="docs/images/screenshot-status-indicators.webp" alt="Status indicator dots" width="500">
+<img src="docs/images/screenshot-status-indicators.webp" alt="Status indicator dots" width="250">
 
 ### Session explorer
 
