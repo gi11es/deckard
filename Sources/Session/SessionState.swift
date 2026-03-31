@@ -113,8 +113,12 @@ class SessionManager {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(state) else { return }
-        try? data.write(to: stateURL, options: .atomic)
-        isDirty = false
+        do {
+            try data.write(to: stateURL, options: .atomic)
+            isDirty = false
+        } catch {
+            // Write failed — keep isDirty true so the next autosave cycle retries.
+        }
     }
 
     func load() -> DeckardState? {
