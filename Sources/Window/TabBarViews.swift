@@ -48,16 +48,13 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
         // Badge dot — positioned on the right by layout constraints below
         if badgeState != .none {
-            let dot = NSView()
-            dot.wantsLayer = true
-            dot.layer?.cornerRadius = 3.5
-            dot.layer?.backgroundColor = VerticalTabRowView.colorForBadge(badgeState).cgColor
+            let dot = BadgeShapeView(
+                shape: VerticalTabRowView.shapeForBadge(badgeState),
+                color: VerticalTabRowView.colorForBadge(badgeState)
+            )
             dot.toolTip = VerticalTabRowView.tooltipForBadge(badgeState, activity: activity)
-            dot.translatesAutoresizingMaskIntoConstraints = false
             addSubview(dot)
             NSLayoutConstraint.activate([
-                dot.widthAnchor.constraint(equalToConstant: 7),
-                dot.heightAnchor.constraint(equalToConstant: 7),
                 dot.centerYAnchor.constraint(equalTo: centerYAnchor),
             ])
             if SettingsWindowController.isBadgeAnimated(badgeState) {
