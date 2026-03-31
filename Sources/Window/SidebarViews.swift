@@ -181,6 +181,14 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         return defaultBadgeColors[state] ?? .systemGray
     }
 
+    static func shapeForBadge(_ state: TabItem.BadgeState) -> TabItem.BadgeShape {
+        if let raw = UserDefaults.standard.string(forKey: "badgeShape.\(state.rawValue)"),
+           let shape = TabItem.BadgeShape(rawValue: raw) {
+            return shape
+        }
+        return .circle
+    }
+
     override func mouseDown(with event: NSEvent) {
         if event.clickCount == 2 {
             startEditing()
@@ -833,5 +841,130 @@ class AddTabButton: NSView {
 
     override func rightMouseDown(with event: NSEvent) {
         rightClickAction()
+    }
+}
+
+// MARK: - BadgeShapeView
+
+/// Draws a badge dot using a CAShapeLayer for customizable shapes.
+class BadgeShapeView: NSView {
+    private let shapeLayer = CAShapeLayer()
+
+    init(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
+        super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
+        wantsLayer = true
+        layer?.addSublayer(shapeLayer)
+        translatesAutoresizingMaskIntoConstraints = false
+        NSLayoutConstraint.activate([
+            widthAnchor.constraint(equalToConstant: size),
+            heightAnchor.constraint(equalToConstant: size),
+        ])
+        updateAppearance(shape: shape, color: color, size: size)
+    }
+
+    required init?(coder: NSCoder) { fatalError() }
+
+    func updateAppearance(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
+        let rect = CGRect(x: 0, y: 0, width: size, height: size)
+        shapeLayer.path = Self.path(for: shape, in: rect)
+        shapeLayer.fillColor = color.cgColor
+        shapeLayer.frame = rect
+    }
+
+    static func path(for shape: TabItem.BadgeShape, in rect: CGRect) -> CGPath {
+        let w = rect.width
+        let h = rect.height
+        let cx = rect.midX
+        let cy = rect.midY
+
+        switch shape {
+        case .circle:
+            return CGPath(ellipseIn: rect, transform: nil)
+
+        case .square:
+            // Inset slightly so visual weight matches the circle
+            let inset: CGFloat = 0.5
+            return CGPath(rect: rect.insetBy(dx: inset, dy: inset), transform: nil)
+
+        case .diamond:
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: cx, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: cy))
+            path.addLine(to: CGPoint(x: cx, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: cy))
+            path.closeSubpath()
+            return path
+
+        case .triangleUp:
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: cx, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+            path.closeSubpath()
+            return path
+
+        case .triangleDown:
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: cx, y: rect.maxY))
+            path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY))
+            path.addLine(to: CGPoint(x: rect.minX, y: rect.minY))
+            path.closeSubpath()
+            return path
+
+        case .cross:
+            let arm = w * 0.22
+            let path = CGMutablePath()
+            path.move(to: CGPoint(x: cx - arm, y: rect.minY))
+            path.addLine(to: CGPoint(x: cx + arm, y: rect.minY))
+            path.addLine(to: CGPoint(x: cx + arm, y: cy - arm))
+            path.addLine(to: CGPoint(x: rect.maxX, y: cy - arm))
+            path.addLine(to: CGPoint(x: rect.maxX, y: cy + arm))
+            path.addLine(to: CGPoint(x: cx + arm, y: cy + arm))
+            path.addLine(to: CGPoint(x: cx + arm, y: rect.maxY))
+            path.addLine(to: CGPoint(x: cx - arm, y: rect.maxY))
+            path.addLine(to: CGPoint(x: cx - arm, y: cy + arm))
+            path.addLine(to: CGPoint(x: rect.minX, y: cy + arm))
+            path.addLine(to: CGPoint(x: rect.minX, y: cy - arm))
+            path.addLine(to: CGPoint(x: cx - arm, y: cy - arm))
+            path.closeSubpath()
+            return path
+
+        case .xCross:
+            // Same as cross but rotated 45°
+            var transform = CGAffineTransform.identity
+                .translatedBy(x: cx, y: cy)
+                .rotated(by: .pi / 4)
+                .translatedBy(x: -cx, y: -cy)
+            let crossPath = Self.path(for: .cross, in: rect)
+            return crossPath.copy(using: &transform) ?? crossPath
+
+        case .hexagon:
+            let path = CGMutablePath()
+            let r = w / 2
+            for i in 0..<6 {
+                let angle = CGFloat(i) * .pi / 3 - .pi / 6  // flat-top hexagon
+                let px = cx + r * cos(angle)
+                let py = cy + r * sin(angle)
+                if i == 0 { path.move(to: CGPoint(x: px, y: py)) }
+                else { path.addLine(to: CGPoint(x: px, y: py)) }
+            }
+            path.closeSubpath()
+            return path
+
+        case .star:
+            let path = CGMutablePath()
+            let outerR = w / 2
+            let innerR = outerR * 0.38
+            for i in 0..<10 {
+                let angle = CGFloat(i) * .pi / 5 - .pi / 2
+                let r = i % 2 == 0 ? outerR : innerR
+                let px = cx + r * cos(angle)
+                let py = cy + r * sin(angle)
+                if i == 0 { path.move(to: CGPoint(x: px, y: py)) }
+                else { path.addLine(to: CGPoint(x: px, y: py)) }
+            }
+            path.closeSubpath()
+            return path
+        }
     }
 }
