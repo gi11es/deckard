@@ -64,6 +64,8 @@
 		SE000005SE000005SE000005 /* SummaryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SE000006SE000006SE000006 /* SummaryManager.swift */; };
 		SE000007SE000007SE000007 /* SessionExplorerWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = SE000008SE000008SE000008 /* SessionExplorerWindowController.swift */; };
 		SE000009SE000009SE000009 /* SessionExplorerTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SE00000ASE00000ASE00000A /* SessionExplorerTimelineView.swift */; };
+		CF000001CF000001CF000001 /* ClaudeCLIFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000002CF000002CF000002 /* ClaudeCLIFlags.swift */; };
+		CF000003CF000003CF000003 /* ClaudeCLIFlagsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000004CF000004CF000004 /* ClaudeCLIFlagsTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -124,6 +126,8 @@
 		SE000006SE000006SE000006 /* SummaryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryManager.swift; sourceTree = "<group>"; };
 		SE000008SE000008SE000008 /* SessionExplorerWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionExplorerWindowController.swift; sourceTree = "<group>"; };
 		SE00000ASE00000ASE00000A /* SessionExplorerTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionExplorerTimelineView.swift; sourceTree = "<group>"; };
+		CF000002CF000002CF000002 /* ClaudeCLIFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCLIFlags.swift; sourceTree = "<group>"; };
+		CF000004CF000004CF000004 /* ClaudeCLIFlagsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCLIFlagsTests.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -257,6 +261,7 @@
 				AABB0005AABB0005AABB0005 /* ShortcutNames.swift */,
 				AABB0007AABB0007AABB0007 /* DeckardHooksInstaller.swift */,
 				FDAC0002FDAC0002FDAC0002 /* FullDiskAccessChecker.swift */,
+				CF000002CF000002CF000002 /* ClaudeCLIFlags.swift */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -283,6 +288,7 @@
 				AA110002AA110002AA110002 /* ThemeColorsTests.swift */,
 				AA140002AA140002AA140002 /* ThemeManagerTests.swift */,
 				AA1B0002AA1B0002AA1B0002 /* WindowControllerLogicTests.swift */,
+				CF000004CF000004CF000004 /* ClaudeCLIFlagsTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -441,6 +447,7 @@
 				SE000005SE000005SE000005 /* SummaryManager.swift in Sources */,
 				SE000007SE000007SE000007 /* SessionExplorerWindowController.swift in Sources */,
 				SE000009SE000009SE000009 /* SessionExplorerTimelineView.swift in Sources */,
+				CF000001CF000001CF000001 /* ClaudeCLIFlags.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -467,6 +474,7 @@
 				AA1F0001AA1F0001AA1F0001 /* SidebarFolderTests.swift in Sources */,
 				AA200001AA200001AA200001 /* SidebarFolderViewTests.swift in Sources */,
 				QA200006QA200006QA200006 /* QuotaMonitorTests.swift in Sources */,
+				CF000003CF000003CF000003 /* ClaudeCLIFlagsTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
