@@ -865,7 +865,6 @@ class BadgeShapeView: NSView {
 
     static func path(for shape: TabItem.BadgeShape, in rect: CGRect) -> CGPath {
         let w = rect.width
-        let h = rect.height
         let cx = rect.midX
         let cy = rect.midY
 
