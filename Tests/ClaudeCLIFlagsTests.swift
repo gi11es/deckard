@@ -86,3 +86,61 @@ final class ClaudeCLIFlagsTests: XCTestCase {
         XCTAssertTrue(flags.isEmpty)
     }
 }
+
+final class ArgsSerializationTests: XCTestCase {
+
+    func testSerializeChipsToString() {
+        let chips = [
+            ArgsChip(flag: "--permission-mode", value: "auto"),
+            ArgsChip(flag: "--verbose", value: nil),
+            ArgsChip(flag: "--model", value: "sonnet"),
+        ]
+        let result = ArgsChip.serialize(chips)
+        XCTAssertEqual(result, "--permission-mode auto --verbose --model sonnet")
+    }
+
+    func testDeserializeStringToChips() {
+        let input = "--permission-mode auto --verbose --model sonnet"
+        let flags = ClaudeCLIFlags.parse(helpOutput: """
+          --permission-mode <mode>   Permission mode (choices: "auto", "default")
+          --verbose                  Verbose
+          --model <model>            Model
+        """)
+        let chips = ArgsChip.deserialize(input, knownFlags: flags)
+        XCTAssertEqual(chips.count, 3)
+        XCTAssertEqual(chips[0].flag, "--permission-mode")
+        XCTAssertEqual(chips[0].value, "auto")
+        XCTAssertEqual(chips[1].flag, "--verbose")
+        XCTAssertNil(chips[1].value)
+        XCTAssertEqual(chips[2].flag, "--model")
+        XCTAssertEqual(chips[2].value, "sonnet")
+    }
+
+    func testDeserializeUnknownFlags() {
+        let input = "--unknown-flag some-value --verbose"
+        let flags = ClaudeCLIFlags.parse(helpOutput: """
+          --verbose   Verbose
+        """)
+        let chips = ArgsChip.deserialize(input, knownFlags: flags)
+        XCTAssertEqual(chips.count, 2)
+        XCTAssertEqual(chips[0].flag, "--unknown-flag")
+        XCTAssertEqual(chips[0].value, "some-value")
+        XCTAssertEqual(chips[1].flag, "--verbose")
+    }
+
+    func testRoundTrip() {
+        let original = "--permission-mode auto --verbose"
+        let flags = ClaudeCLIFlags.parse(helpOutput: """
+          --permission-mode <mode>   Permission mode (choices: "auto", "default")
+          --verbose                  Verbose
+        """)
+        let chips = ArgsChip.deserialize(original, knownFlags: flags)
+        let serialized = ArgsChip.serialize(chips)
+        XCTAssertEqual(serialized, original)
+    }
+
+    func testDeserializeEmptyString() {
+        let chips = ArgsChip.deserialize("", knownFlags: [])
+        XCTAssertTrue(chips.isEmpty)
+    }
+}

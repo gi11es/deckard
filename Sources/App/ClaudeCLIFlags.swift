@@ -137,3 +137,59 @@ final class ClaudeCLIFlags {
         }
     }
 }
+
+/// A single chip representing one CLI argument (flag + optional value).
+struct ArgsChip: Equatable {
+    let flag: String     // e.g. "--permission-mode"
+    let value: String?   // e.g. "auto", nil for boolean flags
+
+    /// Join chips into a CLI argument string.
+    static func serialize(_ chips: [ArgsChip]) -> String {
+        chips.map { chip in
+            if let value = chip.value {
+                return "\(chip.flag) \(value)"
+            }
+            return chip.flag
+        }.joined(separator: " ")
+    }
+
+    /// Parse a CLI argument string into chips, using known flags to determine
+    /// which flags take values. Unknown flags are assumed to take a value if
+    /// the next token doesn't start with "-".
+    static func deserialize(_ string: String, knownFlags: [ClaudeFlag]) -> [ArgsChip] {
+        let tokens = string.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        guard !tokens.isEmpty else { return [] }
+
+        let flagMap = Dictionary(uniqueKeysWithValues: knownFlags.map { ($0.longName, $0) })
+        var chips: [ArgsChip] = []
+        var i = 0
+
+        while i < tokens.count {
+            let token = tokens[i]
+            guard token.hasPrefix("-") else {
+                i += 1
+                continue
+            }
+
+            if let known = flagMap[token] {
+                switch known.valueType {
+                case .boolean:
+                    chips.append(ArgsChip(flag: token, value: nil))
+                    i += 1
+                case .freeText, .enumeration:
+                    let value = (i + 1 < tokens.count && !tokens[i + 1].hasPrefix("-"))
+                        ? tokens[i + 1] : nil
+                    chips.append(ArgsChip(flag: token, value: value))
+                    i += (value != nil ? 2 : 1)
+                }
+            } else {
+                let value = (i + 1 < tokens.count && !tokens[i + 1].hasPrefix("-"))
+                    ? tokens[i + 1] : nil
+                chips.append(ArgsChip(flag: token, value: value))
+                i += (value != nil ? 2 : 1)
+            }
+        }
+
+        return chips
+    }
+}
