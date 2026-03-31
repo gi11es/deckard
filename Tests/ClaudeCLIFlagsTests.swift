@@ -18,6 +18,8 @@ final class ClaudeCLIFlagsTests: XCTestCase {
       -v, --version                                     Output the version number
       -h, --help                                        Display help for command
       --resume [value]                                  Resume a conversation by session ID
+      -w, --worktree [name]                              Create a new git worktree for this session (optionally specify a name)
+      --tmux                                             Create a tmux session for the worktree (requires --worktree). Uses iTerm2 native panes when available; use --tmux=classic for traditional tmux.
     """
 
     func testParsesBooleanFlag() {
@@ -71,6 +73,15 @@ final class ClaudeCLIFlagsTests: XCTestCase {
         XCTAssertFalse(longNames.contains("--version"))
         XCTAssertFalse(longNames.contains("--help"))
         XCTAssertFalse(longNames.contains("--resume"))
+    }
+
+    func testValueTypeOverrideForcesBoolean() {
+        let flags = ClaudeCLIFlags.parse(helpOutput: sampleHelp)
+        let worktree = flags.first { $0.longName == "--worktree" }
+        XCTAssertNotNil(worktree)
+        XCTAssertEqual(worktree?.valueType, .boolean)
+        XCTAssertNil(worktree?.valuePlaceholder)
+        XCTAssertEqual(worktree?.shortName, "-w")
     }
 
     func testParsesAliasedFlag() {

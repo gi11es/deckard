@@ -32,6 +32,14 @@ final class ClaudeCLIFlags {
         "--no-session-persistence", "--fallback-model", "--from-pr", "--session-id",
     ]
 
+    /// Flags whose parsed valueType is overridden.
+    /// e.g. --worktree normally takes an optional [name], but we force it to boolean
+    /// so users can't pin a worktree name as a persistent default (which breaks sessions).
+    static let valueTypeOverrides: [String: ClaudeFlag.ValueType] = [
+        "--worktree": .boolean,
+        "--tmux": .boolean,
+    ]
+
     /// Posted on the main thread when flags finish loading.
     static let didLoadNotification = Notification.Name("ClaudeCLIFlagsDidLoad")
 
@@ -76,14 +84,15 @@ final class ClaudeCLIFlags {
             // Skip blocklisted flags
             if blocklist.contains(longName) { return }
 
-            let valueType = Self.determineValueType(placeholder: placeholder, description: desc)
+            let parsedType = Self.determineValueType(placeholder: placeholder, description: desc)
+            let valueType = valueTypeOverrides[longName] ?? parsedType
 
             results.append(ClaudeFlag(
                 longName: longName,
                 shortName: shortName,
                 description: desc,
                 valueType: valueType,
-                valuePlaceholder: placeholder.map { "<\($0)>" }
+                valuePlaceholder: valueType == .boolean ? nil : placeholder.map { "<\($0)>" }
             ))
         }
 
