@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.17.0](https://github.com/gi11es/deckard/compare/v0.16.0...v0.17.0) (2026-03-31)
+
+
+### Features
+
+* add BadgeShape enum to TabItem ([97a59ad](https://github.com/gi11es/deckard/commit/97a59ad9b19731424c7f1367da78eb25338bd4c9))
+* add BadgeShapeView and shape path generation ([2495390](https://github.com/gi11es/deckard/commit/2495390effe6e38d43de55b243cb5d3b905672cd))
+* add shape picker column to badge settings table ([b645eaf](https://github.com/gi11es/deckard/commit/b645eafa65fe47017733ff0a42bd768213e1c590))
+* Claude CLI args autocomplete in settings ([#62](https://github.com/gi11es/deckard/issues/62)) ([3ac6fbd](https://github.com/gi11es/deckard/commit/3ac6fbd5d31b9f70faa9864eb039224b5ea03f0e))
+* use BadgeShapeView for horizontal tab bar badges ([cc59e2a](https://github.com/gi11es/deckard/commit/cc59e2aee97a819c79ee0b8ae8fd3f26dd4721f0))
+* use BadgeShapeView for sidebar badge dots ([b4ffdad](https://github.com/gi11es/deckard/commit/b4ffdad32654771c5b1f4a1b0d87597ee38af87d))
+
+
+### Bug Fixes
+
+* add defaultBadgeShapes property per spec ([6cbab21](https://github.com/gi11es/deckard/commit/6cbab217b6ad0ae910d27ffdfaa3daa69a9e1687))
+* disable optionAsMetaKey so dead key accents work normally ([1a200c1](https://github.com/gi11es/deckard/commit/1a200c15c83702c0e8a9b5dc38858d0f4a93b47a))
+* only write state.json to disk when state has actually changed ([#64](https://github.com/gi11es/deckard/issues/64)) ([cbfa374](https://github.com/gi11es/deckard/commit/cbfa374791941742654910b59edf9fc6b18e20de))
+* pin release-please-action to commit with 17.3.0 ([cb382cf](https://github.com/gi11es/deckard/commit/cb382cf0c48b9cb76e1baa9286509436cd05a786))
+* remove star shape, fix triangle orientation, add unicode previews to all shapes ([008d362](https://github.com/gi11es/deckard/commit/008d36219f1f8a2efb69b8cbc5ed3abf6b133bff))
+* remove unused variable h in BadgeShapeView.path ([1e8ffaf](https://github.com/gi11es/deckard/commit/1e8ffafc1cb2600baf1fec6549ebcb9755319d1b))
+* resolve SwiftLint statement_position violation in hexagon path ([5058746](https://github.com/gi11es/deckard/commit/5058746385893e6c7b6c06e9a01d11cb4b5bdfbf))
+* suppress unseen badges for Claude tabs restored during startup ([#63](https://github.com/gi11es/deckard/issues/63)) ([d40da30](https://github.com/gi11es/deckard/commit/d40da3033e7aecbd9be4b9b499460710dc04bb3e))
+* use filled diamond glyph and monospaced font for shape dropdown ([7b9f2df](https://github.com/gi11es/deckard/commit/7b9f2df540a10eb85e9917def00a5b860049a689))
+* use unicode-only labels for shape picker dropdown ([83c2414](https://github.com/gi11es/deckard/commit/83c2414a47e7d9d396f459f26e5ef81ad96ce138))
+
 ## [0.16.0](https://github.com/gi11es/deckard/compare/v0.15.0...v0.16.0) (2026-03-30)
 
 
