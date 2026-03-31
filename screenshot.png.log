@@ -1,1 +1,0 @@
-ERROR: Error Domain=com.apple.ScreenCaptureKit.SCStreamErrorDomain Code=-3801 "The user declined TCCs for application, window, display capture" UserInfo={NSLocalizedDescription=The user declined TCCs for application, window, display capture}
