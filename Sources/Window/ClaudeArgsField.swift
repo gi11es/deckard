@@ -627,7 +627,7 @@ extension ClaudeArgsField: NSTextFieldDelegate, NSTableViewDataSource, NSTableVi
         let count = enumChoices.isEmpty ? filteredFlags.count : enumChoices.count
         let rowHeight: CGFloat = 36
         let maxVisible = 6
-        let height = min(CGFloat(count), CGFloat(maxVisible)) * rowHeight + 4
+        let height = min(CGFloat(count), CGFloat(maxVisible)) * rowHeight + 8
         let width = max(bounds.width, 280)
 
         let winFrame = NSRect(
