@@ -255,9 +255,11 @@ extension ClaudeArgsField: NSTextFieldDelegate, NSTableViewDataSource, NSTableVi
 
         let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Flag"))
         column.title = ""
+        column.resizingMask = .autoresizingMask
 
         let table = NSTableView()
         table.addTableColumn(column)
+        table.columnAutoresizingStyle = .lastColumnOnlyAutoresizingStyle
         table.headerView = nil
         table.rowHeight = 36
         table.selectionHighlightStyle = .regular
@@ -481,6 +483,14 @@ extension ClaudeArgsField: NSTextFieldDelegate, NSTableViewDataSource, NSTableVi
             return false
         }
 
+        if commandSelector == #selector(NSResponder.deleteForward(_:)) {
+            if textField.stringValue.isEmpty, let idx = selectedChipIndex {
+                removeChip(at: idx)
+                return true
+            }
+            return false
+        }
+
         if commandSelector == #selector(NSResponder.deleteBackward(_:)) {
             if textField.stringValue.isEmpty {
                 if let idx = selectedChipIndex {
@@ -598,6 +608,11 @@ extension ClaudeArgsField: NSTextFieldDelegate, NSTableViewDataSource, NSTableVi
         )
         suggestionWindow.setFrame(winFrame, display: true)
 
+        // Resize the table column to fill the window width.
+        if let table = suggestionTable, let col = table.tableColumns.first {
+            col.width = width
+        }
+
         if suggestionWindow.parent != parentWindow {
             parentWindow.addChildWindow(suggestionWindow, ordered: .above)
         }
@@ -632,33 +647,30 @@ extension ClaudeArgsField: NSTextFieldDelegate, NSTableViewDataSource, NSTableVi
             cell = NSTableCellView()
             cell.identifier = cellID
 
-            let stack = NSStackView()
-            stack.orientation = .vertical
-            stack.alignment = .leading
-            stack.spacing = 1
-            stack.translatesAutoresizingMaskIntoConstraints = false
-            stack.edgeInsets = NSEdgeInsets(top: 4, left: 8, bottom: 4, right: 8)
-
             let titleField = NSTextField(labelWithString: "")
             titleField.font = .monospacedSystemFont(ofSize: 12, weight: .bold)
             titleField.tag = 100
             titleField.lineBreakMode = .byTruncatingTail
+            titleField.translatesAutoresizingMaskIntoConstraints = false
+            titleField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
             let descField = NSTextField(labelWithString: "")
             descField.font = .systemFont(ofSize: 10)
             descField.textColor = .secondaryLabelColor
             descField.tag = 200
             descField.lineBreakMode = .byTruncatingTail
+            descField.translatesAutoresizingMaskIntoConstraints = false
+            descField.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
 
-            stack.addArrangedSubview(titleField)
-            stack.addArrangedSubview(descField)
-
-            cell.addSubview(stack)
+            cell.addSubview(titleField)
+            cell.addSubview(descField)
             NSLayoutConstraint.activate([
-                stack.topAnchor.constraint(equalTo: cell.topAnchor),
-                stack.bottomAnchor.constraint(equalTo: cell.bottomAnchor),
-                stack.leadingAnchor.constraint(equalTo: cell.leadingAnchor),
-                stack.trailingAnchor.constraint(equalTo: cell.trailingAnchor),
+                titleField.topAnchor.constraint(equalTo: cell.topAnchor, constant: 4),
+                titleField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+                titleField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
+                descField.topAnchor.constraint(equalTo: titleField.bottomAnchor, constant: 1),
+                descField.leadingAnchor.constraint(equalTo: cell.leadingAnchor, constant: 8),
+                descField.trailingAnchor.constraint(equalTo: cell.trailingAnchor, constant: -8),
             ])
         }
 
