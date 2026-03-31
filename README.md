@@ -15,7 +15,7 @@ Run multiple sessions side by side in a single window with tabs, projects, and s
   <img alt="Platform" src="https://img.shields.io/badge/macOS_14+-grey?style=flat-square">
 </p>
 
-![Deckard screenshot](docs/images/screenshot.png)
+![Deckard screenshot](docs/images/screenshot.png?v=60ecfcf0)
 
 ## Features
 
@@ -23,31 +23,31 @@ Run multiple sessions side by side in a single window with tabs, projects, and s
 
 Open multiple Claude Code (and plain terminal) tabs per project. Switch between them with Cmd+1–9 or drag to reorder.
 
-<img src="docs/images/screenshot-tabs.webp" alt="Tab bar with Claude and terminal tabs" width="600">
+<img src="docs/images/screenshot-tabs.webp?v=cdf54ee7" alt="Tab bar with Claude and terminal tabs" width="600">
 
 ### Project sidebar
 
 Each open directory gets its own set of tabs, persisted across restarts. Group related projects into collapsible sidebar folders for organization (e.g., by client).
 
-<img src="docs/images/screenshot-sidebar.webp" alt="Project sidebar with folders" width="280">
+<img src="docs/images/screenshot-sidebar.webp?v=ff3961fc" alt="Project sidebar with folders" width="280">
 
 ### Session state detection
 
 Tab badges show whether Claude is thinking, waiting for input, needs tool permission, or has errored. Terminal tabs show real-time CPU and disk activity for the foreground process.
 
-<img src="docs/images/screenshot-status-indicators.webp" alt="Status indicator dots" width="250">
+<img src="docs/images/screenshot-status-indicators.webp?v=42af91f8" alt="Status indicator dots" width="250">
 
 ### Session explorer
 
 Browse all past Claude sessions with Cmd+Shift+E. View the full conversation timeline, resume or fork from any point, and bookmark favorites with a star toggle. Optionally summarize sessions and per-turn actions with Haiku — summaries are cached and incrementally updated when sessions are continued.
 
-<img src="docs/images/screenshot-session-explorer.webp" alt="Session explorer window" width="600">
+<img src="docs/images/screenshot-session-explorer.webp?v=03aa1cca" alt="Session explorer window" width="600">
 
 ### 486 color themes
 
 Ships with 486 built-in themes (Ghostty format) and loads custom themes from `~/.config/ghostty/themes`. Search and preview in Settings. Status indicator shapes, colors, and blink are fully customizable.
 
-<img src="docs/images/screenshot-themes.webp" alt="Theme settings with status indicators" width="500">
+<img src="docs/images/screenshot-themes.webp?v=1fb04fe4" alt="Theme settings with status indicators" width="500">
 
 ### More
 
