@@ -569,7 +569,7 @@ class SidebarDropZone: NSView {
 /// NSStackView subclass that accepts drops for reordering.
 /// Supports project drag (reorder/drop onto folder) and folder drag (reorder folders).
 class ReorderableStackView: NSStackView {
-    var onReorder: ((Int, Int) -> Void)?
+    var onReorder: ((Int, Int, Bool) -> Void)?
     var onDropOntoFolder: ((SidebarFolderView, Int) -> Void)?
     var onFolderReorder: ((Int, Int) -> Void)?
 
@@ -581,6 +581,7 @@ class ReorderableStackView: NSStackView {
         return v
     }()
     private var currentDropIndex: Int = -1
+    private var currentDropForceFullWidth: Bool = false
     private weak var highlightedFolder: SidebarFolderView?
 
     private func dropIndex(for sender: NSDraggingInfo) -> Int {
@@ -618,8 +619,9 @@ class ReorderableStackView: NSStackView {
     }
 
     private func showIndicator(at index: Int, forceFullWidth: Bool = false) {
-        guard index != currentDropIndex else { return }
+        guard index != currentDropIndex || forceFullWidth != currentDropForceFullWidth else { return }
         currentDropIndex = index
+        currentDropForceFullWidth = forceFullWidth
 
         // Use frame-based positioning (no autolayout) for simplicity
         if dropIndicator.superview !== self {
@@ -660,6 +662,7 @@ class ReorderableStackView: NSStackView {
     func hideIndicator() {
         dropIndicator.isHidden = true
         currentDropIndex = -1
+        currentDropForceFullWidth = false
         clearFolderHighlight()
     }
 
@@ -745,7 +748,21 @@ class ReorderableStackView: NSStackView {
         } else {
             // Not over a folder — show the line indicator
             clearFolderHighlight()
-            showIndicator(at: dropIndex(for: sender))
+            let idx = dropIndex(for: sender)
+            // At the boundary between the last child of an expanded folder
+            // and the next non-indented row, use cursor Y to disambiguate:
+            // upper half (folder child territory) → indented indicator,
+            // lower half (top-level territory) → full-width indicator.
+            var forceFullWidth = false
+            if idx > 0, idx < arrangedSubviews.count {
+                let prevIndented = (arrangedSubviews[idx - 1] as? VerticalTabRowView)?.indent ?? 0 > 0
+                let currIndented = (arrangedSubviews[idx] as? VerticalTabRowView)?.indent ?? 0 > 0
+                if prevIndented && !currIndented {
+                    let location = convert(sender.draggingLocation, from: nil)
+                    forceFullWidth = location.y <= arrangedSubviews[idx].frame.maxY
+                }
+            }
+            showIndicator(at: idx, forceFullWidth: forceFullWidth)
         }
         return .move
     }
@@ -760,6 +777,7 @@ class ReorderableStackView: NSStackView {
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         let wasOnFolder = highlightedFolder
+        let wasForceFullWidth = currentDropForceFullWidth
         hideIndicator()
 
         // Handle project drag
@@ -771,7 +789,7 @@ class ReorderableStackView: NSStackView {
                 return true
             }
             let toIndex = dropIndex(for: sender)
-            onReorder?(fromIndex, toIndex)
+            onReorder?(fromIndex, toIndex, wasForceFullWidth)
             return true
         }
 

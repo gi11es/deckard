@@ -189,8 +189,8 @@ extension DeckardWindowController {
         }
 
         sidebarStackView.registerForDraggedTypes([deckardProjectDragType, deckardSidebarDragType, deckardFolderDragType])
-        sidebarStackView.onReorder = { [weak self] from, to in
-            self?.handleSidebarDragReorder(fromProjectIndex: from, toRow: to)
+        sidebarStackView.onReorder = { [weak self] from, to, forceTopLevel in
+            self?.handleSidebarDragReorder(fromProjectIndex: from, toRow: to, forceTopLevel: forceTopLevel)
         }
         sidebarStackView.onDropOntoFolder = { [weak self] folderView, fromIndex in
             folderView.onDrop?(folderView, fromIndex)
@@ -307,7 +307,7 @@ extension DeckardWindowController {
     /// Handle drag reorder in the sidebar.
     /// `fromProjectIndex` is the flat projects array index (from the pasteboard).
     /// `toRow` is the stack view row index of the drop target.
-    func handleSidebarDragReorder(fromProjectIndex: Int, toRow: Int) {
+    func handleSidebarDragReorder(fromProjectIndex: Int, toRow: Int, forceTopLevel: Bool = false) {
         guard fromProjectIndex >= 0, fromProjectIndex < projects.count else { return }
         let draggedProject = projects[fromProjectIndex]
         let infos = sidebarRowInfos()
@@ -335,7 +335,7 @@ extension DeckardWindowController {
         if let pf = toInfo.parentFolder {
             effectiveFolder = pf
             effectiveChildIndex = toInfo.childIndexInFolder
-        } else if toRow > 0, toRow - 1 < infos.count, let prevFolder = infos[toRow - 1].parentFolder {
+        } else if !forceTopLevel, toRow > 0, toRow - 1 < infos.count, let prevFolder = infos[toRow - 1].parentFolder {
             // The previous row is a folder child — we're inserting at the end of that folder
             effectiveFolder = prevFolder
             effectiveChildIndex = prevFolder.projectIds.count
