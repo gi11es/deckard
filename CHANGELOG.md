@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.2](https://github.com/gi11es/deckard/compare/v0.17.1...v0.17.2) (2026-04-01)
+
+
+### Bug Fixes
+
+* allow top-level drop between expanded folder and items below ([3a1c8c5](https://github.com/gi11es/deckard/commit/3a1c8c523338891e1820a2c2c207a06dc6a3bf5e))
+* sidebar drag-drop reorder within folders and at top level ([b9d5aec](https://github.com/gi11es/deckard/commit/b9d5aece1098ae3a5bc839d5b617fe0097346ad2))
+
 ## [0.17.1](https://github.com/gi11es/deckard/compare/v0.17.0...v0.17.1) (2026-03-31)
 
 
