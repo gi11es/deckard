@@ -298,8 +298,10 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     set -g history-limit 50000
     set -s set-clipboard on
     set -s extended-keys on
-    bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel pbcopy
-    bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel pbcopy
+    bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-no-clear pbcopy
+    bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-no-clear pbcopy
+    bind-key -T root DoubleClick1Pane select-pane -t = \\; if -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" "send-keys -M" "copy-mode -H; send-keys -X select-word; send-keys -X copy-pipe-no-clear pbcopy"
+    bind-key -T root TripleClick1Pane select-pane -t = \\; if -F "#{||:#{pane_in_mode},#{mouse_any_flag}}" "send-keys -M" "copy-mode -H; send-keys -X select-line; send-keys -X copy-pipe-no-clear pbcopy"
     """
 
     /// Apply tmux options (from UserDefaults or defaults) to a session.
