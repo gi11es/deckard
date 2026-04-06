@@ -157,6 +157,10 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         // Build environment
         var env = ProcessInfo.processInfo.environment
         env["TERM"] = "xterm-256color"
+        env["COLORTERM"] = "truecolor"
+        // Advertise terminal identity so CLI tools (e.g. Claude Code) can detect
+        // Kitty keyboard protocol support for Shift+Enter and other modified keys.
+        env["TERM_PROGRAM"] = "Deckard"
         // Ensure UTF-8 locale for proper emoji/wide character handling in tmux
         if env["LANG"] == nil && env["LC_ALL"] == nil {
             env["LANG"] = "en_US.UTF-8"
