@@ -416,4 +416,79 @@ final class DeckardHooksInstallerTests: XCTestCase {
             XCTAssertFalse(marker.isEmpty, "Marker '\(marker)' should be non-empty")
         }
     }
+
+    // MARK: - Hook script reads session_id from stdin with PID walking fallback
+
+    func testHookScriptReadsSessionIdFromStdin() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        let hooksDir = tempDir + "hooks/"
+        try FileManager.default.createDirectory(atPath: hooksDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let hookPath = hooksDir + "notify.sh"
+        let statusLinePath = hooksDir + "statusline.sh"
+        DeckardHooksInstaller.installHookScript(
+            hookScriptPath: hookPath,
+            statusLineScriptPath: statusLinePath
+        )
+
+        let content = try String(contentsOfFile: hookPath, encoding: .utf8)
+
+        // Must read stdin into a variable (not drain it)
+        XCTAssertTrue(content.contains("INPUT=$(cat)"),
+                       "Hook script should capture stdin into INPUT variable")
+        XCTAssertFalse(content.contains("cat > /dev/null"),
+                        "Hook script must not drain stdin — session_id comes from it")
+
+        // Must extract session_id from stdin JSON for session-start
+        XCTAssertTrue(content.contains("session_id"),
+                       "Hook script should extract session_id from stdin JSON")
+    }
+
+    func testHookScriptFallsBackToPidWalking() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        let hooksDir = tempDir + "hooks/"
+        try FileManager.default.createDirectory(atPath: hooksDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let hookPath = hooksDir + "notify.sh"
+        let statusLinePath = hooksDir + "statusline.sh"
+        DeckardHooksInstaller.installHookScript(
+            hookScriptPath: hookPath,
+            statusLineScriptPath: statusLinePath
+        )
+
+        let content = try String(contentsOfFile: hookPath, encoding: .utf8)
+
+        // PID walking should still exist as fallback when stdin doesn't contain session_id
+        XCTAssertTrue(content.contains("ppid"),
+                       "Hook script should fall back to PID walking when stdin has no session_id")
+        XCTAssertTrue(content.contains(".claude/sessions/"),
+                       "Hook script should check session files as fallback")
+    }
+
+    func testHookScriptTriesStdinBeforePidWalking() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        let hooksDir = tempDir + "hooks/"
+        try FileManager.default.createDirectory(atPath: hooksDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let hookPath = hooksDir + "notify.sh"
+        let statusLinePath = hooksDir + "statusline.sh"
+        DeckardHooksInstaller.installHookScript(
+            hookScriptPath: hookPath,
+            statusLineScriptPath: statusLinePath
+        )
+
+        let content = try String(contentsOfFile: hookPath, encoding: .utf8)
+
+        // stdin extraction must come BEFORE PID walking
+        guard let stdinPos = content.range(of: "session_id")?.lowerBound,
+              let pidPos = content.range(of: "ppid")?.lowerBound else {
+            XCTFail("Script must contain both session_id extraction and ppid fallback")
+            return
+        }
+        XCTAssertTrue(stdinPos < pidPos,
+                       "Hook script should try stdin session_id before falling back to PID walking")
+    }
 }

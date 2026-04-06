@@ -14,25 +14,32 @@ enum DeckardHooksInstaller {
         [ -z "$DECKARD_SOCKET_PATH" ] && exit 0
 
         EVENT="$1"
-        cat > /dev/null  # drain stdin (hooks don't carry rate_limits)
+        INPUT=$(cat)
         EXTRA=""
 
-        # For session-start, walk parent PIDs to find the Claude session ID
+        # For session-start, extract the session ID so Deckard can find the JSONL transcript.
+        # Primary: read session_id from stdin JSON (works for both new and resumed sessions).
+        # Fallback: walk parent PIDs to find ~/.claude/sessions/<pid>.json (original method,
+        #           unreliable for resumed sessions but better than nothing if stdin is empty).
         if [ "$EVENT" = "session-start" ]; then
-            PID=$$
-            CWD="$(pwd)"
-            for _ in 1 2 3 4 5; do
-                PID=$(ps -o ppid= -p "$PID" 2>/dev/null | tr -d ' ')
-                [ -z "$PID" ] || [ "$PID" = "1" ] && break
-                SESSION_FILE="$HOME/.claude/sessions/${PID}.json"
-                if [ -f "$SESSION_FILE" ]; then
-                    FILE_CWD=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('cwd',''))" "$SESSION_FILE" 2>/dev/null)
-                    if [ "$FILE_CWD" = "$CWD" ]; then
-                        SID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sessionId'])" "$SESSION_FILE" 2>/dev/null)
-                        [ -n "$SID" ] && EXTRA=",\\"sessionId\\":\\"$SID\\"" && break
+            SID=$(printf '%s' "$INPUT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+            if [ -z "$SID" ]; then
+                PID=$$
+                CWD="$(pwd)"
+                for _ in 1 2 3 4 5; do
+                    PID=$(ps -o ppid= -p "$PID" 2>/dev/null | tr -d ' ')
+                    [ -z "$PID" ] || [ "$PID" = "1" ] && break
+                    SESSION_FILE="$HOME/.claude/sessions/${PID}.json"
+                    if [ -f "$SESSION_FILE" ]; then
+                        FILE_CWD=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1])).get('cwd',''))" "$SESSION_FILE" 2>/dev/null)
+                        if [ "$FILE_CWD" = "$CWD" ]; then
+                            SID=$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['sessionId'])" "$SESSION_FILE" 2>/dev/null)
+                            break
+                        fi
                     fi
-                fi
-            done
+                done
+            fi
+            [ -n "$SID" ] && EXTRA=",\\"sessionId\\":\\"$SID\\""
         fi
 
         printf '{"command":"hook.%s","surfaceId":"%s"%s}\\n' "$EVENT" "$DECKARD_SURFACE_ID" "$EXTRA" \\

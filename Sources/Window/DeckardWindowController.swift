@@ -1122,19 +1122,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func updateSessionId(forSurfaceId surfaceIdStr: String, sessionId: String) {
         guard let tab = tabForSurfaceId(surfaceIdStr) else { return }
-        // Only set the session ID if the tab doesn't already have one.
-        // Resumed sessions report a new ID in ~/.claude/sessions/<pid>.json
-        // that doesn't correspond to an actual JSONL session file.
-        if tab.sessionId == nil || tab.sessionId!.isEmpty {
-            tab.sessionId = sessionId
-            SessionManager.shared.saveSessionName(sessionId: sessionId, name: tab.name)
-            saveState()
-            // Start watching if this is the currently displayed tab
-            if let project = currentProject,
-               let idx = project.tabs.firstIndex(where: { $0.id == tab.id }),
-               idx == project.selectedTabIndex {
-                refreshContextBar(for: tab)
-            }
+        guard tab.sessionId != sessionId else { return }
+        tab.sessionId = sessionId
+        SessionManager.shared.saveSessionName(sessionId: sessionId, name: tab.name)
+        saveState()
+        // Start watching if this is the currently displayed tab
+        if let project = currentProject,
+           let idx = project.tabs.firstIndex(where: { $0.id == tab.id }),
+           idx == project.selectedTabIndex {
+            refreshContextBar(for: tab)
         }
     }
 
