@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.18.1](https://github.com/gi11es/deckard/compare/v0.18.0...v0.18.1) (2026-04-06)
+
+
+### Bug Fixes
+
+* context bar not updating for resumed Claude Code sessions ([#72](https://github.com/gi11es/deckard/issues/72)) ([9a75f32](https://github.com/gi11es/deckard/commit/9a75f321114bfc891d3a229bc0e649b784a375e4))
+* make PID-walking fallback continue loop when sessionId extraction fails ([08b33de](https://github.com/gi11es/deckard/commit/08b33de246b4b3b361caff6acf8a41ad98c4c4cf))
+* set TERM_PROGRAM and COLORTERM env vars for terminal identification ([#74](https://github.com/gi11es/deckard/issues/74)) ([6fec56b](https://github.com/gi11es/deckard/commit/6fec56bf5f004ebcb50055aeb7726aea4d8c492e)), closes [#73](https://github.com/gi11es/deckard/issues/73)
+
 ## [0.18.0](https://github.com/gi11es/deckard/compare/v0.17.2...v0.18.0) (2026-04-05)
 
 
