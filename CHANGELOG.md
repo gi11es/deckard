@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.19.0](https://github.com/gi11es/deckard/compare/v0.18.1...v0.19.0) (2026-04-07)
+
+
+### Features
+
+* per-project default Claude arguments ([#76](https://github.com/gi11es/deckard/issues/76)) ([565af3a](https://github.com/gi11es/deckard/commit/565af3a5b59535593cbd5241dd32647824fde29c))
+
 ## [0.18.1](https://github.com/gi11es/deckard/compare/v0.18.0...v0.18.1) (2026-04-06)
 
 
