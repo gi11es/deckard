@@ -1229,7 +1229,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                         sessionId: tab.sessionId,
                         tmuxSessionName: tab.surface.tmuxSessionName
                     )
-                }
+                },
+                defaultArgs: project.defaultArgs
             )
         }
 
@@ -1290,6 +1291,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for (i, ps) in projectStates.enumerated() {
             let project = ProjectItem(path: ps.path)
             project.name = ps.name
+            project.defaultArgs = ps.defaultArgs
 
             let selTab = min(max(ps.selectedTabIndex, 0), max(ps.tabs.count - 1, 0))
 
