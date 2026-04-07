@@ -661,7 +661,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let initialInput: String?
         if isClaude {
-            let resolvedArgs = extraArgs ?? UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
+            let resolvedArgs = extraArgs ?? project.defaultArgs ?? UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
             let extraArgsSuffix = resolvedArgs.isEmpty ? "" : " \(resolvedArgs)"
             var claudeArgs = extraArgsSuffix
             if let sessionIdToResume {
@@ -715,7 +715,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let project = projects[selectedProjectIndex]
 
         if isClaude && UserDefaults.standard.bool(forKey: "promptForSessionArgs") {
-            promptForClaudeArgs { [weak self] args in
+            promptForClaudeArgs(for: project) { [weak self] args in
                 guard let self else { return }
                 guard let args else {
                     // User cancelled
@@ -747,7 +747,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    private func promptForClaudeArgs(completion: @escaping (String?) -> Void) {
+    private func promptForClaudeArgs(for project: ProjectItem, completion: @escaping (String?) -> Void) {
         let alert = NSAlert()
         alert.messageText = "Claude Code Arguments"
         alert.informativeText = "Arguments passed to this session:"
@@ -755,7 +755,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         alert.addButton(withTitle: "Cancel")
 
         let field = ClaudeArgsField(frame: NSRect(x: 0, y: 0, width: 400, height: 60))
-        field.stringValue = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
+        field.stringValue = project.defaultArgs ?? UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
         alert.accessoryView = field
 
         guard let window else {
