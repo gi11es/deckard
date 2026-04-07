@@ -584,6 +584,11 @@ extension DeckardWindowController {
         exploreItem.representedObject = project
         menu.addItem(exploreItem)
 
+        let defaultArgsItem = NSMenuItem(title: "Default Arguments\u{2026}", action: #selector(defaultArgsMenuAction(_:)), keyEquivalent: "")
+        defaultArgsItem.target = self
+        defaultArgsItem.representedObject = project
+        menu.addItem(defaultArgsItem)
+
         menu.addItem(.separator())
 
         // Folder options
@@ -691,6 +696,28 @@ extension DeckardWindowController {
 
         // Keep a strong reference so the window isn't deallocated
         objc_setAssociatedObject(explorer.window!, "explorerController", explorer, .OBJC_ASSOCIATION_RETAIN)
+    }
+
+    @objc func defaultArgsMenuAction(_ sender: NSMenuItem) {
+        guard let project = sender.representedObject as? ProjectItem,
+              let window else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Default Arguments for \(project.name)"
+        alert.informativeText = "These arguments will be used for new Claude tabs in this project, overriding global defaults. Leave empty to clear."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = ClaudeArgsField(frame: NSRect(x: 0, y: 0, width: 400, height: 60))
+        field.stringValue = project.defaultArgs ?? ""
+        alert.accessoryView = field
+
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            let value = field.stringValue.trimmingCharacters(in: .whitespaces)
+            project.defaultArgs = value.isEmpty ? nil : value
+            self?.saveState()
+        }
     }
 
     // MARK: - Sidebar Selection
