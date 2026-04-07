@@ -36,6 +36,7 @@ struct ProjectState: Codable {
     var name: String
     var selectedTabIndex: Int
     var tabs: [ProjectTabState]
+    var defaultArgs: String?
 }
 
 struct ProjectTabState: Codable {

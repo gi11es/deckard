@@ -69,6 +69,7 @@ class ProjectItem {
     var name: String  // basename of path
     var tabs: [TabItem] = []
     var selectedTabIndex: Int = 0
+    var defaultArgs: String?
 
     init(path: String) {
         self.id = UUID()
