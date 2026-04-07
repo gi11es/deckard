@@ -122,7 +122,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         grid.columnSpacing = 8
 
         // Extra arguments
-        let extraArgsLabel = NSTextField(labelWithString: "Extra arguments:")
+        let extraArgsLabel = NSTextField(labelWithString: "Default Claude arguments:")
         extraArgsLabel.alignment = .right
 
         let extraArgsField = ClaudeArgsField(frame: NSRect(x: 0, y: 0, width: 400, height: 60))
