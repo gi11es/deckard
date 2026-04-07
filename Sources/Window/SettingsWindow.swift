@@ -116,7 +116,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         let grid = NSGridView(numberOfColumns: 2, rows: 0)
         grid.translatesAutoresizingMaskIntoConstraints = false
         grid.column(at: 0).xPlacement = .trailing
-        grid.column(at: 0).width = 155
+        grid.column(at: 0).width = 175
         grid.column(at: 1).xPlacement = .fill
         grid.rowSpacing = 6
         grid.columnSpacing = 8
