@@ -584,7 +584,7 @@ extension DeckardWindowController {
         exploreItem.representedObject = project
         menu.addItem(exploreItem)
 
-        let defaultArgsItem = NSMenuItem(title: "Default Arguments\u{2026}", action: #selector(defaultArgsMenuAction(_:)), keyEquivalent: "")
+        let defaultArgsItem = NSMenuItem(title: "Default Claude Arguments\u{2026}", action: #selector(defaultArgsMenuAction(_:)), keyEquivalent: "")
         defaultArgsItem.target = self
         defaultArgsItem.representedObject = project
         menu.addItem(defaultArgsItem)

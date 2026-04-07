@@ -135,7 +135,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
         grid.addRow(with: [extraArgsLabel, extraArgsField])
 
-        let extraArgsHelp = NSTextField(labelWithString: "Arguments passed to every new Claude Code session.")
+        let extraArgsHelp = NSTextField(labelWithString: "Arguments passed to every new Claude Code session. Can be overridden per project.")
         extraArgsHelp.font = .systemFont(ofSize: 11)
         extraArgsHelp.textColor = .secondaryLabelColor
         grid.addRow(with: [NSGridCell.emptyContentView, extraArgsHelp])
