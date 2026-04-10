@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.20.0](https://github.com/gi11es/deckard/compare/v0.19.0...v0.20.0) (2026-04-10)
+
+
+### Features
+
+* add New Claude Tab and New Terminal Tab to tab context menu ([3529951](https://github.com/gi11es/deckard/commit/35299517e7e8e9b5e851a326dcaf5de9cdb3363d))
+* add right-click context menu to horizontal tabs for closing ([6531da5](https://github.com/gi11es/deckard/commit/6531da514f06edfb4797b51cdd06a38b8af1ddc7))
+* show keyboard shortcut hints in tab context menu ([8b37ccf](https://github.com/gi11es/deckard/commit/8b37ccfe59387c25595db10d2cfd3aa12ce4143f))
+
+
+### Bug Fixes
+
+* center settings and session explorer windows on main app window ([7218593](https://github.com/gi11es/deckard/commit/72185933491b635d012ab6bb2f4dc10def9dbce2))
+* suppress keyboard input during Claude tab startup ([0277b74](https://github.com/gi11es/deckard/commit/0277b7406622ecd7cfeaed5762dfcec47becdb65))
+
 ## [0.19.0](https://github.com/gi11es/deckard/compare/v0.18.1...v0.19.0) (2026-04-07)
 
 
