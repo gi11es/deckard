@@ -57,8 +57,15 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
 
         super.init(window: window)
         window.delegate = self
-        window.setFrameAutosaveName("SessionExplorerWindow")
-        window.center()
+
+        // Center on the main Deckard window, or fall back to screen center
+        if let mainFrame = NSApp.mainWindow?.frame {
+            let x = mainFrame.midX - window.frame.width / 2
+            let y = mainFrame.midY - window.frame.height / 2
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        } else {
+            window.center()
+        }
 
         setupUI()
         loadData()

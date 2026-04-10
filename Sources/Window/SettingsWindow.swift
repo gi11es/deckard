@@ -35,9 +35,17 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         )
         window.contentMinSize = NSSize(width: 720, height: 840)
         window.contentMaxSize = NSSize(width: 720, height: 840)
-        window.center()
 
         super.init(window: window)
+
+        // Center on the main Deckard window, or fall back to screen center
+        if let mainFrame = NSApp.mainWindow?.frame {
+            let x = mainFrame.midX - window.frame.width / 2
+            let y = mainFrame.midY - window.frame.height / 2
+            window.setFrameOrigin(NSPoint(x: x, y: y))
+        } else {
+            window.center()
+        }
         window.delegate = self
 
         let toolbar = NSToolbar(identifier: "SettingsToolbar")
