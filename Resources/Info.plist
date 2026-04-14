@@ -52,5 +52,13 @@
 	<string>A program running inside Deckard would like to access your location information.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>A program running inside Deckard would like to access your photo library.</string>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>A program running inside Deckard would like to access Bluetooth.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>A program running inside Deckard would like to access the local network.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>A program running inside Deckard would like to access speech recognition.</string>
+	<key>NSSystemAdministrationUsageDescription</key>
+	<string>A program running inside Deckard requires elevated privileges.</string>
 </dict>
 </plist>
