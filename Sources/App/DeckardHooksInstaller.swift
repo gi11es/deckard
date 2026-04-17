@@ -116,13 +116,18 @@ enum DeckardHooksInstaller {
         NSHomeDirectory() + "/.deckard/hooks"
     }()
 
-    private static let hookEvents: [(key: String, arg: String)] = [
-        ("SessionStart", "session-start"),
-        ("Stop", "stop"),
-        ("StopFailure", "stop-failure"),
-        ("PreToolUse", "pre-tool-use"),
-        ("Notification", "notification"),
-        ("UserPromptSubmit", "user-prompt-submit"),
+    typealias ClaudeVersion = (major: Int, minor: Int, patch: Int)
+
+    // Minimum Claude Code version required for each hook event (nil = supported on all versions).
+    // StopFailure was added in 2.1.78 — installing it on older Claude Code causes the whole
+    // settings.json to be skipped with "Invalid key in record" (issue #81).
+    private static let hookEvents: [(key: String, arg: String, minVersion: ClaudeVersion?)] = [
+        ("SessionStart", "session-start", nil),
+        ("Stop", "stop", nil),
+        ("StopFailure", "stop-failure", (2, 1, 78)),
+        ("PreToolUse", "pre-tool-use", nil),
+        ("Notification", "notification", nil),
+        ("UserPromptSubmit", "user-prompt-submit", nil),
     ]
 
     /// Install the hook script and merge hooks into Claude Code's settings.
@@ -156,7 +161,11 @@ enum DeckardHooksInstaller {
         }
     }
 
-    static func mergeHooksIntoSettings(settingsPath: String? = nil, originalStatusLinePath: String? = nil) {
+    static func mergeHooksIntoSettings(
+        settingsPath: String? = nil,
+        originalStatusLinePath: String? = nil,
+        versionProvider: () -> ClaudeVersion? = { detectClaudeCodeVersion() }
+    ) {
         let effectiveSettingsPath = settingsPath ?? Self.settingsPath
         let effectiveOriginalPath = originalStatusLinePath ?? Self.originalStatusLinePath
         let fm = FileManager.default
@@ -177,12 +186,15 @@ enum DeckardHooksInstaller {
         // Build or merge hooks
         var hooks = settings["hooks"] as? [String: Any] ?? [:]
         let scriptPath = hookScriptPath
+        let installedVersion = versionProvider()
 
-        for (eventName, eventArg) in hookEvents {
+        for (eventName, eventArg, minVersion) in hookEvents {
             let command = "\(scriptPath) \(eventArg)"
             var entries = hooks[eventName] as? [[String: Any]] ?? []
 
-            // Remove any existing Deckard hook (so we always update to latest)
+            // Always remove any existing Deckard hook so we update to the latest — and
+            // so events no longer supported (e.g. Claude Code downgraded below the
+            // min version for this hook) get cleaned up instead of lingering.
             entries.removeAll { entry in
                 guard let entryHooks = entry["hooks"] as? [[String: Any]] else { return false }
                 return entryHooks.contains { hook in
@@ -190,22 +202,31 @@ enum DeckardHooksInstaller {
                 }
             }
 
-            // Add our hook
-            entries.append([
-                "matcher": "",
-                "hooks": [
-                    [
-                        "type": "command",
-                        "command": command,
-                        "timeout": 10,
-                    ] as [String: Any],
-                ],
-            ] as [String: Any])
+            if isHookSupported(minVersion: minVersion, installed: installedVersion) {
+                entries.append([
+                    "matcher": "",
+                    "hooks": [
+                        [
+                            "type": "command",
+                            "command": command,
+                            "timeout": 10,
+                        ] as [String: Any],
+                    ],
+                ] as [String: Any])
+            }
 
-            hooks[eventName] = entries
+            if entries.isEmpty {
+                hooks.removeValue(forKey: eventName)
+            } else {
+                hooks[eventName] = entries
+            }
         }
 
-        settings["hooks"] = hooks
+        if hooks.isEmpty {
+            settings.removeValue(forKey: "hooks")
+        } else {
+            settings["hooks"] = hooks
+        }
 
         // Save original statusLine if it's not ours
         if let statusLine = settings["statusLine"] as? [String: Any],
@@ -291,6 +312,57 @@ enum DeckardHooksInstaller {
         // Clean up hooks directory and saved original
         try? fm.removeItem(atPath: effectiveHooksDir)
         try? fm.removeItem(atPath: effectiveOriginalPath)
+    }
+
+    /// Run `claude --version` via a login shell (so the user's full PATH — homebrew,
+    /// npm global, ~/.claude/local — is available, same as `ClaudeCLIFlags` does)
+    /// and return the parsed version. Returns nil if claude isn't installed or the
+    /// output can't be parsed.
+    static func detectClaudeCodeVersion() -> ClaudeVersion? {
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        process.arguments = ["-l", "-c", "claude --version"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            guard let output = String(data: data, encoding: .utf8) else { return nil }
+            return parseClaudeCodeVersion(output)
+        } catch {
+            return nil
+        }
+    }
+
+    /// Extract the first "X.Y.Z" triplet from `claude --version` output.
+    /// Typical output: "2.1.78 (Claude Code)".
+    static func parseClaudeCodeVersion(_ output: String) -> ClaudeVersion? {
+        guard let regex = try? NSRegularExpression(pattern: #"(\d+)\.(\d+)\.(\d+)"#),
+              let match = regex.firstMatch(
+                in: output, range: NSRange(output.startIndex..., in: output)),
+              match.numberOfRanges >= 4 else {
+            return nil
+        }
+        let ns = output as NSString
+        guard let major = Int(ns.substring(with: match.range(at: 1))),
+              let minor = Int(ns.substring(with: match.range(at: 2))),
+              let patch = Int(ns.substring(with: match.range(at: 3))) else {
+            return nil
+        }
+        return (major, minor, patch)
+    }
+
+    /// Fail-safe: if the event requires a minimum version and we couldn't determine
+    /// the installed version, skip it — writing an unknown hook key causes Claude
+    /// Code to reject the whole settings file.
+    static func isHookSupported(minVersion: ClaudeVersion?, installed: ClaudeVersion?) -> Bool {
+        guard let min = minVersion else { return true }
+        guard let v = installed else { return false }
+        return (v.major, v.minor, v.patch) >= (min.major, min.minor, min.patch)
     }
 
     private static func saveOriginalStatusLine(_ config: [String: Any], to path: String) {

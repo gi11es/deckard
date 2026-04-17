@@ -26,6 +26,71 @@ final class DeckardHooksInstallerTests: XCTestCase {
         XCTAssertEqual(expectedEvents.count, 6)
     }
 
+    // MARK: - Version parsing
+
+    func testParseClaudeCodeVersionStandardOutput() {
+        let v = DeckardHooksInstaller.parseClaudeCodeVersion("2.1.78 (Claude Code)")
+        XCTAssertEqual(v?.major, 2)
+        XCTAssertEqual(v?.minor, 1)
+        XCTAssertEqual(v?.patch, 78)
+    }
+
+    func testParseClaudeCodeVersionBareTriplet() {
+        let v = DeckardHooksInstaller.parseClaudeCodeVersion("1.0.0\n")
+        XCTAssertEqual(v?.major, 1)
+        XCTAssertEqual(v?.minor, 0)
+        XCTAssertEqual(v?.patch, 0)
+    }
+
+    func testParseClaudeCodeVersionWithPrerelease() {
+        let v = DeckardHooksInstaller.parseClaudeCodeVersion("2.1.78-beta.3")
+        XCTAssertEqual(v?.major, 2)
+        XCTAssertEqual(v?.minor, 1)
+        XCTAssertEqual(v?.patch, 78)
+    }
+
+    func testParseClaudeCodeVersionEmpty() {
+        XCTAssertNil(DeckardHooksInstaller.parseClaudeCodeVersion(""))
+    }
+
+    func testParseClaudeCodeVersionNoTriplet() {
+        XCTAssertNil(DeckardHooksInstaller.parseClaudeCodeVersion("claude: command not found"))
+    }
+
+    // MARK: - Hook support check
+
+    func testIsHookSupportedWhenNoMinVersion() {
+        XCTAssertTrue(DeckardHooksInstaller.isHookSupported(minVersion: nil, installed: nil))
+        XCTAssertTrue(DeckardHooksInstaller.isHookSupported(minVersion: nil, installed: (1, 0, 0)))
+    }
+
+    func testIsHookSupportedRejectsUnknownVersion() {
+        // Fail-safe: if we can't detect the installed version, don't risk writing
+        // an unknown key that would make Claude Code skip the whole settings file.
+        XCTAssertFalse(DeckardHooksInstaller.isHookSupported(
+            minVersion: (2, 1, 78), installed: nil))
+    }
+
+    func testIsHookSupportedExactMatch() {
+        XCTAssertTrue(DeckardHooksInstaller.isHookSupported(
+            minVersion: (2, 1, 78), installed: (2, 1, 78)))
+    }
+
+    func testIsHookSupportedOlderPatch() {
+        XCTAssertFalse(DeckardHooksInstaller.isHookSupported(
+            minVersion: (2, 1, 78), installed: (2, 1, 77)))
+    }
+
+    func testIsHookSupportedOlderMinor() {
+        XCTAssertFalse(DeckardHooksInstaller.isHookSupported(
+            minVersion: (2, 1, 78), installed: (2, 0, 999)))
+    }
+
+    func testIsHookSupportedNewerMajor() {
+        XCTAssertTrue(DeckardHooksInstaller.isHookSupported(
+            minVersion: (2, 1, 78), installed: (3, 0, 0)))
+    }
+
     // MARK: - Settings merge with temp files
 
     func testSettingsMergeCreatesValidJSON() throws {
@@ -137,7 +202,8 @@ final class DeckardHooksInstallerTests: XCTestCase {
 
         DeckardHooksInstaller.mergeHooksIntoSettings(
             settingsPath: settingsPath,
-            originalStatusLinePath: originalSavePath
+            originalStatusLinePath: originalSavePath,
+            versionProvider: { (2, 1, 78) }
         )
 
         // Verify original was saved
@@ -172,7 +238,8 @@ final class DeckardHooksInstallerTests: XCTestCase {
 
         DeckardHooksInstaller.mergeHooksIntoSettings(
             settingsPath: settingsPath,
-            originalStatusLinePath: originalSavePath
+            originalStatusLinePath: originalSavePath,
+            versionProvider: { (2, 1, 78) }
         )
 
         // Original should still point to cc-statusline, not overwritten
@@ -196,7 +263,8 @@ final class DeckardHooksInstallerTests: XCTestCase {
 
         DeckardHooksInstaller.mergeHooksIntoSettings(
             settingsPath: settingsPath,
-            originalStatusLinePath: originalSavePath
+            originalStatusLinePath: originalSavePath,
+            versionProvider: { (2, 1, 78) }
         )
 
         // No original should be saved
@@ -350,7 +418,8 @@ final class DeckardHooksInstallerTests: XCTestCase {
         // Step 1: Deckard install — should save original and overwrite
         DeckardHooksInstaller.mergeHooksIntoSettings(
             settingsPath: settingsPath,
-            originalStatusLinePath: originalSavePath
+            originalStatusLinePath: originalSavePath,
+            versionProvider: { (2, 1, 78) }
         )
 
         // Verify original was saved with ALL fields (including padding)
@@ -369,7 +438,8 @@ final class DeckardHooksInstallerTests: XCTestCase {
         // Step 2: Deckard install again — should NOT overwrite saved original
         DeckardHooksInstaller.mergeHooksIntoSettings(
             settingsPath: settingsPath,
-            originalStatusLinePath: originalSavePath
+            originalStatusLinePath: originalSavePath,
+            versionProvider: { (2, 1, 78) }
         )
         let savedAgain = try JSONSerialization.jsonObject(
             with: Data(contentsOf: URL(fileURLWithPath: originalSavePath))) as! [String: Any]
@@ -490,5 +560,149 @@ final class DeckardHooksInstallerTests: XCTestCase {
         }
         XCTAssertTrue(stdinPos < pidPos,
                        "Hook script should try stdin session_id before falling back to PID walking")
+    }
+
+    // MARK: - Version-gated StopFailure hook
+
+    private func writeEmptySettings(at path: String) throws {
+        let data = try JSONSerialization.data(withJSONObject: [String: Any](), options: .prettyPrinted)
+        try data.write(to: URL(fileURLWithPath: path))
+    }
+
+    func testStopFailureInstalledOnSupportedVersion() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let settingsPath = tempDir + "settings.json"
+        try writeEmptySettings(at: settingsPath)
+
+        DeckardHooksInstaller.mergeHooksIntoSettings(
+            settingsPath: settingsPath,
+            originalStatusLinePath: tempDir + "orig.json",
+            versionProvider: { (2, 1, 78) }
+        )
+
+        let saved = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: URL(fileURLWithPath: settingsPath))) as! [String: Any]
+        let hooks = saved["hooks"] as! [String: Any]
+        XCTAssertNotNil(hooks["StopFailure"], "StopFailure should be installed on >= 2.1.78")
+        XCTAssertNotNil(hooks["Stop"], "Stop should always be installed")
+        XCTAssertNotNil(hooks["SessionStart"])
+    }
+
+    func testStopFailureOmittedOnOlderVersion() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let settingsPath = tempDir + "settings.json"
+        try writeEmptySettings(at: settingsPath)
+
+        DeckardHooksInstaller.mergeHooksIntoSettings(
+            settingsPath: settingsPath,
+            originalStatusLinePath: tempDir + "orig.json",
+            versionProvider: { (2, 1, 77) }
+        )
+
+        let saved = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: URL(fileURLWithPath: settingsPath))) as! [String: Any]
+        let hooks = saved["hooks"] as! [String: Any]
+        XCTAssertNil(hooks["StopFailure"],
+                     "StopFailure must not be written on Claude Code < 2.1.78 (issue #81)")
+        // The supported hooks still land so Deckard keeps working on older CC.
+        XCTAssertNotNil(hooks["Stop"])
+        XCTAssertNotNil(hooks["SessionStart"])
+    }
+
+    func testStopFailureOmittedWhenVersionUnknown() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let settingsPath = tempDir + "settings.json"
+        try writeEmptySettings(at: settingsPath)
+
+        DeckardHooksInstaller.mergeHooksIntoSettings(
+            settingsPath: settingsPath,
+            originalStatusLinePath: tempDir + "orig.json",
+            versionProvider: { nil }
+        )
+
+        let saved = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: URL(fileURLWithPath: settingsPath))) as! [String: Any]
+        let hooks = saved["hooks"] as! [String: Any]
+        XCTAssertNil(hooks["StopFailure"],
+                     "Fail-safe: skip version-gated hooks when we can't detect the installed version")
+    }
+
+    func testStaleStopFailureRemovedOnDowngrade() throws {
+        // Simulates the issue #81 recovery: user had a newer Claude Code (Deckard
+        // installed StopFailure), then downgraded. On next Deckard launch the stale
+        // StopFailure entry must be removed so Claude Code stops rejecting settings.json.
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let settingsPath = tempDir + "settings.json"
+        let initial: [String: Any] = [
+            "hooks": [
+                "StopFailure": [
+                    [
+                        "matcher": "",
+                        "hooks": [[
+                            "type": "command",
+                            "command": NSHomeDirectory() + "/.deckard/hooks/notify.sh stop-failure",
+                            "timeout": 10,
+                        ]],
+                    ],
+                ],
+            ],
+        ]
+        let data = try JSONSerialization.data(withJSONObject: initial, options: .prettyPrinted)
+        try data.write(to: URL(fileURLWithPath: settingsPath))
+
+        DeckardHooksInstaller.mergeHooksIntoSettings(
+            settingsPath: settingsPath,
+            originalStatusLinePath: tempDir + "orig.json",
+            versionProvider: { (2, 1, 77) }
+        )
+
+        let saved = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: URL(fileURLWithPath: settingsPath))) as! [String: Any]
+        let hooks = saved["hooks"] as! [String: Any]
+        XCTAssertNil(hooks["StopFailure"],
+                     "Stale Deckard StopFailure entry must be cleaned up when the installed version is below the min")
+    }
+
+    func testNonDeckardStopFailureHookPreserved() throws {
+        // If the user has their own StopFailure hook, we must not delete it just
+        // because our own version gate says we can't install ours.
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        try FileManager.default.createDirectory(atPath: tempDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let settingsPath = tempDir + "settings.json"
+        let userHook: [String: Any] = [
+            "matcher": "",
+            "hooks": [["type": "command", "command": "/usr/local/bin/my-own-hook", "timeout": 5]],
+        ]
+        let initial: [String: Any] = ["hooks": ["StopFailure": [userHook]]]
+        let data = try JSONSerialization.data(withJSONObject: initial, options: .prettyPrinted)
+        try data.write(to: URL(fileURLWithPath: settingsPath))
+
+        DeckardHooksInstaller.mergeHooksIntoSettings(
+            settingsPath: settingsPath,
+            originalStatusLinePath: tempDir + "orig.json",
+            versionProvider: { (2, 1, 77) }
+        )
+
+        let saved = try JSONSerialization.jsonObject(
+            with: Data(contentsOf: URL(fileURLWithPath: settingsPath))) as! [String: Any]
+        let hooks = saved["hooks"] as! [String: Any]
+        let entries = hooks["StopFailure"] as! [[String: Any]]
+        XCTAssertEqual(entries.count, 1)
+        let remaining = (entries[0]["hooks"] as! [[String: Any]])[0]
+        XCTAssertEqual(remaining["command"] as? String, "/usr/local/bin/my-own-hook")
     }
 }
