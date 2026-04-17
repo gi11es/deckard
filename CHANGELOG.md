@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.21.0](https://github.com/gi11es/deckard/compare/v0.20.0...v0.21.0) (2026-04-17)
+
+
+### Features
+
+* add TCC usage descriptions and entitlements for child process permissions ([#80](https://github.com/gi11es/deckard/issues/80)) ([1db18d3](https://github.com/gi11es/deckard/commit/1db18d354bebacf5b0da0c1e9d9f404f1721bfa9))
+* include release notes in Sparkle appcast ([0b10b41](https://github.com/gi11es/deckard/commit/0b10b41671ddf29bbcbabdb9aabd0b140342c88e))
+
+
+### Bug Fixes
+
+* gate StopFailure hook on Claude Code &gt;= 2.1.78 ([#81](https://github.com/gi11es/deckard/issues/81)) ([cc1077e](https://github.com/gi11es/deckard/commit/cc1077e9a0ef2c834392f7653ef0de508cbfbb44))
+* recognize Opus 4.7 context limit and raise Sonnet 4.6 to 1M ([b014a84](https://github.com/gi11es/deckard/commit/b014a84fd19b633ec2b99d14e611753d4f091e96))
+
 ## [0.20.0](https://github.com/gi11es/deckard/compare/v0.19.0...v0.20.0) (2026-04-10)
 
 
