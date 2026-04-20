@@ -3,8 +3,11 @@ import Foundation
 extension String {
     /// Encodes a project path into the directory name Claude Code uses under `~/.claude/projects/`.
     /// Resolves symlinks first so the encoded name matches the canonical path the CLI uses.
+    /// The CLI replaces both "/" and "." with "-".
     var claudeProjectDirName: String {
-        (self as NSString).resolvingSymlinksInPath.replacingOccurrences(of: "/", with: "-")
+        (self as NSString).resolvingSymlinksInPath
+            .replacingOccurrences(of: "/", with: "-")
+            .replacingOccurrences(of: ".", with: "-")
     }
 }
 

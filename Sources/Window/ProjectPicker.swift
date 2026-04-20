@@ -470,9 +470,12 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
     }
 
     /// Decode a Claude Code project directory name back to a filesystem path.
-    /// Claude encodes "/" as "-", so "-Users-gilles-Documents-ai-trend-finder" must
-    /// be decoded by finding which hyphens are path separators and which are literal.
-    /// Strategy: greedily build the path left-to-right, checking if each segment exists.
+    /// Claude encodes both "/" and "." as "-", so "-Users-tibor-code-trogulja-trogulja-github-io"
+    /// must be decoded by finding which hyphens are path separators, dots, or literal dashes.
+    /// Strategy: greedily build the path left-to-right, checking if each segment exists as a
+    /// directory. When the final path doesn't exist, scan the parent for an entry whose name
+    /// (with dots replaced by dashes) matches the last segment — this recovers dotted names
+    /// like "trogulja.github.io".
     static func decodeCloudeProjectPath(_ encoded: String) -> String? {
         let stripped = encoded.hasPrefix("-") ? String(encoded.dropFirst()) : encoded
         let parts = stripped.components(separatedBy: "-")
@@ -494,7 +497,25 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
         }
 
         // Append final segment
-        path += "/" + segment
-        return path
+        let decoded = path + "/" + segment
+
+        var isDir: ObjCBool = false
+        if fm.fileExists(atPath: decoded, isDirectory: &isDir) {
+            return decoded
+        }
+
+        // The final segment may contain dashes that were originally dots.
+        // Scan the parent directory for an entry whose dot-normalized name matches.
+        if fm.fileExists(atPath: path, isDirectory: &isDir), isDir.boolValue,
+           let entries = try? fm.contentsOfDirectory(atPath: path) {
+            for entry in entries {
+                let normalized = entry.replacingOccurrences(of: ".", with: "-")
+                if normalized == segment {
+                    return path + "/" + entry
+                }
+            }
+        }
+
+        return decoded
     }
 }
