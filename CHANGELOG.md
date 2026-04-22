@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.21.1](https://github.com/gi11es/deckard/compare/v0.21.0...v0.21.1) (2026-04-22)
+
+
+### Bug Fixes
+
+* encode all non-alphanumeric chars in project dir names ([2468bb6](https://github.com/gi11es/deckard/commit/2468bb6ad0e916bcad943334c9910de2459108e4))
+* handle dots in folder names for context bar and recent projects ([#84](https://github.com/gi11es/deckard/issues/84)) ([65cc715](https://github.com/gi11es/deckard/commit/65cc715632741829fbccde922d285530ce9cfc72)), closes [#83](https://github.com/gi11es/deckard/issues/83)
+
 ## [0.21.0](https://github.com/gi11es/deckard/compare/v0.20.0...v0.21.0) (2026-04-17)
 
 
