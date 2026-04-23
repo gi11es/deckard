@@ -704,6 +704,33 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     /// Guards against rapid duplicate tab creation from key repeat.
     var isCreatingTab = false
 
+    func addYoloTabToCurrentProject() {
+        guard !isCreatingTab else { return }
+        isCreatingTab = true
+
+        guard selectedProjectIndex >= 0, selectedProjectIndex < projects.count else {
+            isCreatingTab = false
+            return
+        }
+        let project = projects[selectedProjectIndex]
+
+        let prefix = "Yolo #"
+        let maxNum = project.tabs
+            .compactMap { tab -> Int? in
+                guard tab.name.hasPrefix(prefix) else { return nil }
+                return Int(tab.name.dropFirst(prefix.count))
+            }
+            .max() ?? 0
+        let tabName = "\(prefix)\(maxNum + 1)"
+
+        let baseArgs = project.defaultArgs ?? UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
+        let yoloFlag = "--dangerously-skip-permissions"
+        let yoloArgs = baseArgs.contains(yoloFlag) ? baseArgs : (baseArgs.isEmpty ? yoloFlag : "\(baseArgs) \(yoloFlag)")
+
+        createTabInProject(project, isClaude: true, name: tabName, extraArgs: yoloArgs)
+        finalizeTabCreation(in: project)
+    }
+
     func addTabToCurrentProject(isClaude: Bool) {
         guard !isCreatingTab else { return }
         isCreatingTab = true

@@ -193,6 +193,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         claudeItem.setShortcut(for: .newClaudeTab)
         fileMenu.addItem(claudeItem)
 
+        let yoloItem = NSMenuItem(title: "New Claude Yolo Tab", action: #selector(newClaudeYoloTab), keyEquivalent: "")
+        yoloItem.setShortcut(for: .newClaudeYoloTab)
+        fileMenu.addItem(yoloItem)
+
         let termItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalTab), keyEquivalent: "")
         termItem.setShortcut(for: .newTerminalTab)
         fileMenu.addItem(termItem)
@@ -299,6 +303,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func newClaudeTab() {
         windowController?.addTabToCurrentProject(isClaude: true)
+    }
+
+    @objc private func newClaudeYoloTab() {
+        windowController?.addYoloTabToCurrentProject()
     }
 
     @objc private func newTerminalTab() {

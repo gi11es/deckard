@@ -3,6 +3,7 @@ import KeyboardShortcuts
 extension KeyboardShortcuts.Name {
     static let openFolder = Self("openFolder", default: .init(.o, modifiers: .command))
     static let newClaudeTab = Self("newClaudeTab", default: .init(.t, modifiers: .command))
+    static let newClaudeYoloTab = Self("newClaudeYoloTab", default: .init(.y, modifiers: .command))
     static let newTerminalTab = Self("newTerminalTab", default: .init(.t, modifiers: [.command, .shift]))
     static let closeTab = Self("closeTab", default: .init(.w, modifiers: .command))
     static let closeFolder = Self("closeFolder", default: .init(.w, modifiers: [.command, .shift]))
@@ -36,6 +37,7 @@ struct ShortcutEntry {
 let configurableShortcuts: [ShortcutEntry] = [
     ShortcutEntry(name: .openFolder, label: "Open Folder"),
     ShortcutEntry(name: .newClaudeTab, label: "New Claude Tab"),
+    ShortcutEntry(name: .newClaudeYoloTab, label: "New Claude Yolo Tab"),
     ShortcutEntry(name: .newTerminalTab, label: "New Terminal Tab"),
     ShortcutEntry(name: .closeTab, label: "Close Tab"),
     ShortcutEntry(name: .closeFolder, label: "Close Folder"),
