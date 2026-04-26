@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.21.2](https://github.com/gi11es/deckard/compare/v0.21.1...v0.21.2) (2026-04-26)
+
+
+### Bug Fixes
+
+* preserve window frame across lock screen and macOS 15 tiling ([c1e7628](https://github.com/gi11es/deckard/commit/c1e7628d671ae800fa1f5e86a6a1a36dec0010c8))
+
 ## [0.21.1](https://github.com/gi11es/deckard/compare/v0.21.0...v0.21.1) (2026-04-22)
 
 
