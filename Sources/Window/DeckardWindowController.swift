@@ -189,6 +189,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     /// Consecutive active poll count per surface — require 2 before showing as active.
     private var terminalActiveStreak: [UUID: Int] = [:]
     private var flagsMonitor: Any?
+    /// Window frame captured before sleep/screen sleep. Restored on wake to undo
+    /// AppKit's tendency to resize windows when displays disconnect/reconnect
+    /// during lock screen or system sleep.
+    private var preSleepWindowFrame: NSRect?
 
     init() {
         let window = NSWindow(
@@ -207,8 +211,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         super.init(window: window)
 
-        window.setFrameAutosaveName("DeckardMainWindow")
-        if !window.setFrameUsingName("DeckardMainWindow") {
+        Self.sanitizeAutosavedFrameForTiling()
+        window.setFrameAutosaveName(Self.frameAutosaveName)
+        if !window.setFrameUsingName(Self.frameAutosaveName) {
             window.center()
         }
 
@@ -220,23 +225,23 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Show cached quota data immediately if available
         quotaDidChange()
 
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil, queue: .main
-        ) { [weak self] _ in
-            // Re-assert first responder after system wake to recover from potential focus loss
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                guard let wc = self as? DeckardWindowController,
-                      let project = wc.currentProject else { return }
-                let idx = project.selectedTabIndex
-                guard idx >= 0, idx < project.tabs.count else { return }
-                let tab = project.tabs[idx]
-                let fr = wc.window?.firstResponder
-                DiagnosticLog.shared.log("sleep",
-                    "wake recovery: firstResponder=\(type(of: fr)) surfaceId=\(tab.id)")
-                wc.window?.makeFirstResponder(tab.surface.view)
-            }
+        let wsNC = NSWorkspace.shared.notificationCenter
+        let saveFrame: (Notification) -> Void = { [weak self] _ in
+            guard let self, let frame = self.window?.frame else { return }
+            self.preSleepWindowFrame = frame
         }
+        wsNC.addObserver(forName: NSWorkspace.willSleepNotification,
+                         object: nil, queue: .main, using: saveFrame)
+        wsNC.addObserver(forName: NSWorkspace.screensDidSleepNotification,
+                         object: nil, queue: .main, using: saveFrame)
+
+        let onWake: (Notification) -> Void = { [weak self] _ in
+            self?.handleWake()
+        }
+        wsNC.addObserver(forName: NSWorkspace.didWakeNotification,
+                         object: nil, queue: .main, using: onWake)
+        wsNC.addObserver(forName: NSWorkspace.screensDidWakeNotification,
+                         object: nil, queue: .main, using: onWake)
 
         restoreOrCreateInitial()
 
@@ -270,6 +275,87 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         if let monitor = flagsMonitor { NSEvent.removeMonitor(monitor) }
         SessionManager.shared.stopAutosave()
         processMonitorTimer?.invalidate()
+    }
+
+    // MARK: - Frame Autosave (with macOS 15 tiling workaround)
+
+    private static let frameAutosaveName = "DeckardMainWindow"
+
+    /// Strip macOS 15 (Sequoia) edge-tiling state from the saved autosave
+    /// string. Without this, AppKit restores the window into its previously
+    /// tiled state — which on a multi-display setup means the window opens
+    /// snapped to a screen edge at full screen-tile size, instead of the
+    /// user's preferred frame from before they edge-snapped it.
+    ///
+    /// Autosave string format:
+    ///   "winX winY winW winH screenX screenY screenW screenH [tilingJSON]"
+    /// When tiled, the geometry is the *tiled* frame and the JSON contains
+    /// the user's preferred frame as `untiledFrame`. We substitute the
+    /// untiled frame back as the geometry and drop the JSON.
+    private static func sanitizeAutosavedFrameForTiling() {
+        let key = "NSWindow Frame \(frameAutosaveName)"
+        let defaults = UserDefaults.standard
+        guard let raw = defaults.string(forKey: key),
+              let braceIdx = raw.firstIndex(of: "{") else { return }
+
+        var cleaned = String(raw[..<braceIdx]).trimmingCharacters(in: .whitespaces)
+        if let untiled = parseUntiledFrame(in: String(raw[braceIdx...])) {
+            let parts = cleaned.split(separator: " ", omittingEmptySubsequences: true)
+            if parts.count >= 8 {
+                let screen = parts[4..<8].joined(separator: " ")
+                cleaned = "\(Int(untiled.origin.x)) \(Int(untiled.origin.y))"
+                    + " \(Int(untiled.size.width)) \(Int(untiled.size.height)) \(screen)"
+            }
+        }
+        defaults.set(cleaned, forKey: key)
+    }
+
+    private static func parseUntiledFrame(in json: String) -> NSRect? {
+        guard let prefix = json.range(of: "\"untiledFrame\":\"") else { return nil }
+        let after = json[prefix.upperBound...]
+        guard let endQuote = after.firstIndex(of: "\"") else { return nil }
+        let rect = NSRectFromString(String(after[..<endQuote]))
+        return (rect.width > 0 && rect.height > 0) ? rect : nil
+    }
+
+    // MARK: - Sleep / Wake
+
+    private func handleWake() {
+        // Two restoration attempts: the first catches resizes that happen during
+        // wake; the second catches the slower screen-reconnect path (which can
+        // fire seconds after the wake notification when displays come back).
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) { [weak self] in
+            self?.restoreFrameIfNeeded()
+            self?.restoreFirstResponderAfterWake()
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) { [weak self] in
+            self?.restoreFrameIfNeeded()
+        }
+    }
+
+    private func restoreFrameIfNeeded() {
+        guard let saved = preSleepWindowFrame,
+              let window = self.window,
+              window.frame != saved else { return }
+        // Skip if the saved frame is no longer on any connected screen
+        // (e.g. external monitor unplugged while locked) — let macOS handle it.
+        let center = NSPoint(x: saved.midX, y: saved.midY)
+        let onAScreen = NSScreen.screens.contains { $0.frame.contains(center) }
+        guard onAScreen else { return }
+        DiagnosticLog.shared.log("sleep",
+            "restoring pre-sleep window frame: \(window.frame) -> \(saved)")
+        window.setFrame(saved, display: true)
+    }
+
+    private func restoreFirstResponderAfterWake() {
+        guard let project = currentProject else { return }
+        let idx = project.selectedTabIndex
+        guard idx >= 0, idx < project.tabs.count else { return }
+        let tab = project.tabs[idx]
+        let fr = window?.firstResponder
+        DiagnosticLog.shared.log("sleep",
+            "wake recovery: firstResponder=\(type(of: fr)) surfaceId=\(tab.id)")
+        window?.makeFirstResponder(tab.surface.view)
     }
 
     // MARK: - UI Setup
