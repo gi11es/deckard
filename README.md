@@ -1,6 +1,6 @@
 # Deckard
 
-A native macOS workspace for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://openai.com/codex), and classic terminal tabs. Deckard treats agent sessions as first-class tabs: Claude Code and Codex can both be created, resumed, forked, explored, bookmarked, summarized, and restored across app launches.
+A native macOS workspace for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://openai.com/codex), and classic terminal tabs. Deckard treats agent sessions as first-class tabs: Claude Code and Codex can both be created, resumed, forked, explored, bookmarked, and restored across app launches.
 
 Run multiple agents side by side in a single window with project-aware tabs, session persistence, status badges, and usage telemetry when the underlying CLI exposes it. Built with Swift and AppKit. Terminal rendering is powered by [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm).
 
@@ -39,7 +39,7 @@ Claude Code and Codex have separate badge states and customizable colors. Claude
 
 ### Session Explorer
 
-Browse past Claude Code and Codex sessions with Cmd+Shift+E. The explorer lists both providers for the current project, lets you resume or fork any session, and supports bookmark stars, timeline views, action extraction, and cached summaries.
+Browse past Claude Code and Codex sessions with Cmd+Shift+E. The explorer lists both providers for the current project, lets you resume or fork any session, and supports bookmark stars and timeline views.
 
 Fork-at-turn works for both agent providers. For Claude Code, Deckard truncates the Claude session JSONL and resumes with Claude's fork support. For Codex, Deckard creates a truncated Codex rollout file, registers it with Codex's local state database, and launches `codex fork` or `codex resume` as appropriate.
 
@@ -70,7 +70,7 @@ Ships with 486 built-in themes in Ghostty format and loads custom themes from `~
 
 - **Session persistence**: Claude Code sessions resume with `claude --resume`; Codex sessions resume with `codex resume`. Tab structure and working directories are preserved across restarts.
 - **Forking workflows**: Claude Code and Codex sessions can be forked from the explorer, including from a specific user turn.
-- **Bookmarks and summaries**: Claude Code and Codex sessions use separate bookmark and summary caches so provider sessions with similar IDs do not collide.
+- **Bookmarks**: Claude Code and Codex sessions use separate bookmark caches so provider sessions with similar IDs do not collide.
 - **Customizable shortcuts**: All keyboard shortcuts are rebindable in Settings > Shortcuts, including new Claude, Codex, and terminal tab commands.
 - **tmux integration**: When tmux is installed, classic terminal tabs are transparently wrapped in tmux sessions. Quit and relaunch Deckard to resume shell state, scrollback, running processes, and environment. tmux options are editable in Settings > Terminal.
 - **Drag and drop**: Drag files from Finder into any terminal surface. Paths are shell-escaped and inserted automatically.
@@ -88,7 +88,6 @@ Ships with 486 built-in themes in Ghostty format and loads custom themes from `~
 | Session explorer listing | Yes | Yes |
 | Timeline and action view | Yes | Yes |
 | Bookmarks | Yes | Yes |
-| Cached summaries | Yes | Yes |
 | Provider-specific badges | Yes | Yes |
 | Context, quota, token rate | Yes | Yes, when Codex writes `token_count` events |
 
@@ -136,11 +135,11 @@ On launch, Deckard installs Claude Code integrations idempotently:
 1. **Lifecycle hooks**: a shell script and entries in `~/.claude/settings.json` notify Deckard when Claude starts thinking, finishes a response, needs tool approval, encounters an error, or emits status-line quota data. Communication happens over a Unix domain socket.
 2. **`/deckard` skill**: a Claude Code slash command at `~/.claude/commands/deckard.md` for filing bug reports and feature requests directly from a session.
 
-Deckard reads Claude session JSONL files under `~/.claude/projects` for session discovery, timelines, action extraction, context usage, summaries, resume, and fork-at-turn.
+Deckard reads Claude session JSONL files under `~/.claude/projects` for session discovery, timelines, context usage, resume, and fork-at-turn.
 
 **Codex**
 
-Deckard reads Codex rollout files under `~/.codex/sessions` and the local Codex state database at `~/.codex/state_5.sqlite`. That provides project-scoped session discovery, resume, fork, fork-at-turn, timeline parsing, action extraction, badges, context usage, quota percentages, and token-rate calculation when Codex has written the corresponding events.
+Deckard reads Codex rollout files under `~/.codex/sessions` and the local Codex state database at `~/.codex/state_5.sqlite`. That provides project-scoped session discovery, resume, fork, fork-at-turn, timeline parsing, badges, context usage, quota percentages, and token-rate calculation when Codex has written the corresponding events.
 
 Deckard does not install Codex hooks. It launches the Codex CLI directly with `codex`, `codex resume`, or `codex fork`.
 

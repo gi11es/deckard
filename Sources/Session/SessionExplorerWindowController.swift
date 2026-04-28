@@ -184,7 +184,6 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
                 messageCount: session.messageCount,
                 firstUserMessage: session.firstUserMessage,
                 savedName: (name?.isEmpty == false) ? name : nil,
-                summary: SummaryManager.shared.cachedSummary(forSessionId: session.sessionId, kind: session.kind),
                 isBookmarked: bookmarkedIds.contains(session.sessionId)
             )
         }
@@ -212,7 +211,6 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         if !query.isEmpty {
             sessions = sessions.filter {
                 ($0.savedName ?? "").lowercased().contains(query) ||
-                ($0.summary ?? "").lowercased().contains(query) ||
                 $0.firstUserMessage.lowercased().contains(query)
             }
         }
@@ -314,60 +312,17 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
 
         let updatedSession = allSessions.first(where: { $0.cacheKey == cacheKey }) ?? session
 
-        let cachedActionSummaries = SummaryManager.shared.cachedTurnSummaries(forSessionId: sessionId, kind: session.agentKind)
-
-        let actions = ContextMonitor.shared.parseActions(sessionId: sessionId, projectPath: projectPath, kind: session.agentKind)
-        let hasUncachedActions = entries.contains { entry in
-            let turnActions = actions[entry.index] ?? []
-            return !turnActions.isEmpty && cachedActionSummaries[entry.index] == nil
-        }
-        let cachedTurnCount = SummaryManager.shared.cachedSummaryTurnCount(forSessionId: sessionId, kind: session.agentKind)
-        let needsSessionSummary = updatedSession.summary == nil || cachedTurnCount < entries.count
-        let summarizeEnabled = needsSessionSummary || hasUncachedActions
-
         let isOpen = openSessionIds.contains(updatedSession.cacheKey)
 
         timelineController?.showTimeline(
             session: updatedSession,
             entries: entries,
             options: .init(
-                cachedActionSummaries: cachedActionSummaries,
-                summarizeEnabled: summarizeEnabled,
                 resumeEnabled: !isOpen,
                 forkAtPointEnabled: updatedSession.agentKind.isAgent,
                 scrollToIndex: scrollToMessageIndex
             )
         )
-
-        timelineController?.onSummarize = { [weak self] in
-            self?.summarizeAll(session: updatedSession, entries: entries, actions: actions)
-        }
-    }
-
-    private func summarizeAll(session: ExplorerSessionInfo, entries: [TimelineEntry], actions: [Int: [String]]) {
-        timelineController?.setSummarizing(true)
-
-        SummaryManager.shared.generateCombinedSummaries(
-            SummaryManager.CombinedSummaryRequest(
-                sessionId: session.sessionId,
-                projectPath: projectPath,
-                kind: session.agentKind,
-                currentTurnCount: entries.count,
-                actions: actions)
-        ) { [weak self] sessionSummary, actionSummaries in
-            guard let self, self.selectedSessionId == session.cacheKey else { return }
-
-            if let summary = sessionSummary,
-               let idx = self.allSessions.firstIndex(where: { $0.cacheKey == session.cacheKey }) {
-                self.allSessions[idx].summary = summary
-                if let fIdx = self.filteredSessions.firstIndex(where: { $0.cacheKey == session.cacheKey }) {
-                    self.filteredSessions[fIdx].summary = summary
-                }
-            }
-
-            // Rebuild right pane with updated data
-            self.selectSession(cacheKey: session.cacheKey, scrollToMessageIndex: nil)
-        }
     }
 
     // MARK: - NSSplitViewDelegate

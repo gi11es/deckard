@@ -430,26 +430,6 @@ class ContextMonitor {
             trimmed.hasPrefix("<user_instructions>")
     }
 
-    private func codexActionDescription(name: String, arguments: String?) -> String {
-        guard let arguments,
-              let data = arguments.data(using: .utf8),
-              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
-            return name
-        }
-
-        if let cmd = json["cmd"] as? String ?? json["command"] as? String {
-            let brief = cmd.split(separator: "\n").first.map(String.init) ?? cmd
-            return "\(name): \(String(brief.prefix(50)))"
-        }
-        if let path = json["path"] as? String ?? json["file_path"] as? String {
-            return "\(name) \((path as NSString).lastPathComponent)"
-        }
-        if let pattern = json["pattern"] as? String {
-            return "\(name) \(pattern)"
-        }
-        return name
-    }
-
     /// Parses a session JSONL file and returns an ordered list of user turns.
     /// Deduplicates by promptId — only the first occurrence with non-empty content is kept.
     func parseTimeline(sessionId: String, projectPath: String, kind: TabKind = .claude) -> [TimelineEntry] {
@@ -502,8 +482,7 @@ class ContextMonitor {
                 index: entries.count,
                 promptId: promptId,
                 message: text.trimmingCharacters(in: .whitespacesAndNewlines),
-                timestamp: timestamp,
-                actionSummary: nil
+                timestamp: timestamp
             ))
         }
 
@@ -534,105 +513,11 @@ class ContextMonitor {
                 index: entries.count,
                 promptId: "\(sessionId)-\(entries.count)",
                 message: text,
-                timestamp: timestamp,
-                actionSummary: nil
+                timestamp: timestamp
             ))
         }
 
         return entries
-    }
-
-    /// Extracts a raw description of tool uses for each user turn in a session.
-    /// Returns a dictionary mapping turn index to a list of action descriptions.
-    func parseActions(sessionId: String, projectPath: String, kind: TabKind = .claude) -> [Int: [String]] {
-        if kind == .codex {
-            return parseCodexActions(sessionId: sessionId, projectPath: projectPath)
-        }
-
-        let encoded = projectPath.claudeProjectDirName
-        let jsonlPath = NSHomeDirectory() + "/.claude/projects/\(encoded)/\(sessionId).jsonl"
-
-        guard let data = try? Data(contentsOf: URL(fileURLWithPath: jsonlPath)),
-              let content = String(data: data, encoding: .utf8) else { return [:] }
-
-        var result: [Int: [String]] = [:]
-        var currentTurnIndex = -1
-        var seenPromptIds = Set<String>()
-
-        for line in content.split(separator: "\n") {
-            guard let lineData = line.data(using: .utf8),
-                  let json = try? JSONSerialization.jsonObject(with: lineData) as? [String: Any],
-                  let type = json["type"] as? String else { continue }
-
-            if type == "user", let promptId = json["promptId"] as? String,
-               !seenPromptIds.contains(promptId) {
-                let msg = json["message"] as? [String: Any]
-                var text = ""
-                if let c = msg?["content"] as? String {
-                    text = c
-                } else if let arr = msg?["content"] as? [[String: Any]] {
-                    text = arr.first(where: { $0["type"] as? String == "text" })?["text"] as? String ?? ""
-                }
-                guard !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
-                    seenPromptIds.insert(promptId)
-                    continue
-                }
-                seenPromptIds.insert(promptId)
-                currentTurnIndex += 1
-            } else if type == "assistant", currentTurnIndex >= 0 {
-                let msg = json["message"] as? [String: Any]
-                let inner = msg?["message"] as? [String: Any] ?? msg
-                guard let contentArr = inner?["content"] as? [[String: Any]] else { continue }
-
-                for block in contentArr {
-                    guard block["type"] as? String == "tool_use",
-                          let name = block["name"] as? String else { continue }
-                    let input = block["input"] as? [String: Any] ?? [:]
-                    var desc = name
-                    if let fp = input["file_path"] as? String {
-                        let filename = (fp as NSString).lastPathComponent
-                        desc = "\(name) \(filename)"
-                    } else if let cmd = input["command"] as? String {
-                        let brief = cmd.split(separator: "\n").first.map(String.init) ?? cmd
-                        desc = "\(name): \(String(brief.prefix(50)))"
-                    } else if let pattern = input["pattern"] as? String {
-                        desc = "\(name) \(pattern)"
-                    }
-                    result[currentTurnIndex, default: []].append(desc)
-                }
-            }
-        }
-
-        return result
-    }
-
-    private func parseCodexActions(sessionId: String, projectPath: String) -> [Int: [String]] {
-        guard let fileURL = codexSessionFileURL(sessionId: sessionId),
-              let data = try? Data(contentsOf: fileURL),
-              let content = String(data: data, encoding: .utf8) else { return [:] }
-
-        var result: [Int: [String]] = [:]
-        var currentTurnIndex = -1
-
-        for line in content.split(separator: "\n") {
-            guard let json = parseJSONObject(line),
-                  json["type"] as? String == "response_item",
-                  let payload = json["payload"] as? [String: Any],
-                  let payloadType = payload["type"] as? String else { continue }
-
-            if codexRealUserMessageText(from: json) != nil {
-                currentTurnIndex += 1
-                continue
-            }
-
-            if payloadType == "function_call", currentTurnIndex >= 0,
-               let name = payload["name"] as? String {
-                let desc = codexActionDescription(name: name, arguments: payload["arguments"] as? String)
-                result[currentTurnIndex, default: []].append(desc)
-            }
-        }
-
-        return result
     }
 
     /// Creates a truncated copy of a session JSONL, keeping everything up to (and including

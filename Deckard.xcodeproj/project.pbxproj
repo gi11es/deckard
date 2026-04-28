@@ -61,7 +61,6 @@
 		QA200006QA200006QA200006 /* QuotaMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QA200005QA200005QA200005 /* QuotaMonitorTests.swift */; };
 		SE000001SE000001SE000001 /* SessionExplorerModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = SE000002SE000002SE000002 /* SessionExplorerModels.swift */; };
 		SE000003SE000003SE000003 /* BookmarkManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SE000004SE000004SE000004 /* BookmarkManager.swift */; };
-		SE000005SE000005SE000005 /* SummaryManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = SE000006SE000006SE000006 /* SummaryManager.swift */; };
 		SE000007SE000007SE000007 /* SessionExplorerWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = SE000008SE000008SE000008 /* SessionExplorerWindowController.swift */; };
 		SE000009SE000009SE000009 /* SessionExplorerTimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = SE00000ASE00000ASE00000A /* SessionExplorerTimelineView.swift */; };
 		CF000001CF000001CF000001 /* ClaudeCLIFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000002CF000002CF000002 /* ClaudeCLIFlags.swift */; };
@@ -124,7 +123,6 @@
 		QA200005QA200005QA200005 /* QuotaMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaMonitorTests.swift; sourceTree = "<group>"; };
 		SE000002SE000002SE000002 /* SessionExplorerModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionExplorerModels.swift; sourceTree = "<group>"; };
 		SE000004SE000004SE000004 /* BookmarkManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BookmarkManager.swift; sourceTree = "<group>"; };
-		SE000006SE000006SE000006 /* SummaryManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SummaryManager.swift; sourceTree = "<group>"; };
 		SE000008SE000008SE000008 /* SessionExplorerWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionExplorerWindowController.swift; sourceTree = "<group>"; };
 		SE00000ASE00000ASE00000A /* SessionExplorerTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionExplorerTimelineView.swift; sourceTree = "<group>"; };
 		CF000002CF000002CF000002 /* ClaudeCLIFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCLIFlags.swift; sourceTree = "<group>"; };
@@ -230,7 +228,6 @@
 				7BE2AA0719D32ACCD1549184 /* SessionState.swift */,
 				SE000002SE000002SE000002 /* SessionExplorerModels.swift */,
 				SE000004SE000004SE000004 /* BookmarkManager.swift */,
-				SE000006SE000006SE000006 /* SummaryManager.swift */,
 				SE000008SE000008SE000008 /* SessionExplorerWindowController.swift */,
 				SE00000ASE00000ASE00000A /* SessionExplorerTimelineView.swift */,
 			);
@@ -447,7 +444,6 @@
 				QA200004QA200004QA200004 /* QuotaView.swift in Sources */,
 				SE000001SE000001SE000001 /* SessionExplorerModels.swift in Sources */,
 				SE000003SE000003SE000003 /* BookmarkManager.swift in Sources */,
-				SE000005SE000005SE000005 /* SummaryManager.swift in Sources */,
 				SE000007SE000007SE000007 /* SessionExplorerWindowController.swift in Sources */,
 				SE000009SE000009SE000009 /* SessionExplorerTimelineView.swift in Sources */,
 				CF000001CF000001CF000001 /* ClaudeCLIFlags.swift in Sources */,

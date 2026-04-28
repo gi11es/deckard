@@ -9,7 +9,6 @@ struct ExplorerSessionInfo {
     var messageCount: Int
     let firstUserMessage: String
     var savedName: String?
-    var summary: String?
     var isBookmarked: Bool
 
     var cacheKey: String {
@@ -23,7 +22,6 @@ struct ExplorerSessionInfo {
          messageCount: Int,
          firstUserMessage: String,
          savedName: String?,
-         summary: String?,
          isBookmarked: Bool) {
         self.agentKind = agentKind
         self.sessionId = sessionId
@@ -32,7 +30,6 @@ struct ExplorerSessionInfo {
         self.messageCount = messageCount
         self.firstUserMessage = firstUserMessage
         self.savedName = savedName
-        self.summary = summary
         self.isBookmarked = isBookmarked
     }
 }
@@ -43,5 +40,4 @@ struct TimelineEntry {
     let promptId: String
     let message: String
     let timestamp: Date?
-    var actionSummary: String?
 }
