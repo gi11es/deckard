@@ -4,6 +4,14 @@ import Foundation
 class SummaryManager {
     static let shared = SummaryManager()
 
+    struct CombinedSummaryRequest {
+        let sessionId: String
+        let projectPath: String
+        let kind: TabKind
+        let currentTurnCount: Int
+        let actions: [Int: [String]]
+    }
+
     private let fileURL: URL = {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let deckardDir = appSupport.appendingPathComponent("Deckard")
@@ -105,17 +113,25 @@ class SummaryManager {
         actions: [Int: [String]],
         completion: @escaping (String?, [Int: String]) -> Void
     ) {
-        generateCombinedSummaries(sessionId: sessionId, projectPath: projectPath, kind: .claude, currentTurnCount: currentTurnCount, actions: actions, completion: completion)
+        generateCombinedSummaries(
+            CombinedSummaryRequest(
+                sessionId: sessionId,
+                projectPath: projectPath,
+                kind: .claude,
+                currentTurnCount: currentTurnCount,
+                actions: actions),
+            completion: completion)
     }
 
     func generateCombinedSummaries(
-        sessionId: String,
-        projectPath: String,
-        kind: TabKind,
-        currentTurnCount: Int,
-        actions: [Int: [String]],
+        _ request: CombinedSummaryRequest,
         completion: @escaping (String?, [Int: String]) -> Void
     ) {
+        let sessionId = request.sessionId
+        let projectPath = request.projectPath
+        let kind = request.kind
+        let currentTurnCount = request.currentTurnCount
+        let actions = request.actions
         let sessionCacheKey = cacheKey(sessionId: sessionId, kind: kind)
         let key = "combined-\(sessionCacheKey)"
         guard !inFlightSessionIds.contains(key) else { return }

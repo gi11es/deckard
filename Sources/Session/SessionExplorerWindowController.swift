@@ -348,11 +348,12 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         timelineController?.setSummarizing(true)
 
         SummaryManager.shared.generateCombinedSummaries(
-            sessionId: session.sessionId,
-            projectPath: projectPath,
-            kind: session.agentKind,
-            currentTurnCount: entries.count,
-            actions: actions
+            SummaryManager.CombinedSummaryRequest(
+                sessionId: session.sessionId,
+                projectPath: projectPath,
+                kind: session.agentKind,
+                currentTurnCount: entries.count,
+                actions: actions)
         ) { [weak self] sessionSummary, actionSummaries in
             guard let self, self.selectedSessionId == session.cacheKey else { return }
 

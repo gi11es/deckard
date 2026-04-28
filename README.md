@@ -1,6 +1,6 @@
 # Deckard
 
-A native macOS workspace for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), OpenAI Codex, and classic terminal tabs. Deckard treats agent sessions as first-class tabs: Claude Code and Codex can both be created, resumed, forked, explored, bookmarked, summarized, and restored across app launches.
+A native macOS workspace for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://openai.com/codex), and classic terminal tabs. Deckard treats agent sessions as first-class tabs: Claude Code and Codex can both be created, resumed, forked, explored, bookmarked, summarized, and restored across app launches.
 
 Run multiple agents side by side in a single window with project-aware tabs, session persistence, status badges, and usage telemetry when the underlying CLI exposes it. Built with Swift and AppKit. Terminal rendering is powered by [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm).
 
@@ -107,8 +107,8 @@ brew install gi11es/tap/deckard
 ## Requirements
 
 - macOS 14.0 (Sonoma) or later
-- Claude Code CLI installed to use Claude tabs
-- Codex CLI installed to use Codex tabs
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed to use Claude tabs
+- [Codex CLI](https://openai.com/codex/get-started/) installed to use Codex tabs
 - Xcode 16+ to build from source
 
 Deckard can be used with only Claude Code, only Codex, or both installed. Terminal tabs work without either agent CLI.

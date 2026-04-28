@@ -263,7 +263,7 @@ struct TabInfo: Codable {
     var id: String
     var name: String
     var isClaude: Bool
-    var kind: String? = nil
+    var kind: String?
     var isMaster: Bool
     var sessionId: String?
     var badgeState: String
