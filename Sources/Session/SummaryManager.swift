@@ -22,14 +22,22 @@ class SummaryManager {
 
     /// Returns a cached summary for the session, or nil if not yet generated.
     func cachedSummary(forSessionId sessionId: String) -> String? {
+        cachedSummary(forSessionId: sessionId, kind: .claude)
+    }
+
+    func cachedSummary(forSessionId sessionId: String, kind: TabKind) -> String? {
         let all = loadAll()
-        return all[sessionId]?.summary
+        return all[cacheKey(sessionId: sessionId, kind: kind)]?.summary
     }
 
     /// Returns the cached turn count for a session summary, or 0 if unknown.
     func cachedSummaryTurnCount(forSessionId sessionId: String) -> Int {
+        cachedSummaryTurnCount(forSessionId: sessionId, kind: .claude)
+    }
+
+    func cachedSummaryTurnCount(forSessionId sessionId: String, kind: TabKind) -> Int {
         let all = loadAll()
-        return all[sessionId]?.turnCount ?? 0
+        return all[cacheKey(sessionId: sessionId, kind: kind)]?.turnCount ?? 0
     }
 
     /// Returns true if a summary generation is currently in progress for this session.
@@ -41,8 +49,13 @@ class SummaryManager {
     /// turns than when it was generated, the summary is regenerated.
     /// Calls `completion` on the main thread with the result.
     func generateSummary(sessionId: String, projectPath: String, currentTurnCount: Int, completion: @escaping (String?) -> Void) {
+        generateSummary(sessionId: sessionId, projectPath: projectPath, kind: .claude, currentTurnCount: currentTurnCount, completion: completion)
+    }
+
+    func generateSummary(sessionId: String, projectPath: String, kind: TabKind, currentTurnCount: Int, completion: @escaping (String?) -> Void) {
+        let cacheKey = cacheKey(sessionId: sessionId, kind: kind)
         let all = loadAll()
-        let cached = all[sessionId]
+        let cached = all[cacheKey]
 
         // Return cached if it covers all current turns
         if let cached, (cached.turnCount ?? 0) >= currentTurnCount {
@@ -51,28 +64,28 @@ class SummaryManager {
         }
 
         // Already in flight?
-        guard !inFlightSessionIds.contains(sessionId) else { return }
-        inFlightSessionIds.insert(sessionId)
+        guard !inFlightSessionIds.contains(cacheKey) else { return }
+        inFlightSessionIds.insert(cacheKey)
 
         // Parse user messages for the prompt
-        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath)
+        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath, kind: kind)
         guard !entries.isEmpty else {
-            inFlightSessionIds.remove(sessionId)
+            inFlightSessionIds.remove(cacheKey)
             completion(cached?.summary)
             return
         }
 
         let userMessages = entries.map { $0.message }.joined(separator: "\n---\n")
-        let prompt = "Summarize this Claude Code session in 1-2 concise sentences, focusing on what was accomplished. Only output the summary, nothing else.\n\nUser messages:\n\(userMessages)"
+        let prompt = "Summarize this \(kind.displayName) session in 1-2 concise sentences, focusing on what was accomplished. Only output the summary, nothing else.\n\nUser messages:\n\(userMessages)"
 
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let result = self?.runClaudePrint(prompt: prompt)
 
             DispatchQueue.main.async {
-                self?.inFlightSessionIds.remove(sessionId)
+                self?.inFlightSessionIds.remove(cacheKey)
 
                 if let summary = result, !summary.isEmpty {
-                    self?.saveSummary(sessionId: sessionId, summary: summary, turnCount: entries.count)
+                    self?.saveSummary(sessionId: cacheKey, summary: summary, turnCount: entries.count)
                     completion(summary)
                 } else {
                     completion(cached?.summary)
@@ -92,15 +105,27 @@ class SummaryManager {
         actions: [Int: [String]],
         completion: @escaping (String?, [Int: String]) -> Void
     ) {
-        let key = "combined-\(sessionId)"
+        generateCombinedSummaries(sessionId: sessionId, projectPath: projectPath, kind: .claude, currentTurnCount: currentTurnCount, actions: actions, completion: completion)
+    }
+
+    func generateCombinedSummaries(
+        sessionId: String,
+        projectPath: String,
+        kind: TabKind,
+        currentTurnCount: Int,
+        actions: [Int: [String]],
+        completion: @escaping (String?, [Int: String]) -> Void
+    ) {
+        let sessionCacheKey = cacheKey(sessionId: sessionId, kind: kind)
+        let key = "combined-\(sessionCacheKey)"
         guard !inFlightSessionIds.contains(key) else { return }
         inFlightSessionIds.insert(key)
 
         // Determine what needs generation
-        let cachedSessionSummary = loadAll()[sessionId]
+        let cachedSessionSummary = loadAll()[sessionCacheKey]
         let needsSessionSummary = cachedSessionSummary == nil || (cachedSessionSummary?.turnCount ?? 0) < currentTurnCount
 
-        let existingTurnSummaries = cachedTurnSummaries(forSessionId: sessionId)
+        let existingTurnSummaries = cachedTurnSummaries(forSessionId: sessionId, kind: kind)
         let nonEmpty = actions.filter { !$0.value.isEmpty }
         let needsTurnSummaries = nonEmpty.filter { existingTurnSummaries[$0.key] == nil }
 
@@ -112,13 +137,13 @@ class SummaryManager {
         }
 
         // Build combined prompt
-        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath)
+        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath, kind: kind)
         let userMessages = entries.map { $0.message }.joined(separator: "\n---\n")
 
         var promptParts: [String] = []
 
         if needsSessionSummary {
-            promptParts.append("PART 1: Summarize this Claude Code session in 1-2 concise sentences, focusing on what was accomplished. Output on a line starting with \"SESSION:\".")
+            promptParts.append("PART 1: Summarize this \(kind.displayName) session in 1-2 concise sentences, focusing on what was accomplished. Output on a line starting with \"SESSION:\".")
             promptParts.append("\nUser messages:\n\(userMessages)\n")
         }
 
@@ -161,7 +186,7 @@ class SummaryManager {
 
                 // Persist session summary
                 if let summary = sessionSummary, needsSessionSummary {
-                    self?.saveSummary(sessionId: sessionId, summary: summary, turnCount: currentTurnCount)
+                    self?.saveSummary(sessionId: sessionCacheKey, summary: summary, turnCount: currentTurnCount)
                 }
 
                 // Mark all requested turns as cached (empty string for ones haiku skipped)
@@ -172,7 +197,7 @@ class SummaryManager {
                 }
                 let mergedTurns = existingTurnSummaries.merging(allRequestedTurns) { _, new in new }
                 if !needsTurnSummaries.isEmpty {
-                    self?.saveTurnSummaries(sessionId: sessionId, summaries: mergedTurns)
+                    self?.saveTurnSummaries(sessionId: sessionCacheKey, summaries: mergedTurns)
                 }
 
                 completion(
@@ -200,8 +225,12 @@ class SummaryManager {
 
     /// Returns all cached turn summaries for a session.
     func cachedTurnSummaries(forSessionId sessionId: String) -> [Int: String] {
+        cachedTurnSummaries(forSessionId: sessionId, kind: .claude)
+    }
+
+    func cachedTurnSummaries(forSessionId sessionId: String, kind: TabKind) -> [Int: String] {
         let all = loadAllTurnSummaries()
-        guard let cached = all[sessionId] else { return [:] }
+        guard let cached = all[cacheKey(sessionId: sessionId, kind: kind)] else { return [:] }
         var result: [Int: String] = [:]
         for (key, value) in cached.summaries {
             if let idx = Int(key) { result[idx] = value }
@@ -215,10 +244,15 @@ class SummaryManager {
     /// `actions` maps turn index to raw action descriptions. `totalTurnCount` is the current
     /// number of turns in the session (used to detect continued sessions).
     func generateTurnSummaries(sessionId: String, actions: [Int: [String]], completion: @escaping ([Int: String]) -> Void) {
-        let key = "turns-\(sessionId)"
+        generateTurnSummaries(sessionId: sessionId, kind: .claude, actions: actions, completion: completion)
+    }
+
+    func generateTurnSummaries(sessionId: String, kind: TabKind, actions: [Int: [String]], completion: @escaping ([Int: String]) -> Void) {
+        let sessionCacheKey = cacheKey(sessionId: sessionId, kind: kind)
+        let key = "turns-\(sessionCacheKey)"
 
         // Load existing cached summaries
-        let existing = cachedTurnSummaries(forSessionId: sessionId)
+        let existing = cachedTurnSummaries(forSessionId: sessionId, kind: kind)
 
         // Figure out which turns need summarization (have actions but no cached summary)
         let nonEmpty = actions.filter { !$0.value.isEmpty }
@@ -269,7 +303,7 @@ class SummaryManager {
 
                 // Merge with existing and persist
                 let merged = existing.merging(newSummaries) { _, new in new }
-                self?.saveTurnSummaries(sessionId: sessionId, summaries: merged)
+                self?.saveTurnSummaries(sessionId: sessionCacheKey, summaries: merged)
                 completion(merged)
             }
         }
@@ -299,6 +333,10 @@ class SummaryManager {
     }
 
     // MARK: - Private
+
+    private func cacheKey(sessionId: String, kind: TabKind) -> String {
+        kind == .claude ? sessionId : "\(kind.rawValue):\(sessionId)"
+    }
 
     private func runClaudePrint(prompt: String) -> String? {
         let process = Process()

@@ -41,6 +41,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         nc.addObserver(self, selector: #selector(handleSurfaceClosed(_:)), name: .deckardSurfaceClosed, object: nil)
         nc.addObserver(self, selector: #selector(handleTitleChanged(_:)), name: .deckardSurfaceTitleChanged, object: nil)
         nc.addObserver(self, selector: #selector(handleNewTab), name: .deckardNewTab, object: nil)
+        nc.addObserver(self, selector: #selector(handleNewCodexTab), name: .deckardNewCodexTab, object: nil)
         nc.addObserver(self, selector: #selector(handleCloseTab), name: .deckardCloseTab, object: nil)
 
         // Start the control socket for hook communication.
@@ -148,7 +149,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func handleNewTab() {
-        windowController?.addTabToCurrentProject(isClaude: true)
+        windowController?.addTabToCurrentProject(kind: .claude)
+    }
+
+    @objc private func handleNewCodexTab() {
+        windowController?.addTabToCurrentProject(kind: .codex)
     }
 
     @objc private func handleCloseTab() {
@@ -192,6 +197,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let claudeItem = NSMenuItem(title: "New Claude Tab", action: #selector(newClaudeTab), keyEquivalent: "")
         claudeItem.setShortcut(for: .newClaudeTab)
         fileMenu.addItem(claudeItem)
+
+        let codexItem = NSMenuItem(title: "New Codex Tab", action: #selector(newCodexTab), keyEquivalent: "")
+        codexItem.setShortcut(for: .newCodexTab)
+        fileMenu.addItem(codexItem)
 
         let termItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalTab), keyEquivalent: "")
         termItem.setShortcut(for: .newTerminalTab)
@@ -298,11 +307,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func newClaudeTab() {
-        windowController?.addTabToCurrentProject(isClaude: true)
+        windowController?.addTabToCurrentProject(kind: .claude)
+    }
+
+    @objc private func newCodexTab() {
+        windowController?.addTabToCurrentProject(kind: .codex)
     }
 
     @objc private func newTerminalTab() {
-        windowController?.addTabToCurrentProject(isClaude: false)
+        windowController?.addTabToCurrentProject(kind: .terminal)
     }
 
     @objc private func closeCurrentTab() {

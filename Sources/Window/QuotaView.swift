@@ -57,7 +57,7 @@ class SparklineView: NSView {
 
 // MARK: - QuotaView
 
-/// Displays Claude Code context usage, rate limit usage, and token rate in the sidebar.
+/// Displays agent context usage, rate limit usage, and token rate in the sidebar.
 class QuotaView: NSView {
     // --- Context row (top) ---
     private let contextLabel = NSTextField(labelWithString: "context")
@@ -69,7 +69,7 @@ class QuotaView: NSView {
     private var contextViews: [NSView] { [contextLabel, contextPercent, contextBar, contextModel] }
 
     // --- 5h row ---
-    private let fiveHourLabel = NSTextField(labelWithString: "5h session")
+    private let fiveHourLabel = NSTextField(labelWithString: "5h limit")
     private let fiveHourPercent = NSTextField(labelWithString: "")
     private let fiveHourBar = NSView()
     private let fiveHourFill = NSView()
@@ -77,7 +77,7 @@ class QuotaView: NSView {
     private var fiveHourFillWidth: NSLayoutConstraint?
 
     // --- 7d row ---
-    private let sevenDayLabel = NSTextField(labelWithString: "7d weekly")
+    private let sevenDayLabel = NSTextField(labelWithString: "7d limit")
     private let sevenDayPercent = NSTextField(labelWithString: "")
     private let sevenDayBar = NSView()
     private let sevenDayFill = NSView()
@@ -254,6 +254,11 @@ class QuotaView: NSView {
             contextViews.forEach { $0.isHidden = true }
         }
         updateVisibility()
+    }
+
+    func clear() {
+        updateContext(usage: nil, tabName: nil)
+        update(snapshot: nil, tokenRate: nil, sparklineData: [])
     }
 
     func update(snapshot: QuotaMonitor.QuotaSnapshot?, tokenRate: QuotaMonitor.TokenRate?,

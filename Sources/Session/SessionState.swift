@@ -1,5 +1,23 @@
 import Foundation
 
+enum TabKind: String, Codable, CaseIterable {
+    case claude
+    case codex
+    case terminal
+
+    var displayName: String {
+        switch self {
+        case .claude: return "Claude"
+        case .codex: return "Codex"
+        case .terminal: return "Terminal"
+        }
+    }
+
+    var isAgent: Bool {
+        self == .claude || self == .codex
+    }
+}
+
 /// Persisted state for Deckard — saved to ~/Library/Application Support/Deckard/state.json
 struct DeckardState: Codable {
     var version: Int = 2
@@ -42,9 +60,54 @@ struct ProjectState: Codable {
 struct ProjectTabState: Codable {
     var id: String
     var name: String
-    var isClaude: Bool
+    var kind: TabKind
     var sessionId: String?
     var tmuxSessionName: String?
+
+    var isClaude: Bool {
+        get { kind == .claude }
+        set { kind = newValue ? .claude : .terminal }
+    }
+
+    init(id: String, name: String, kind: TabKind, sessionId: String? = nil, tmuxSessionName: String? = nil) {
+        self.id = id
+        self.name = name
+        self.kind = kind
+        self.sessionId = sessionId
+        self.tmuxSessionName = tmuxSessionName
+    }
+
+    init(id: String, name: String, isClaude: Bool, sessionId: String? = nil, tmuxSessionName: String? = nil) {
+        self.init(id: id, name: name, kind: isClaude ? .claude : .terminal, sessionId: sessionId, tmuxSessionName: tmuxSessionName)
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, kind, isClaude, sessionId, tmuxSessionName
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(kind, forKey: .kind)
+        try container.encode(kind == .claude, forKey: .isClaude)
+        try container.encodeIfPresent(sessionId, forKey: .sessionId)
+        try container.encodeIfPresent(tmuxSessionName, forKey: .tmuxSessionName)
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        sessionId = try container.decodeIfPresent(String.self, forKey: .sessionId)
+        tmuxSessionName = try container.decodeIfPresent(String.self, forKey: .tmuxSessionName)
+        if let decodedKind = try container.decodeIfPresent(TabKind.self, forKey: .kind) {
+            kind = decodedKind
+        } else {
+            let legacyIsClaude = try container.decodeIfPresent(Bool.self, forKey: .isClaude) ?? false
+            kind = legacyIsClaude ? .claude : .terminal
+        }
+    }
 }
 
 struct SidebarFolderState: Codable {
@@ -151,6 +214,10 @@ class SessionManager {
 
     private var cachedSessionNames: [String: String]?
 
+    static func sessionCacheKey(sessionId: String, kind: TabKind) -> String {
+        kind == .claude ? sessionId : "\(kind.rawValue):\(sessionId)"
+    }
+
     func loadSessionNames() -> [String: String] {
         if let cached = cachedSessionNames { return cached }
         guard let data = try? Data(contentsOf: sessionNamesURL),
@@ -163,8 +230,12 @@ class SessionManager {
     }
 
     func saveSessionName(sessionId: String, name: String) {
+        saveSessionName(sessionId: sessionId, kind: .claude, name: name)
+    }
+
+    func saveSessionName(sessionId: String, kind: TabKind, name: String) {
         var names = loadSessionNames()
-        names[sessionId] = name
+        names[Self.sessionCacheKey(sessionId: sessionId, kind: kind)] = name
         cachedSessionNames = names
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]

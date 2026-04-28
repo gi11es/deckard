@@ -146,6 +146,10 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         case .waitingForInput: return "Waiting for input"
         case .needsPermission: return "Needs permission"
         case .error: return "Error"
+        case .codexIdle: return "Codex idle"
+        case .codexThinking: return "Codex working..."
+        case .codexError: return "Codex error"
+        case .codexCompletedUnseen: return "Codex done (unvisited)"
         case .terminalIdle: return "Idle"
         case .terminalActive: return activity?.description ?? "Running"
         case .terminalError: return "Error"
@@ -160,6 +164,10 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         .waitingForInput: NSColor(red: 0.65, green: 0.4, blue: 0.9, alpha: 1.0),
         .needsPermission: .systemOrange,
         .error: .systemRed,
+        .codexIdle: NSColor(red: 0.26, green: 0.58, blue: 0.42, alpha: 1.0),
+        .codexThinking: NSColor(red: 0.18, green: 0.76, blue: 0.48, alpha: 1.0),
+        .codexError: .systemRed,
+        .codexCompletedUnseen: NSColor(red: 0.10, green: 0.84, blue: 0.66, alpha: 1.0),
         .terminalIdle: NSColor(red: 0.35, green: 0.55, blue: 0.54, alpha: 1.0),
         .terminalActive: NSColor(red: 0.45, green: 0.72, blue: 0.71, alpha: 1.0),
         .terminalError: NSColor(red: 0.85, green: 0.3, blue: 0.3, alpha: 1.0),
@@ -809,23 +817,26 @@ class ReorderableStackView: NSStackView {
 
 // MARK: - AddTabButton
 
-/// + button: left-click adds Claude tab, right-click adds terminal tab.
+/// + button: left-click adds Claude tab; modifiers/context menu expose other tab types.
 class AddTabButton: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
-    private let leftClickAction: () -> Void
-    private let rightClickAction: () -> Void
+    private let claudeAction: () -> Void
+    private let codexAction: () -> Void
+    private let terminalAction: () -> Void
     private let label: NSTextField
 
-    init(leftClickAction: @escaping () -> Void, rightClickAction: @escaping () -> Void) {
-        self.leftClickAction = leftClickAction
-        self.rightClickAction = rightClickAction
+    init(claudeAction: @escaping () -> Void, codexAction: @escaping () -> Void, terminalAction: @escaping () -> Void) {
+        self.claudeAction = claudeAction
+        self.codexAction = codexAction
+        self.terminalAction = terminalAction
         label = NSTextField(labelWithString: "  +")
         label.font = .systemFont(ofSize: 12, weight: .medium)
         label.textColor = ThemeManager.shared.currentColors.secondaryText
         super.init(frame: .zero)
         translatesAutoresizingMaskIntoConstraints = false
         toolTip = shortcutTooltip("New Claude tab", for: .newClaudeTab)
-            + "\nShift-click or right-click: " + shortcutTooltip("new Terminal", for: .newTerminalTab)
+            + "\nOption-click: " + shortcutTooltip("new Codex", for: .newCodexTab)
+            + "\nShift-click: " + shortcutTooltip("new Terminal", for: .newTerminalTab)
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
         NSLayoutConstraint.activate([
@@ -840,16 +851,38 @@ class AddTabButton: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override func mouseDown(with event: NSEvent) {
-        if event.modifierFlags.contains(.shift) {
-            rightClickAction()  // Shift+click opens terminal tab
+        if event.modifierFlags.contains(.option) {
+            codexAction()
+        } else if event.modifierFlags.contains(.shift) {
+            terminalAction()
         } else {
-            leftClickAction()
+            claudeAction()
         }
     }
 
     override func rightMouseDown(with event: NSEvent) {
-        rightClickAction()
+        let menu = NSMenu()
+        let claudeItem = NSMenuItem(title: "New Claude Tab", action: #selector(newClaudeAction), keyEquivalent: "")
+        claudeItem.setShortcut(for: .newClaudeTab)
+        claudeItem.target = self
+        menu.addItem(claudeItem)
+
+        let codexItem = NSMenuItem(title: "New Codex Tab", action: #selector(newCodexAction), keyEquivalent: "")
+        codexItem.setShortcut(for: .newCodexTab)
+        codexItem.target = self
+        menu.addItem(codexItem)
+
+        let terminalItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalAction), keyEquivalent: "")
+        terminalItem.setShortcut(for: .newTerminalTab)
+        terminalItem.target = self
+        menu.addItem(terminalItem)
+
+        NSMenu.popUpContextMenu(menu, with: event, for: self)
     }
+
+    @objc private func newClaudeAction() { claudeAction() }
+    @objc private func newCodexAction() { codexAction() }
+    @objc private func newTerminalAction() { terminalAction() }
 }
 
 // MARK: - BadgeShapeView

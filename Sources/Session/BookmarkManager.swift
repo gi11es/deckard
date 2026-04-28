@@ -16,21 +16,34 @@ class BookmarkManager {
 
     /// Returns all bookmarked session IDs for a project.
     func bookmarkedSessionIds(forProjectPath projectPath: String) -> Set<String> {
+        bookmarkedSessionIds(forProjectPath: projectPath, kind: .claude)
+    }
+
+    func bookmarkedSessionIds(forProjectPath projectPath: String, kind: TabKind) -> Set<String> {
         let all = loadAll()
-        let key = projectPath.claudeProjectDirName
+        let key = projectKey(projectPath: projectPath, kind: kind)
         return Set(all[key] ?? [])
     }
 
     /// Checks if a session is bookmarked.
     func isBookmarked(projectPath: String, sessionId: String) -> Bool {
-        bookmarkedSessionIds(forProjectPath: projectPath).contains(sessionId)
+        isBookmarked(projectPath: projectPath, sessionId: sessionId, kind: .claude)
+    }
+
+    func isBookmarked(projectPath: String, sessionId: String, kind: TabKind) -> Bool {
+        bookmarkedSessionIds(forProjectPath: projectPath, kind: kind).contains(sessionId)
     }
 
     /// Toggles the bookmark state for a session. Returns the new state.
     @discardableResult
     func toggleBookmark(projectPath: String, sessionId: String) -> Bool {
+        toggleBookmark(projectPath: projectPath, sessionId: sessionId, kind: .claude)
+    }
+
+    @discardableResult
+    func toggleBookmark(projectPath: String, sessionId: String, kind: TabKind) -> Bool {
         var all = loadAll()
-        let key = projectPath.claudeProjectDirName
+        let key = projectKey(projectPath: projectPath, kind: kind)
         var ids = all[key] ?? []
 
         if let idx = ids.firstIndex(of: sessionId) {
@@ -47,6 +60,11 @@ class BookmarkManager {
     }
 
     // MARK: - Private
+
+    private func projectKey(projectPath: String, kind: TabKind) -> String {
+        let encoded = projectPath.claudeProjectDirName
+        return kind == .claude ? encoded : "\(kind.rawValue):\(encoded)"
+    }
 
     private func loadAll() -> [String: [String]] {
         if let cached = cache { return cached }

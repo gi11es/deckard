@@ -1,7 +1,8 @@
 import Foundation
 
-/// A Claude Code session on disk, enriched with parsed metadata.
+/// An agent session on disk, enriched with parsed metadata.
 struct ExplorerSessionInfo {
+    let agentKind: TabKind
     let sessionId: String
     let filePath: URL
     let modificationDate: Date
@@ -10,6 +11,30 @@ struct ExplorerSessionInfo {
     var savedName: String?
     var summary: String?
     var isBookmarked: Bool
+
+    var cacheKey: String {
+        SessionManager.sessionCacheKey(sessionId: sessionId, kind: agentKind)
+    }
+
+    init(agentKind: TabKind = .claude,
+         sessionId: String,
+         filePath: URL,
+         modificationDate: Date,
+         messageCount: Int,
+         firstUserMessage: String,
+         savedName: String?,
+         summary: String?,
+         isBookmarked: Bool) {
+        self.agentKind = agentKind
+        self.sessionId = sessionId
+        self.filePath = filePath
+        self.modificationDate = modificationDate
+        self.messageCount = messageCount
+        self.firstUserMessage = firstUserMessage
+        self.savedName = savedName
+        self.summary = summary
+        self.isBookmarked = isBookmarked
+    }
 }
 
 /// A single user turn within a session timeline.

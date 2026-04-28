@@ -10,6 +10,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
 
     private var currentSession: ExplorerSessionInfo?
     private var entries: [TimelineEntry] = []
+    private var forkAtPointEnabled = false
     private var summarizeSpinner: NSProgressIndicator?
 
     // Callbacks
@@ -59,6 +60,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         let cachedActionSummaries: [Int: String]
         let summarizeEnabled: Bool
         let resumeEnabled: Bool
+        let forkAtPointEnabled: Bool
         let scrollToIndex: Int?
     }
 
@@ -67,6 +69,7 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
     func showTimeline(session: ExplorerSessionInfo, entries: [TimelineEntry], options: TimelineOptions) {
         self.currentSession = session
         self.entries = entries
+        self.forkAtPointEnabled = options.forkAtPointEnabled
 
         // Apply cached action summaries
         for i in 0..<self.entries.count {
@@ -337,29 +340,35 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
         }
 
         // Fork here button (icon rotated 180° so arrows point down)
-        let forkBtn = NSButton(title: "", target: nil, action: nil)
-        if let branchImage = NSImage(systemSymbolName: "arrow.branch", accessibilityDescription: "Fork here") {
-            let size = branchImage.size
-            let rotated = NSImage(size: size, flipped: false) { _ in
-                let ctx = NSGraphicsContext.current!.cgContext
-                ctx.translateBy(x: size.width / 2, y: size.height / 2)
-                ctx.rotate(by: .pi)
-                ctx.translateBy(x: -size.width / 2, y: -size.height / 2)
-                branchImage.draw(in: NSRect(origin: .zero, size: size))
-                return true
+        let forkBtn: NSButton?
+        if forkAtPointEnabled {
+            let btn = NSButton(title: "", target: nil, action: nil)
+            if let branchImage = NSImage(systemSymbolName: "arrow.branch", accessibilityDescription: "Fork here") {
+                let size = branchImage.size
+                let rotated = NSImage(size: size, flipped: false) { _ in
+                    let ctx = NSGraphicsContext.current!.cgContext
+                    ctx.translateBy(x: size.width / 2, y: size.height / 2)
+                    ctx.rotate(by: .pi)
+                    ctx.translateBy(x: -size.width / 2, y: -size.height / 2)
+                    branchImage.draw(in: NSRect(origin: .zero, size: size))
+                    return true
+                }
+                rotated.isTemplate = true
+                btn.image = rotated
             }
-            rotated.isTemplate = true
-            forkBtn.image = rotated
+            btn.bezelStyle = .inline
+            btn.isBordered = false
+            btn.toolTip = "Fork here"
+            btn.contentTintColor = NSColor(red: 0.4, green: 0.6, blue: 0.9, alpha: 0.8)
+            btn.tag = entry.index
+            btn.target = self
+            btn.action = #selector(forkHereClicked(_:))
+            btn.translatesAutoresizingMaskIntoConstraints = false
+            cell.addSubview(btn)
+            forkBtn = btn
+        } else {
+            forkBtn = nil
         }
-        forkBtn.bezelStyle = .inline
-        forkBtn.isBordered = false
-        forkBtn.toolTip = "Fork here"
-        forkBtn.contentTintColor = NSColor(red: 0.4, green: 0.6, blue: 0.9, alpha: 0.8)
-        forkBtn.tag = entry.index
-        forkBtn.target = self
-        forkBtn.action = #selector(forkHereClicked(_:))
-        forkBtn.translatesAutoresizingMaskIntoConstraints = false
-        cell.addSubview(forkBtn)
 
         NSLayoutConstraint.activate([
             // Vertical line
@@ -383,10 +392,14 @@ class SessionExplorerTimelineController: NSObject, NSTableViewDataSource, NSTabl
             metaField.leadingAnchor.constraint(equalTo: msgField.leadingAnchor),
             metaField.topAnchor.constraint(equalTo: msgField.bottomAnchor, constant: 2),
 
-            // Fork here
-            forkBtn.leadingAnchor.constraint(equalTo: metaField.trailingAnchor, constant: 8),
-            forkBtn.centerYAnchor.constraint(equalTo: metaField.centerYAnchor),
         ])
+
+        if let forkBtn {
+            NSLayoutConstraint.activate([
+                forkBtn.leadingAnchor.constraint(equalTo: metaField.trailingAnchor, constant: 8),
+                forkBtn.centerYAnchor.constraint(equalTo: metaField.centerYAnchor),
+            ])
+        }
 
         if let actionField {
             NSLayoutConstraint.activate([

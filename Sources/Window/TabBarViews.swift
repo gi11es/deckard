@@ -17,6 +17,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
     var onEditingFinished: (() -> Void)?
     var onClose: (() -> Void)?
     var onNewClaude: (() -> Void)?
+    var onNewCodex: (() -> Void)?
     var onNewTerminal: (() -> Void)?
     private var rawName: String
 
@@ -25,7 +26,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
     private var badgeDot: NSView?
 
-    init(displayTitle: String, editableName: String, isClaude: Bool = false,
+    init(displayTitle: String, editableName: String, kind: TabKind = .terminal,
          badgeState: TabItem.BadgeState = .none,
          activity: ProcessMonitor.ActivityInfo? = nil,
          isSelected: Bool, index: Int,
@@ -185,6 +186,10 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
         claudeItem.setShortcut(for: .newClaudeTab)
         menu.addItem(claudeItem)
 
+        let codexItem = NSMenuItem(title: "New Codex Tab", action: #selector(newCodexAction), keyEquivalent: "")
+        codexItem.setShortcut(for: .newCodexTab)
+        menu.addItem(codexItem)
+
         let termItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalAction), keyEquivalent: "")
         termItem.setShortcut(for: .newTerminalTab)
         menu.addItem(termItem)
@@ -199,6 +204,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
     }
 
     @objc private func newClaudeAction() { onNewClaude?() }
+    @objc private func newCodexAction() { onNewCodex?() }
     @objc private func newTerminalAction() { onNewTerminal?() }
     @objc private func closeTabAction() { onClose?() }
 

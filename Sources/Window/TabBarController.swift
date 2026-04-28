@@ -40,7 +40,7 @@ extension DeckardWindowController {
             let tabView = HorizontalTabView(
                 displayTitle: title,
                 editableName: tab.name,
-                isClaude: tab.isClaude,
+                kind: tab.kind,
                 badgeState: tab.badgeState,
                 activity: terminalActivity[tab.id],
                 isSelected: isSelected,
@@ -54,7 +54,7 @@ extension DeckardWindowController {
                 let tab = project.tabs[i]
                 tab.name = newName
                 if let sid = tab.sessionId, !sid.isEmpty {
-                    SessionManager.shared.saveSessionName(sessionId: sid, name: newName)
+                    SessionManager.shared.saveSessionName(sessionId: sid, kind: tab.kind, name: newName)
                 }
                 self.rebuildTabBar()
                 self.saveState()
@@ -63,8 +63,8 @@ extension DeckardWindowController {
                 guard let self = self, let project = self.currentProject,
                       i < project.tabs.count else { return }
                 let tab = project.tabs[i]
-                let base = tab.isClaude ? "Claude" : "Terminal"
-                let sameType = project.tabs.filter { $0.isClaude == tab.isClaude }
+                let base = tab.kind.displayName
+                let sameType = project.tabs.filter { $0.kind == tab.kind }
                 tab.name = sameType.count <= 1 ? base : "\(base) #\(i + 1)"
                 self.rebuildTabBar()
                 self.saveState()
@@ -76,10 +76,13 @@ extension DeckardWindowController {
                 self.tabBarCloseClicked(btn)
             }
             tabView.onNewClaude = { [weak self] in
-                self?.addTabToCurrentProject(isClaude: true)
+                self?.addTabToCurrentProject(kind: .claude)
+            }
+            tabView.onNewCodex = { [weak self] in
+                self?.addTabToCurrentProject(kind: .codex)
             }
             tabView.onNewTerminal = { [weak self] in
-                self?.addTabToCurrentProject(isClaude: false)
+                self?.addTabToCurrentProject(kind: .terminal)
             }
             tabView.onEditingFinished = { [weak self] in
                 guard let self = self, self.needsTabBarRebuild else { return }
@@ -98,8 +101,9 @@ extension DeckardWindowController {
 
         // Add "+" button
         let addButton = AddTabButton(
-            leftClickAction: { [weak self] in self?.addTabToCurrentProject(isClaude: true) },
-            rightClickAction: { [weak self] in self?.addTabToCurrentProject(isClaude: false) }
+            claudeAction: { [weak self] in self?.addTabToCurrentProject(kind: .claude) },
+            codexAction: { [weak self] in self?.addTabToCurrentProject(kind: .codex) },
+            terminalAction: { [weak self] in self?.addTabToCurrentProject(kind: .terminal) }
         )
         tabBar.addArrangedSubview(addButton)
 

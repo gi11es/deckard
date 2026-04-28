@@ -170,7 +170,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
         let tabConfigField = NSTextField()
         tabConfigField.stringValue = UserDefaults.standard.string(forKey: "defaultTabConfig") ?? "claude, terminal"
-        tabConfigField.placeholderString = "claude, terminal"
+        tabConfigField.placeholderString = "claude, codex, terminal"
         tabConfigField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         objc_setAssociatedObject(tabConfigField, &settingsKeyAssoc, "defaultTabConfig", .OBJC_ASSOCIATION_RETAIN)
         tabConfigField.delegate = self
@@ -183,7 +183,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
         grid.addRow(with: [tabConfigLabel, tabConfigField])
 
-        let tabConfigHelp = NSTextField(labelWithString: "Comma-separated list: claude, terminal")
+        let tabConfigHelp = NSTextField(labelWithString: "Comma-separated list: claude, codex, terminal")
         tabConfigHelp.font = .systemFont(ofSize: 11)
         tabConfigHelp.textColor = .secondaryLabelColor
         grid.addRow(with: [NSGridCell.emptyContentView, tabConfigHelp])
@@ -693,20 +693,27 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         (.idle, "Idle"),
         (.thinking, "Thinking"),
         (.waitingForInput, "Ready"),
-        (.needsPermission, "Needs Permission"),
+        (.needsPermission, "Permission"),
         (.error, "Error"),
-        (.completedUnseen, "Done (Unvisited)"),
+        (.completedUnseen, "Done"),
+    ]
+
+    private static let codexBadgeEntries: [(state: TabItem.BadgeState, label: String)] = [
+        (.codexIdle, "Idle"),
+        (.codexThinking, "Working"),
+        (.codexError, "Error"),
+        (.codexCompletedUnseen, "Done"),
     ]
 
     private static let terminalBadgeEntries: [(state: TabItem.BadgeState, label: String)] = [
         (.terminalIdle, "Idle"),
         (.terminalActive, "Busy"),
         (.terminalError, "Error"),
-        (.terminalCompletedUnseen, "Done (Unvisited)"),
+        (.terminalCompletedUnseen, "Done"),
     ]
 
     /// Default animation settings per state.
-    static let defaultBadgeAnimated: Set<TabItem.BadgeState> = [.thinking, .terminalActive]
+    static let defaultBadgeAnimated: Set<TabItem.BadgeState> = [.thinking, .codexThinking, .terminalActive]
 
     static func isBadgeAnimated(_ state: TabItem.BadgeState) -> Bool {
         if let saved = UserDefaults.standard.object(forKey: "badgeAnimate.\(state.rawValue)") as? Bool {
@@ -721,7 +728,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
                               _ entries: [(state: TabItem.BadgeState, label: String)]) -> NSView {
             let borderColor = NSColor.separatorColor.cgColor
             let rowHeight: CGFloat = 28
-            let colWidths: [CGFloat] = [120, 60, 50, 50]  // state, shape, color, blink
+            let colWidths: [CGFloat] = [84, 54, 38, 38]  // state, shape, color, blink
             let tableWidth = colWidths.reduce(0, +)
             let totalRows = 1 + entries.count
 
@@ -843,12 +850,13 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         }
 
         let claudeTable = makeSectionTable("Claude", Self.claudeBadgeEntries)
+        let codexTable = makeSectionTable("Codex", Self.codexBadgeEntries)
         let terminalTable = makeSectionTable("Terminal", Self.terminalBadgeEntries)
 
-        let hStack = NSStackView(views: [claudeTable, terminalTable])
+        let hStack = NSStackView(views: [claudeTable, codexTable, terminalTable])
         hStack.orientation = .horizontal
         hStack.alignment = .top
-        hStack.spacing = 16
+        hStack.spacing = 12
 
         // Wrap in a vertical stack with the reset button
         let wrapper = NSStackView()
@@ -935,7 +943,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
     }
 
     @objc private func resetBadgeColors() {
-        for entry in Self.claudeBadgeEntries + Self.terminalBadgeEntries {
+        for entry in Self.claudeBadgeEntries + Self.codexBadgeEntries + Self.terminalBadgeEntries {
             UserDefaults.standard.removeObject(forKey: "badgeColor.\(entry.state.rawValue)")
             UserDefaults.standard.removeObject(forKey: "badgeAnimate.\(entry.state.rawValue)")
             UserDefaults.standard.removeObject(forKey: "badgeShape.\(entry.state.rawValue)")
@@ -1067,7 +1075,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         versionLabel.textColor = .secondaryLabelColor
         stack.addArrangedSubview(versionLabel)
 
-        let descLabel = NSTextField(labelWithString: "Multi-session Claude Code terminal manager")
+        let descLabel = NSTextField(labelWithString: "Multi-session Claude Code and Codex terminal manager")
         descLabel.font = .systemFont(ofSize: 12)
         descLabel.textColor = .tertiaryLabelColor
         stack.addArrangedSubview(descLabel)

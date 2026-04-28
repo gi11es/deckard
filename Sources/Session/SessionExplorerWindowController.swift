@@ -8,8 +8,8 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
     private let projectName: String
 
     /// Callback invoked when the user picks an action (resume/fork).
-    /// Parameters: sessionId, forkSession flag, tab name.
-    var onSessionAction: ((String, Bool, String?) -> Void)?
+    /// Parameters: kind, sessionId, forkSession flag, tab name.
+    var onSessionAction: ((TabKind, String, Bool, String?) -> Void)?
 
     /// Session IDs currently open in the project's tabs.
     var openSessionIds = Set<String>()
@@ -169,20 +169,22 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
     // MARK: - Data Loading
 
     private func loadData() {
-        let rawSessions = ContextMonitor.shared.listSessions(forProjectPath: projectPath)
+        let rawSessions = ContextMonitor.shared.listAllSessions(forProjectPath: projectPath)
         let savedNames = SessionManager.shared.loadSessionNames()
-        let bookmarkedIds = BookmarkManager.shared.bookmarkedSessionIds(forProjectPath: projectPath)
 
         allSessions = rawSessions.map { session in
-            let name = savedNames[session.sessionId]
+            let cacheKey = SessionManager.sessionCacheKey(sessionId: session.sessionId, kind: session.kind)
+            let name = savedNames[cacheKey]
+            let bookmarkedIds = BookmarkManager.shared.bookmarkedSessionIds(forProjectPath: projectPath, kind: session.kind)
             return ExplorerSessionInfo(
+                agentKind: session.kind,
                 sessionId: session.sessionId,
-                filePath: URL(fileURLWithPath: NSHomeDirectory() + "/.claude/projects/\(projectPath.claudeProjectDirName)/\(session.sessionId).jsonl"),
+                filePath: session.filePath ?? URL(fileURLWithPath: NSHomeDirectory() + "/.claude/projects/\(projectPath.claudeProjectDirName)/\(session.sessionId).jsonl"),
                 modificationDate: session.modificationDate,
                 messageCount: session.messageCount,
                 firstUserMessage: session.firstUserMessage,
                 savedName: (name?.isEmpty == false) ? name : nil,
-                summary: SummaryManager.shared.cachedSummary(forSessionId: session.sessionId),
+                summary: SummaryManager.shared.cachedSummary(forSessionId: session.sessionId, kind: session.kind),
                 isBookmarked: bookmarkedIds.contains(session.sessionId)
             )
         }
@@ -228,7 +230,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
     }
 
     private func restoreListSelection(sessionId: String) {
-        if let idx = filteredSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+        if let idx = filteredSessions.firstIndex(where: { $0.cacheKey == sessionId }) {
             listTableView.selectRowIndexes(IndexSet(integer: idx), byExtendingSelection: false)
         }
     }
@@ -236,39 +238,43 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
     // MARK: - Actions
 
     private func sessionDisplayName(for sessionId: String) -> String? {
+        guard let session = allSessions.first(where: { $0.cacheKey == sessionId || $0.sessionId == sessionId }) else { return nil }
         let savedNames = SessionManager.shared.loadSessionNames()
-        if let name = savedNames[sessionId], !name.isEmpty { return name }
-        guard let session = allSessions.first(where: { $0.sessionId == sessionId }) else { return nil }
+        if let name = savedNames[session.cacheKey], !name.isEmpty { return name }
         let msg = session.firstUserMessage
         return msg.isEmpty ? nil : String(msg.prefix(60))
     }
 
     private func performAction(sessionId: String, fork: Bool) {
-        onSessionAction?(sessionId, fork, sessionDisplayName(for: sessionId))
+        guard let session = allSessions.first(where: { $0.cacheKey == selectedSessionId || $0.sessionId == sessionId }) else { return }
+        onSessionAction?(session.agentKind, session.sessionId, fork, sessionDisplayName(for: session.cacheKey))
         close()
     }
 
     private func performForkAtPoint(sessionId: String, turnIndex: Int) {
-        let name = sessionDisplayName(for: sessionId)
-        guard let newSessionId = ContextMonitor.shared.truncateSession(
+        guard let session = allSessions.first(where: { $0.cacheKey == selectedSessionId || $0.sessionId == sessionId }),
+              let newSessionId = ContextMonitor.shared.truncateSession(
             sessionId: sessionId,
             projectPath: projectPath,
-            afterTurnIndex: turnIndex
+            afterTurnIndex: turnIndex,
+            kind: session.agentKind
         ) else { return }
 
-        onSessionAction?(newSessionId, true, name)
+        let name = sessionDisplayName(for: session.cacheKey)
+        onSessionAction?(session.agentKind, newSessionId, true, name)
         close()
     }
 
     @objc private func starClicked(_ sender: NSButton) {
         let row = sender.tag
         guard row < filteredSessions.count else { return }
-        let sessionId = filteredSessions[row].sessionId
-        let newState = BookmarkManager.shared.toggleBookmark(projectPath: projectPath, sessionId: sessionId)
-        if let idx = allSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+        let session = filteredSessions[row]
+        let sessionId = session.sessionId
+        let newState = BookmarkManager.shared.toggleBookmark(projectPath: projectPath, sessionId: sessionId, kind: session.agentKind)
+        if let idx = allSessions.firstIndex(where: { $0.cacheKey == session.cacheKey }) {
             allSessions[idx].isBookmarked = newState
         }
-        if let fIdx = filteredSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+        if let fIdx = filteredSessions.firstIndex(where: { $0.cacheKey == session.cacheKey }) {
             filteredSessions[fIdx].isBookmarked = newState
         }
         // Update only the button itself — no row reload
@@ -292,33 +298,34 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         let row = listTableView.selectedRow
         guard row >= 0, row < filteredSessions.count else { return }
         let session = filteredSessions[row]
-        selectSession(sessionId: session.sessionId, scrollToMessageIndex: nil)
+        selectSession(cacheKey: session.cacheKey, scrollToMessageIndex: nil)
     }
 
-    private func selectSession(sessionId: String, scrollToMessageIndex: Int?) {
-        selectedSessionId = sessionId
-        guard let session = allSessions.first(where: { $0.sessionId == sessionId }) else { return }
+    private func selectSession(cacheKey: String, scrollToMessageIndex: Int?) {
+        selectedSessionId = cacheKey
+        guard let session = allSessions.first(where: { $0.cacheKey == cacheKey }) else { return }
+        let sessionId = session.sessionId
 
-        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath)
+        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath, kind: session.agentKind)
 
-        if let idx = allSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+        if let idx = allSessions.firstIndex(where: { $0.cacheKey == cacheKey }) {
             allSessions[idx].messageCount = entries.count
         }
 
-        let updatedSession = allSessions.first(where: { $0.sessionId == sessionId }) ?? session
+        let updatedSession = allSessions.first(where: { $0.cacheKey == cacheKey }) ?? session
 
-        let cachedActionSummaries = SummaryManager.shared.cachedTurnSummaries(forSessionId: sessionId)
+        let cachedActionSummaries = SummaryManager.shared.cachedTurnSummaries(forSessionId: sessionId, kind: session.agentKind)
 
-        let actions = ContextMonitor.shared.parseActions(sessionId: sessionId, projectPath: projectPath)
+        let actions = ContextMonitor.shared.parseActions(sessionId: sessionId, projectPath: projectPath, kind: session.agentKind)
         let hasUncachedActions = entries.contains { entry in
             let turnActions = actions[entry.index] ?? []
             return !turnActions.isEmpty && cachedActionSummaries[entry.index] == nil
         }
-        let cachedTurnCount = SummaryManager.shared.cachedSummaryTurnCount(forSessionId: sessionId)
+        let cachedTurnCount = SummaryManager.shared.cachedSummaryTurnCount(forSessionId: sessionId, kind: session.agentKind)
         let needsSessionSummary = updatedSession.summary == nil || cachedTurnCount < entries.count
         let summarizeEnabled = needsSessionSummary || hasUncachedActions
 
-        let isOpen = openSessionIds.contains(sessionId)
+        let isOpen = openSessionIds.contains(updatedSession.cacheKey)
 
         timelineController?.showTimeline(
             session: updatedSession,
@@ -327,36 +334,38 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
                 cachedActionSummaries: cachedActionSummaries,
                 summarizeEnabled: summarizeEnabled,
                 resumeEnabled: !isOpen,
+                forkAtPointEnabled: updatedSession.agentKind.isAgent,
                 scrollToIndex: scrollToMessageIndex
             )
         )
 
         timelineController?.onSummarize = { [weak self] in
-            self?.summarizeAll(sessionId: sessionId, entries: entries, actions: actions)
+            self?.summarizeAll(session: updatedSession, entries: entries, actions: actions)
         }
     }
 
-    private func summarizeAll(sessionId: String, entries: [TimelineEntry], actions: [Int: [String]]) {
+    private func summarizeAll(session: ExplorerSessionInfo, entries: [TimelineEntry], actions: [Int: [String]]) {
         timelineController?.setSummarizing(true)
 
         SummaryManager.shared.generateCombinedSummaries(
-            sessionId: sessionId,
+            sessionId: session.sessionId,
             projectPath: projectPath,
+            kind: session.agentKind,
             currentTurnCount: entries.count,
             actions: actions
         ) { [weak self] sessionSummary, actionSummaries in
-            guard let self, self.selectedSessionId == sessionId else { return }
+            guard let self, self.selectedSessionId == session.cacheKey else { return }
 
             if let summary = sessionSummary,
-               let idx = self.allSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+               let idx = self.allSessions.firstIndex(where: { $0.cacheKey == session.cacheKey }) {
                 self.allSessions[idx].summary = summary
-                if let fIdx = self.filteredSessions.firstIndex(where: { $0.sessionId == sessionId }) {
+                if let fIdx = self.filteredSessions.firstIndex(where: { $0.cacheKey == session.cacheKey }) {
                     self.filteredSessions[fIdx].summary = summary
                 }
             }
 
             // Rebuild right pane with updated data
-            self.selectSession(sessionId: sessionId, scrollToMessageIndex: nil)
+            self.selectSession(cacheKey: session.cacheKey, scrollToMessageIndex: nil)
         }
     }
 
@@ -401,13 +410,13 @@ extension SessionExplorerWindowController: NSTableViewDataSource, NSTableViewDel
 
         // Title — single line, truncates
         let title = NSTextField(labelWithString: session.savedName ?? session.firstUserMessage)
-        title.font = .systemFont(ofSize: 13, weight: session.sessionId == selectedSessionId ? .semibold : .regular)
+        title.font = .systemFont(ofSize: 13, weight: session.cacheKey == selectedSessionId ? .semibold : .regular)
         title.textColor = .labelColor
         title.lineBreakMode = .byTruncatingTail
 
         // Timestamp
         let timeStr = relativeFormatter.localizedString(for: session.modificationDate, relativeTo: Date())
-        let metaField = NSTextField(labelWithString: timeStr)
+        let metaField = NSTextField(labelWithString: "\(session.agentKind.displayName) · \(timeStr)")
         metaField.font = .systemFont(ofSize: 10)
         metaField.textColor = .tertiaryLabelColor
 
