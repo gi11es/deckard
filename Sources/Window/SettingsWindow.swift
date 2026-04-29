@@ -6,6 +6,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
     private enum Pane: String, CaseIterable {
         case general = "General"
+        case agents = "Agents"
         case theme = "Theme"
         case terminal = "Terminal"
         case shortcuts = "Shortcuts"
@@ -14,6 +15,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         var icon: NSImage {
             switch self {
             case .general: return NSImage(systemSymbolName: "gearshape", accessibilityDescription: "General")!
+            case .agents: return NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: "Agents")!
             case .theme: return NSImage(systemSymbolName: "paintpalette", accessibilityDescription: "Theme")!
             case .terminal: return NSImage(systemSymbolName: "terminal", accessibilityDescription: "Terminal")!
             case .shortcuts: return NSImage(systemSymbolName: "keyboard", accessibilityDescription: "Shortcuts")!
@@ -104,6 +106,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         let newView: NSView
         switch pane {
         case .general: newView = makeGeneralPane()
+        case .agents: newView = makeAgentsPane()
         case .theme: newView = makeThemePane()
         case .terminal: newView = makeTerminalPane()
         case .shortcuts: newView = makeShortcutsPane()
@@ -128,41 +131,6 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         grid.column(at: 1).xPlacement = .fill
         grid.rowSpacing = 6
         grid.columnSpacing = 8
-
-        // Extra arguments
-        let extraArgsLabel = NSTextField(labelWithString: "Default Claude arguments:")
-        extraArgsLabel.alignment = .right
-
-        let extraArgsField = ClaudeArgsField(frame: NSRect(x: 0, y: 0, width: 400, height: 60))
-        extraArgsField.stringValue = UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
-        extraArgsField.translatesAutoresizingMaskIntoConstraints = false
-        extraArgsField.heightAnchor.constraint(greaterThanOrEqualToConstant: 36).isActive = true
-        extraArgsField.onChange = { newValue in
-            UserDefaults.standard.set(newValue, forKey: "claudeExtraArgs")
-        }
-
-        grid.addRow(with: [extraArgsLabel, extraArgsField])
-
-        let extraArgsHelp = NSTextField(labelWithString: "Arguments passed to every new Claude Code session. Can be overridden per project.")
-        extraArgsHelp.font = .systemFont(ofSize: 11)
-        extraArgsHelp.textColor = .secondaryLabelColor
-        grid.addRow(with: [NSGridCell.emptyContentView, extraArgsHelp])
-
-        // Per-session args checkbox
-        let perSessionCheck = NSButton(checkboxWithTitle: "Customize arguments per session", target: self, action: #selector(perSessionArgsToggled(_:)))
-        perSessionCheck.state = UserDefaults.standard.bool(forKey: "promptForSessionArgs") ? .on : .off
-        grid.addRow(with: [NSGridCell.emptyContentView, perSessionCheck])
-
-        let perSessionHelp = NSTextField(labelWithString: "Show a dialog to set arguments when creating a new Claude tab.")
-        perSessionHelp.font = .systemFont(ofSize: 11)
-        perSessionHelp.textColor = .secondaryLabelColor
-        grid.addRow(with: [NSGridCell.emptyContentView, perSessionHelp])
-
-        // Spacer
-        let spacer = NSView()
-        spacer.translatesAutoresizingMaskIntoConstraints = false
-        spacer.heightAnchor.constraint(equalToConstant: 8).isActive = true
-        grid.addRow(with: [NSGridCell.emptyContentView, spacer])
 
         // Default tabs
         let tabConfigLabel = NSTextField(labelWithString: "Default tabs:")
@@ -198,8 +166,131 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         return pane
     }
 
+    // MARK: - Agents Pane
+
+    private func makeAgentsPane() -> NSView {
+        let pane = NSView()
+
+        let stack = NSStackView()
+        stack.orientation = .vertical
+        stack.alignment = .width
+        stack.spacing = 18
+        stack.translatesAutoresizingMaskIntoConstraints = false
+
+        stack.addArrangedSubview(makeAgentDefaultsSection(
+            title: "Claude Code",
+            fieldLabel: "Default arguments:",
+            defaultsKey: "claudeExtraArgs",
+            flagSource: .claude,
+            help: "Arguments passed to every new Claude Code session. Can be overridden per project.",
+            checkboxTitle: "Customize Claude arguments per session",
+            checkboxHelp: "Show a dialog to set arguments when creating a new Claude tab.",
+            checkboxDefaultsKey: "promptForSessionArgs",
+            checkboxAction: #selector(perSessionArgsToggled(_:))
+        ))
+
+        stack.addArrangedSubview(makeAgentDefaultsSection(
+            title: "Codex",
+            fieldLabel: "Default parameters:",
+            defaultsKey: "codexExtraArgs",
+            flagSource: .codex,
+            help: "Codex CLI parameters passed to every new Codex session, such as model, effort, sandbox, and approval settings. Can be overridden per project.",
+            checkboxTitle: "Customize Codex parameters per session",
+            checkboxHelp: "Show a dialog to set parameters when creating a new Codex tab.",
+            checkboxDefaultsKey: "promptForCodexSessionArgs",
+            checkboxAction: #selector(codexPerSessionArgsToggled(_:))
+        ))
+
+        pane.addSubview(stack)
+        NSLayoutConstraint.activate([
+            stack.topAnchor.constraint(equalTo: pane.topAnchor, constant: 20),
+            stack.leadingAnchor.constraint(equalTo: pane.leadingAnchor, constant: 40),
+            stack.trailingAnchor.constraint(equalTo: pane.trailingAnchor, constant: -40),
+        ])
+
+        return pane
+    }
+
+    private func makeAgentDefaultsSection(
+        title: String,
+        fieldLabel: String,
+        defaultsKey: String,
+        flagSource: ClaudeArgsField.FlagSource,
+        help: String,
+        checkboxTitle: String,
+        checkboxHelp: String,
+        checkboxDefaultsKey: String,
+        checkboxAction: Selector
+    ) -> NSView {
+        let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
+
+        let titleLabel = NSTextField(labelWithString: title)
+        titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
+        titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+        let grid = NSGridView(numberOfColumns: 2, rows: 0)
+        grid.translatesAutoresizingMaskIntoConstraints = false
+        grid.column(at: 0).xPlacement = .trailing
+        grid.column(at: 0).width = 150
+        grid.column(at: 1).xPlacement = .fill
+        grid.rowSpacing = 6
+        grid.columnSpacing = 8
+
+        let argsLabel = NSTextField(labelWithString: fieldLabel)
+        argsLabel.alignment = .right
+
+        let argsField = ClaudeArgsField(
+            frame: NSRect(x: 0, y: 0, width: 400, height: 60),
+            flagSource: flagSource
+        )
+        argsField.stringValue = UserDefaults.standard.string(forKey: defaultsKey) ?? ""
+        argsField.translatesAutoresizingMaskIntoConstraints = false
+        argsField.heightAnchor.constraint(greaterThanOrEqualToConstant: 42).isActive = true
+        argsField.onChange = { newValue in
+            UserDefaults.standard.set(newValue, forKey: defaultsKey)
+        }
+
+        grid.addRow(with: [argsLabel, argsField])
+
+        let helpLabel = NSTextField(labelWithString: help)
+        helpLabel.font = .systemFont(ofSize: 11)
+        helpLabel.textColor = .secondaryLabelColor
+        helpLabel.lineBreakMode = .byWordWrapping
+        helpLabel.maximumNumberOfLines = 2
+        helpLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        grid.addRow(with: [NSGridCell.emptyContentView, helpLabel])
+
+        let perSessionCheck = NSButton(checkboxWithTitle: checkboxTitle, target: self, action: checkboxAction)
+        perSessionCheck.state = UserDefaults.standard.bool(forKey: checkboxDefaultsKey) ? .on : .off
+        grid.addRow(with: [NSGridCell.emptyContentView, perSessionCheck])
+
+        let perSessionHelp = NSTextField(labelWithString: checkboxHelp)
+        perSessionHelp.font = .systemFont(ofSize: 11)
+        perSessionHelp.textColor = .secondaryLabelColor
+        grid.addRow(with: [NSGridCell.emptyContentView, perSessionHelp])
+
+        container.addSubview(titleLabel)
+        container.addSubview(grid)
+        NSLayoutConstraint.activate([
+            titleLabel.topAnchor.constraint(equalTo: container.topAnchor),
+            titleLabel.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+
+            grid.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 8),
+            grid.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+            grid.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+            grid.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+        ])
+
+        return container
+    }
+
     @objc private func perSessionArgsToggled(_ sender: NSButton) {
         UserDefaults.standard.set(sender.state == .on, forKey: "promptForSessionArgs")
+    }
+
+    @objc private func codexPerSessionArgsToggled(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: "promptForCodexSessionArgs")
     }
 
     @objc private func vibrancyToggled(_ sender: NSButton) {

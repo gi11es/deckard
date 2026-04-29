@@ -61,9 +61,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         log.log("startup", "Installing Claude Code hooks...")
         DeckardHooksInstaller.installIfNeeded()
 
-        // Parse Claude CLI flags for autocomplete in settings.
+        // Parse agent CLI flags for autocomplete in settings.
         log.log("startup", "Loading Claude CLI flags...")
         ClaudeCLIFlags.shared.load()
+        log.log("startup", "Loading Codex CLI flags...")
+        CodexCLIFlags.shared.load()
 
         // Clean up orphaned tmux sessions from previous runs
         if TerminalSurface.tmuxAvailable {

@@ -89,6 +89,23 @@ class ProcessMonitor {
         }
     }
 
+    /// Return the registered shell PID for a tab. Agent tabs use `exec`, so this
+    /// PID becomes the long-running agent process after startup.
+    func shellPid(forSurface surfaceId: UUID) -> pid_t? {
+        queue.sync {
+            if let cached = cachedPids[surfaceId] {
+                return cached.shell
+            }
+            guard let shellPid = registeredShellPids[surfaceId.uuidString] else {
+                return nil
+            }
+            if let info = getKInfoProc(pid: shellPid) {
+                cachedPids[surfaceId] = (login: info.kp_eproc.e_ppid, shell: shellPid)
+            }
+            return shellPid
+        }
+    }
+
     // MARK: - Core Poll (called on queue)
 
     private func _poll(tabs: [TabInfo]) -> [UUID: ActivityInfo] {

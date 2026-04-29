@@ -51,9 +51,9 @@ Agent usage stats appear only on tabs where Deckard can read real provider data.
 
 | Metric | Claude Code tabs | Codex tabs | Terminal tabs |
 | --- | --- | --- | --- |
-| Context usage bar | Yes, from Claude session usage entries | Yes, from Codex `token_count` rollout events when present | No |
-| 5-hour quota | Yes, from Claude status-line hook data | Yes, from Codex rollout rate-limit data when present | No |
-| 7-day quota | Yes, from Claude status-line hook data | Yes, from Codex rollout rate-limit data when present | No |
+| Context usage bar | Yes, from Claude session usage entries | No reliable local signal; hidden | No |
+| 5-hour quota | Yes, from Claude status-line hook data | Yes, from Codex app-server rate-limit data with rollout fallback | No |
+| 7-day quota | Yes, from Claude status-line hook data | Yes, from Codex app-server rate-limit data with rollout fallback | No |
 | Tokens per minute | Yes, from recent Claude output token usage | Yes, from recent Codex generated token usage | No |
 
 Classic terminal tabs intentionally do not show agent context, quota, or token-rate panels.
@@ -89,7 +89,7 @@ Ships with 486 built-in themes in Ghostty format and loads custom themes from `~
 | Timeline and action view | Yes | Yes |
 | Bookmarks | Yes | Yes |
 | Provider-specific badges | Yes | Yes |
-| Context, quota, token rate | Yes | Yes, when Codex writes `token_count` events |
+| Context, quota, token rate | Yes | Quota via Codex app-server; token rate from `token_count` events when present |
 
 Deckard aims for equal day-to-day workflows across Claude Code and Codex. Some telemetry is necessarily provider-specific because the CLIs expose different local data. When Deckard cannot read a metric reliably, it hides that metric instead of showing stale data from another tab or provider.
 
@@ -139,7 +139,9 @@ Deckard reads Claude session JSONL files under `~/.claude/projects` for session 
 
 **Codex**
 
-Deckard reads Codex rollout files under `~/.codex/sessions` and the local Codex state database at `~/.codex/state_5.sqlite`. That provides project-scoped session discovery, resume, fork, fork-at-turn, timeline parsing, badges, context usage, quota percentages, and token-rate calculation when Codex has written the corresponding events.
+Deckard reads Codex rollout files under `~/.codex/sessions` and the local Codex state database at `~/.codex/state_5.sqlite`. That provides project-scoped session discovery, resume, fork, fork-at-turn, timeline parsing, badges, and token-rate calculation when Codex has written the corresponding events.
+
+For Codex quota, Deckard keeps a local `codex app-server --listen stdio://` JSON-RPC connection open while needed and calls `account/rateLimits/read`, falling back to rollout `token_count` rate-limit events if the app-server data is unavailable.
 
 Deckard does not install Codex hooks. It launches the Codex CLI directly with `codex`, `codex resume`, or `codex fork`.
 

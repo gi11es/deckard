@@ -55,6 +55,7 @@ struct ProjectState: Codable {
     var selectedTabIndex: Int
     var tabs: [ProjectTabState]
     var defaultArgs: String?
+    var defaultCodexArgs: String?
 }
 
 struct ProjectTabState: Codable {

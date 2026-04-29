@@ -19,7 +19,9 @@ final class SessionStateTests: XCTestCase {
                 tabs: [
                     ProjectTabState(id: "tab-1", name: "Claude", isClaude: true, sessionId: "sess-1"),
                     ProjectTabState(id: "tab-2", name: "Terminal", isClaude: false, sessionId: nil),
-                ]
+                ],
+                defaultArgs: "--permission-mode acceptEdits",
+                defaultCodexArgs: "--ask-for-approval never --sandbox workspace-write"
             )
         ]
 
@@ -35,6 +37,8 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.projects?[0].tabs[0].isClaude, true)
         XCTAssertEqual(decoded.projects?[0].tabs[0].sessionId, "sess-1")
         XCTAssertNil(decoded.projects?[0].tabs[1].sessionId)
+        XCTAssertEqual(decoded.projects?[0].defaultArgs, "--permission-mode acceptEdits")
+        XCTAssertEqual(decoded.projects?[0].defaultCodexArgs, "--ask-for-approval never --sandbox workspace-write")
     }
 
     func testEmptyStateRoundtrip() throws {

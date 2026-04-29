@@ -155,3 +155,97 @@ final class ArgsSerializationTests: XCTestCase {
         XCTAssertTrue(chips.isEmpty)
     }
 }
+
+final class CodexCLIFlagsTests: XCTestCase {
+
+    private let sampleHelp = """
+    Options:
+      -c, --config <key=value>
+              Override a configuration value that would otherwise be loaded from `~/.codex/config.toml`.
+
+      -m, --model <MODEL>
+              Model the agent should use
+
+      -s, --sandbox <SANDBOX_MODE>
+              Select the sandbox policy to use when executing model-generated shell commands
+
+              [possible values: read-only, workspace-write, danger-full-access]
+
+      -a, --ask-for-approval <APPROVAL_POLICY>
+              Configure when the model requires human approval before executing a command
+
+              Possible values:
+              - untrusted:  Only run trusted commands without asking
+              - on-request: The model decides when to ask
+              - never:      Never ask for user approval
+
+          --local-provider <OSS_PROVIDER>
+              Specify which local provider to use (lmstudio or ollama). If not specified with --oss,
+              will use config default or show selection
+
+      -C, --cd <DIR>
+              Tell the agent to use the specified directory as its working root
+
+          --full-auto
+              Convenience alias for low-friction sandboxed automatic execution
+
+      -h, --help
+              Print help
+
+      -V, --version
+              Print version
+    """
+
+    func testParsesMultilineCodexOptions() {
+        let flags = CodexCLIFlags.parse(helpOutput: sampleHelp)
+
+        let sandbox = flags.first { $0.longName == "--sandbox" }
+        XCTAssertEqual(sandbox?.shortName, "-s")
+        guard case .enumeration(let values) = sandbox?.valueType else {
+            XCTFail("Expected sandbox enum")
+            return
+        }
+        XCTAssertEqual(values, ["read-only", "workspace-write", "danger-full-access"])
+    }
+
+    func testParsesCodexBulletPossibleValues() {
+        let flags = CodexCLIFlags.parse(helpOutput: sampleHelp)
+
+        let approval = flags.first { $0.longName == "--ask-for-approval" }
+        guard case .enumeration(let values) = approval?.valueType else {
+            XCTFail("Expected approval enum")
+            return
+        }
+        XCTAssertEqual(values, ["untrusted", "on-request", "never"])
+    }
+
+    func testParsesCodexFreeTextAndBooleanFlags() {
+        let flags = CodexCLIFlags.parse(helpOutput: sampleHelp)
+
+        let model = flags.first { $0.longName == "--model" }
+        let fullAuto = flags.first { $0.longName == "--full-auto" }
+
+        XCTAssertEqual(model?.valueType, .freeText)
+        XCTAssertEqual(model?.valuePlaceholder, "<MODEL>")
+        XCTAssertEqual(fullAuto?.valueType, .boolean)
+    }
+
+    func testParsesCodexParentheticalChoices() {
+        let flags = CodexCLIFlags.parse(helpOutput: sampleHelp)
+
+        let provider = flags.first { $0.longName == "--local-provider" }
+        guard case .enumeration(let values) = provider?.valueType else {
+            XCTFail("Expected provider enum")
+            return
+        }
+        XCTAssertEqual(values, ["lmstudio", "ollama"])
+    }
+
+    func testCodexBlocklistExcludesDeckardManagedFlags() {
+        let longNames = CodexCLIFlags.parse(helpOutput: sampleHelp).map(\.longName)
+
+        XCTAssertFalse(longNames.contains("--cd"))
+        XCTAssertFalse(longNames.contains("--help"))
+        XCTAssertFalse(longNames.contains("--version"))
+    }
+}

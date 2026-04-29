@@ -138,6 +138,104 @@ final class ContextMonitorTests: XCTestCase {
         XCTAssertEqual(usage?.cacheReadTokens, 30_000)
     }
 
+    // MARK: - Codex activity parsing
+
+    func testParseCodexActivityInfoReportsStartedTaskBusy() {
+        let content = """
+        {"timestamp":"2026-04-28T19:55:08.554Z","type":"event_msg","payload":{"type":"task_started"}}
+        {"timestamp":"2026-04-28T19:55:08.763Z","type":"event_msg","payload":{"type":"token_count"}}
+        """
+
+        let activity = ContextMonitor.shared.parseCodexActivityInfo(from: content)
+
+        XCTAssertEqual(activity?.isBusy, true)
+        XCTAssertEqual(activity?.isError, false)
+    }
+
+    func testParseCodexActivityInfoTreatsTurnAbortedAsIdle() {
+        let content = """
+        {"timestamp":"2026-04-28T19:55:08.554Z","type":"event_msg","payload":{"type":"task_started"}}
+        {"timestamp":"2026-04-28T19:55:10.124Z","type":"event_msg","payload":{"type":"turn_aborted"}}
+        """
+
+        let activity = ContextMonitor.shared.parseCodexActivityInfo(from: content)
+
+        XCTAssertEqual(activity?.isBusy, false)
+        XCTAssertEqual(activity?.isError, false)
+    }
+
+    func testParseCodexActivityInfoTreatsErrorAsError() {
+        let content = """
+        {"timestamp":"2026-04-28T19:55:08.554Z","type":"event_msg","payload":{"type":"task_started"}}
+        {"timestamp":"2026-04-28T19:55:10.124Z","type":"event_msg","payload":{"type":"error"}}
+        """
+
+        let activity = ContextMonitor.shared.parseCodexActivityInfo(from: content)
+
+        XCTAssertEqual(activity?.isBusy, false)
+        XCTAssertEqual(activity?.isError, true)
+    }
+
+    func testParseCodexUsageReadsQuotaAndTokenRateButDoesNotReportContext() throws {
+        let now = try XCTUnwrap(codexDate("2026-04-28T12:42:05.267Z"))
+        let content = """
+        {"timestamp":"2026-04-28T12:41:05.267Z","type":"event_msg","payload":{"type":"token_count","info":{"total_token_usage":{"input_tokens":48536,"cached_input_tokens":23296,"output_tokens":940,"reasoning_output_tokens":241,"total_tokens":49476},"last_token_usage":{"input_tokens":35145,"cached_input_tokens":11648,"output_tokens":419,"reasoning_output_tokens":139,"total_tokens":35564},"model_context_window":258400},"rate_limits":{"primary":{"used_percent":12.5,"window_minutes":300,"resets_at":1777398056},"secondary":{"used_percent":3.25,"window_minutes":10080,"resets_at":1777984856}}}}
+        """
+
+        let usage = ContextMonitor.shared.parseCodexUsage(from: content, now: now)
+
+        XCTAssertNil(usage?.context)
+        XCTAssertEqual(usage?.quotaSnapshot?.fiveHourUsed, 12.5)
+        XCTAssertEqual(usage?.quotaSnapshot?.sevenDayUsed, 3.25)
+        XCTAssertEqual(try XCTUnwrap(usage?.tokenRate?.tokensPerMinute), 558, accuracy: 0.01)
+        XCTAssertEqual(usage?.sparklineData, [558.0])
+    }
+
+    func testParseCodexUsageAllowsRateLimitsWhenInfoIsNull() throws {
+        let now = try XCTUnwrap(codexDate("2026-04-28T12:42:05.267Z"))
+        let content = """
+        {"timestamp":"2026-04-28T12:41:05.267Z","type":"event_msg","payload":{"type":"token_count","info":null,"rate_limits":{"primary":{"used_percent":0.0,"window_minutes":300,"resets_at":1777398056},"secondary":{"used_percent":0.0,"window_minutes":10080,"resets_at":1777984856}}}}
+        """
+
+        let usage = ContextMonitor.shared.parseCodexUsage(from: content, now: now)
+
+        XCTAssertNil(usage?.context)
+        XCTAssertEqual(usage?.quotaSnapshot?.fiveHourUsed, 0.0)
+        XCTAssertEqual(usage?.quotaSnapshot?.sevenDayUsed, 0.0)
+        XCTAssertNotNil(usage?.quotaSnapshot?.fiveHourResetsAt)
+        XCTAssertNil(usage?.tokenRate)
+    }
+
+    func testParseCodexAppServerQuotaResponseReadsCamelCaseRateLimits() throws {
+        let now = try XCTUnwrap(codexDate("2026-04-28T12:42:05.267Z"))
+        let data = try XCTUnwrap("""
+        {"id":2,"result":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":12.5,"windowDurationMins":300,"resetsAt":1777398056},"secondary":{"usedPercent":3.25,"windowDurationMins":10080,"resetsAt":1777984856},"planType":"pro"},"rateLimitsByLimitId":{"codex":{"limitId":"codex","primary":{"usedPercent":25.0,"windowDurationMins":300,"resetsAt":1777399056},"secondary":{"usedPercent":6.5,"windowDurationMins":10080,"resetsAt":1777985856},"planType":"pro"}}}}
+        """.data(using: .utf8))
+        let response = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        let snapshot = ContextMonitor.shared.parseCodexAppServerQuotaResponse(response, now: now)
+
+        XCTAssertEqual(snapshot?.fiveHourUsed, 25.0)
+        XCTAssertEqual(snapshot?.sevenDayUsed, 6.5)
+        XCTAssertEqual(snapshot?.lastUpdated, now)
+        XCTAssertEqual(snapshot?.fiveHourResetsAt?.timeIntervalSince1970, 1777399056)
+        XCTAssertEqual(snapshot?.sevenDayResetsAt?.timeIntervalSince1970, 1777985856)
+    }
+
+    func testParseCodexAppServerQuotaResponseAllowsNullSecondaryWindow() throws {
+        let now = try XCTUnwrap(codexDate("2026-04-28T12:42:05.267Z"))
+        let data = try XCTUnwrap("""
+        {"id":2,"result":{"rateLimits":{"limitId":"codex","primary":{"usedPercent":17.75,"windowDurationMins":300,"resetsAt":1777398056},"secondary":null,"planType":"pro"}}}
+        """.data(using: .utf8))
+        let response = try XCTUnwrap(JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        let snapshot = ContextMonitor.shared.parseCodexAppServerQuotaResponse(response, now: now)
+
+        XCTAssertEqual(snapshot?.fiveHourUsed, 17.75)
+        XCTAssertEqual(snapshot?.sevenDayUsed, 0)
+        XCTAssertNil(snapshot?.sevenDayResetsAt)
+    }
+
     func testParseUsageNoUsageLines() {
         let content = """
         {"type":"user","message":{"content":"hello"}}
@@ -302,6 +400,12 @@ final class ContextMonitorTests: XCTestCase {
 
     private func assistantUsageLine(model: String, input: Int, cacheRead: Int) -> String {
         "{\"type\":\"assistant\",\"message\":{\"model\":\"\(model)\",\"usage\":{\"input_tokens\":\(input),\"cache_read_input_tokens\":\(cacheRead)}}}"
+    }
+
+    private func codexDate(_ value: String) -> Date? {
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return formatter.date(from: value)
     }
 
     private func makeTempJSONL(lines: [String]) -> String {

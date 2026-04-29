@@ -589,6 +589,11 @@ extension DeckardWindowController {
         defaultArgsItem.representedObject = project
         menu.addItem(defaultArgsItem)
 
+        let defaultCodexArgsItem = NSMenuItem(title: "Default Codex Arguments\u{2026}", action: #selector(defaultCodexArgsMenuAction(_:)), keyEquivalent: "")
+        defaultCodexArgsItem.target = self
+        defaultCodexArgsItem.representedObject = project
+        menu.addItem(defaultCodexArgsItem)
+
         menu.addItem(.separator())
 
         // Folder options
@@ -716,6 +721,31 @@ extension DeckardWindowController {
             guard response == .alertFirstButtonReturn else { return }
             let value = field.stringValue.trimmingCharacters(in: .whitespaces)
             project.defaultArgs = value.isEmpty ? nil : value
+            self?.saveState()
+        }
+    }
+
+    @objc func defaultCodexArgsMenuAction(_ sender: NSMenuItem) {
+        guard let project = sender.representedObject as? ProjectItem,
+              let window else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Default Codex Arguments for \(project.name)"
+        alert.informativeText = "These arguments will be used for new Codex tabs in this project, overriding global defaults. Leave empty to clear."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = ClaudeArgsField(
+            frame: NSRect(x: 0, y: 0, width: 400, height: 60),
+            flagSource: .codex
+        )
+        field.stringValue = project.defaultCodexArgs ?? ""
+        alert.accessoryView = field
+
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            let value = field.stringValue.trimmingCharacters(in: .whitespaces)
+            project.defaultCodexArgs = value.isEmpty ? nil : value
             self?.saveState()
         }
     }

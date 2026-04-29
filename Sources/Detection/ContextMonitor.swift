@@ -1,3 +1,4 @@
+import Darwin
 import Foundation
 
 extension String {
@@ -53,6 +54,21 @@ class ContextMonitor {
         let tokenRate: QuotaMonitor.TokenRate?
         let sparklineData: [Double]
     }
+
+    private let codexAppServerPollInterval: TimeInterval = 60
+    private let codexAppServerCacheMaxAge: TimeInterval = 15 * 60
+    private let codexAppServerTimeout: TimeInterval = 8
+    private let codexAppServerLock = NSLock()
+    private var codexAppServerCachedQuota: QuotaMonitor.QuotaSnapshot?
+    private var codexAppServerCachedAt: Date?
+    private var codexAppServerLastAttempt: Date?
+    private var codexAppServerRequestInFlight = false
+    private let codexAppServerProcessLock = NSLock()
+    private var codexAppServerProcess: Process?
+    private var codexAppServerInput: FileHandle?
+    private var codexAppServerOutput: FileHandle?
+    private var codexAppServerReadBuffer = Data()
+    private var codexAppServerNextRequestId = 2
 
     struct SessionInfo {
         let sessionId: String
@@ -183,6 +199,56 @@ class ContextMonitor {
         return nil
     }
 
+    func codexSessionInfo(openedByProcessId processId: pid_t, projectPath: String) -> SessionInfo? {
+        guard let fileURL = codexOpenRolloutFileURL(processId: processId) else {
+            return nil
+        }
+
+        let resolvedProjectPath = (projectPath as NSString).resolvingSymlinksInPath
+        return parseCodexSessionInfo(fileURL: fileURL, projectPath: resolvedProjectPath)
+    }
+
+    private func codexOpenRolloutFileURL(processId: pid_t) -> URL? {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/sbin/lsof")
+        process.arguments = ["-Fn", "-p", String(processId)]
+        process.standardError = FileHandle.nullDevice
+
+        let output = Pipe()
+        process.standardOutput = output
+
+        do {
+            try process.run()
+        } catch {
+            return nil
+        }
+        process.waitUntilExit()
+        guard process.terminationStatus == 0 else { return nil }
+
+        let data = output.fileHandleForReading.readDataToEndOfFile()
+        guard let raw = String(data: data, encoding: .utf8) else { return nil }
+
+        let rootPath = codexSessionsRoot.path + "/"
+        let candidates = raw
+            .split(separator: "\n")
+            .compactMap { line -> URL? in
+                guard line.first == "n" else { return nil }
+                let path = String(line.dropFirst())
+                guard path.hasPrefix(rootPath),
+                      path.hasSuffix(".jsonl"),
+                      (path as NSString).lastPathComponent.hasPrefix("rollout-") else {
+                    return nil
+                }
+                return URL(fileURLWithPath: path)
+            }
+
+        return candidates.max { lhs, rhs in
+            let lhsDate = (try? lhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            let rhsDate = (try? rhs.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate) ?? .distantPast
+            return lhsDate < rhsDate
+        }
+    }
+
     func latestCodexSession(forProjectPath projectPath: String, after date: Date, excluding excludedIds: Set<String> = []) -> SessionInfo? {
         listCodexSessions(forProjectPath: projectPath)
             .first { $0.modificationDate >= date && !excludedIds.contains($0.sessionId) }
@@ -193,6 +259,10 @@ class ContextMonitor {
             return nil
         }
 
+        return parseCodexActivityInfo(from: content)
+    }
+
+    func parseCodexActivityInfo(from content: String) -> CodexActivityInfo? {
         var latest: CodexActivityInfo?
         for line in content.split(separator: "\n") {
             guard let json = parseJSONObject(line),
@@ -206,10 +276,10 @@ class ContextMonitor {
             case "task_started":
                 isBusy = true
                 isError = false
-            case "task_complete", "task_cancelled":
+            case "task_complete", "task_cancelled", "turn_aborted":
                 isBusy = false
                 isError = false
-            case "task_failed":
+            case "task_failed", "error":
                 isBusy = false
                 isError = true
             default:
@@ -223,14 +293,31 @@ class ContextMonitor {
         return latest
     }
 
-    func getCodexUsage(sessionId: String) -> CodexUsageInfo? {
-        guard let content = codexTailContent(sessionId: sessionId, maxBytes: 1024 * 1024) else {
+    func getCodexUsage(sessionId: String?) -> CodexUsageInfo? {
+        let fileUsage: CodexUsageInfo?
+        if let sessionId,
+           let content = codexTailContent(sessionId: sessionId, maxBytes: 1024 * 1024) {
+            fileUsage = parseCodexUsage(from: content)
+        } else {
+            fileUsage = nil
+        }
+
+        let appServerQuota = codexAppServerQuotaSnapshot()
+        let quotaSnapshot = appServerQuota ?? fileUsage?.quotaSnapshot
+
+        guard fileUsage != nil || quotaSnapshot != nil else {
             return nil
         }
 
-        let now = Date()
+        return CodexUsageInfo(
+            context: nil,
+            quotaSnapshot: quotaSnapshot,
+            tokenRate: fileUsage?.tokenRate,
+            sparklineData: fileUsage?.sparklineData ?? [])
+    }
+
+    func parseCodexUsage(from content: String, now: Date = Date()) -> CodexUsageInfo? {
         let cutoff = now.addingTimeInterval(-300)
-        var context: ContextUsage?
         var quotaSnapshot: QuotaMonitor.QuotaSnapshot?
         var generatedEvents: [(timestamp: Date, tokens: Int)] = []
 
@@ -242,23 +329,10 @@ class ContextMonitor {
 
             let timestamp = (json["timestamp"] as? String).flatMap { codexTimestampFormatter.date(from: $0) }
 
-            if let info = payload["info"] as? [String: Any],
-               let lastUsage = info["last_token_usage"] as? [String: Any] {
-                let contextWindow = codexInt(info["model_context_window"]) ?? 0
-                let totalTokens = codexInt(lastUsage["total_tokens"])
-                    ?? ((codexInt(lastUsage["input_tokens"]) ?? 0)
-                        + (codexInt(lastUsage["output_tokens"]) ?? 0)
-                        + (codexInt(lastUsage["reasoning_output_tokens"]) ?? 0))
+            if let info = payload["info"] as? [String: Any] {
+                let lastUsage = info["last_token_usage"] as? [String: Any]
 
-                if contextWindow > 0, totalTokens > 0 {
-                    context = ContextUsage(
-                        model: "codex",
-                        inputTokens: totalTokens,
-                        cacheReadTokens: 0,
-                        contextLimit: contextWindow)
-                }
-
-                if let timestamp, timestamp >= cutoff {
+                if let lastUsage, let timestamp, timestamp >= cutoff {
                     let generated = (codexInt(lastUsage["output_tokens"]) ?? 0)
                         + (codexInt(lastUsage["reasoning_output_tokens"]) ?? 0)
                     if generated > 0 {
@@ -276,15 +350,257 @@ class ContextMonitor {
         let tokenRate = codexTokenRate(from: generatedEvents, now: now)
         let sparklineData = generatedEvents.suffix(30).map { Double($0.tokens) }
 
-        guard context != nil || quotaSnapshot != nil || tokenRate != nil || !sparklineData.isEmpty else {
+        guard quotaSnapshot != nil || tokenRate != nil || !sparklineData.isEmpty else {
             return nil
         }
 
         return CodexUsageInfo(
-            context: context,
+            context: nil,
             quotaSnapshot: quotaSnapshot,
             tokenRate: tokenRate,
             sparklineData: sparklineData)
+    }
+
+    func parseCodexAppServerQuotaResponse(_ response: [String: Any], now: Date = Date()) -> QuotaMonitor.QuotaSnapshot? {
+        guard response["error"] == nil,
+              let result = response["result"] as? [String: Any] else { return nil }
+
+        if let byLimitId = result["rateLimitsByLimitId"] as? [String: Any] {
+            if let codex = byLimitId["codex"] as? [String: Any],
+               let snapshot = codexQuotaSnapshot(from: codex, timestamp: now) {
+                return snapshot
+            }
+
+            for value in byLimitId.values {
+                guard let limit = value as? [String: Any],
+                      limit["limitId"] as? String == "codex",
+                      let snapshot = codexQuotaSnapshot(from: limit, timestamp: now) else { continue }
+                return snapshot
+            }
+        }
+
+        if let rateLimits = result["rateLimits"] as? [String: Any] {
+            return codexQuotaSnapshot(from: rateLimits, timestamp: now)
+        }
+        if let rateLimits = result["rate_limits"] as? [String: Any] {
+            return codexQuotaSnapshot(from: rateLimits, timestamp: now)
+        }
+
+        return nil
+    }
+
+    private func codexAppServerQuotaSnapshot(now: Date = Date()) -> QuotaMonitor.QuotaSnapshot? {
+        codexAppServerLock.lock()
+        if let cached = codexAppServerFreshEnoughCache(now: now, maxAge: codexAppServerPollInterval) {
+            codexAppServerLock.unlock()
+            return cached
+        }
+
+        if codexAppServerRequestInFlight ||
+            codexAppServerLastAttempt.map({ now.timeIntervalSince($0) < codexAppServerPollInterval }) == true {
+            let cached = codexAppServerFreshEnoughCache(now: now, maxAge: codexAppServerCacheMaxAge)
+            codexAppServerLock.unlock()
+            return cached
+        }
+
+        codexAppServerRequestInFlight = true
+        codexAppServerLastAttempt = now
+        codexAppServerLock.unlock()
+
+        let snapshot = fetchCodexAppServerQuotaSnapshot(now: now)
+        let completedAt = Date()
+
+        codexAppServerLock.lock()
+        codexAppServerRequestInFlight = false
+        if let snapshot {
+            codexAppServerCachedQuota = snapshot
+            codexAppServerCachedAt = completedAt
+        }
+        let cached = codexAppServerFreshEnoughCache(now: completedAt, maxAge: codexAppServerCacheMaxAge)
+        codexAppServerLock.unlock()
+
+        return snapshot ?? cached
+    }
+
+    private func codexAppServerFreshEnoughCache(now: Date, maxAge: TimeInterval) -> QuotaMonitor.QuotaSnapshot? {
+        guard let cached = codexAppServerCachedQuota,
+              let cachedAt = codexAppServerCachedAt,
+              now.timeIntervalSince(cachedAt) <= maxAge else { return nil }
+        return cached
+    }
+
+    private func fetchCodexAppServerQuotaSnapshot(now: Date) -> QuotaMonitor.QuotaSnapshot? {
+        codexAppServerProcessLock.lock()
+        defer { codexAppServerProcessLock.unlock() }
+
+        let deadline = Date().addingTimeInterval(codexAppServerTimeout)
+        guard ensureCodexAppServerRunning(deadline: deadline),
+              let input = codexAppServerInput,
+              let output = codexAppServerOutput else {
+            DiagnosticLog.shared.log("context", "codex app-server quota refresh could not initialize app-server")
+            return nil
+        }
+
+        let requestId = codexAppServerNextRequestId
+        codexAppServerNextRequestId += 1
+
+        guard writeCodexAppServerMessage(["method": "account/rateLimits/read", "id": requestId], to: input),
+              let response = readCodexAppServerResponse(id: requestId, from: output, deadline: deadline) else {
+            stopCodexAppServer()
+            DiagnosticLog.shared.log("context", "codex app-server quota refresh did not return a usable response")
+            return nil
+        }
+
+        if let error = response["error"] as? [String: Any],
+           let message = error["message"] as? String {
+            DiagnosticLog.shared.log("context", "codex app-server quota refresh failed: \(message)")
+        }
+
+        return parseCodexAppServerQuotaResponse(response, now: now)
+    }
+
+    private func ensureCodexAppServerRunning(deadline: Date) -> Bool {
+        if codexAppServerProcess?.isRunning == true,
+           codexAppServerInput != nil,
+           codexAppServerOutput != nil {
+            return true
+        }
+
+        stopCodexAppServer()
+
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        process.arguments = ["-l", "-c", "codex app-server --listen stdio://"]
+
+        let inputPipe = Pipe()
+        let outputPipe = Pipe()
+        process.standardInput = inputPipe
+        process.standardOutput = outputPipe
+        process.standardError = FileHandle.nullDevice
+
+        do {
+            try process.run()
+        } catch {
+            DiagnosticLog.shared.log("context", "codex app-server quota refresh failed to start: \(error.localizedDescription)")
+            return false
+        }
+
+        codexAppServerProcess = process
+        codexAppServerInput = inputPipe.fileHandleForWriting
+        codexAppServerOutput = outputPipe.fileHandleForReading
+        codexAppServerReadBuffer = Data()
+        codexAppServerNextRequestId = 2
+
+        guard writeCodexAppServerMessage([
+            "method": "initialize",
+            "id": 1,
+            "params": [
+                "clientInfo": [
+                    "name": "deckard",
+                    "title": "Deckard",
+                    "version": Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0.0.0",
+                ],
+            ],
+        ], to: inputPipe.fileHandleForWriting),
+            readCodexAppServerResponse(id: 1, from: outputPipe.fileHandleForReading, deadline: deadline) != nil,
+            writeCodexAppServerMessage(["method": "initialized"], to: inputPipe.fileHandleForWriting) else {
+            stopCodexAppServer()
+            return false
+        }
+
+        return true
+    }
+
+    private func stopCodexAppServer() {
+        try? codexAppServerInput?.close()
+        if let process = codexAppServerProcess, process.isRunning {
+            process.terminate()
+            process.waitUntilExit()
+        }
+        codexAppServerProcess = nil
+        codexAppServerInput = nil
+        codexAppServerOutput = nil
+        codexAppServerReadBuffer = Data()
+        codexAppServerNextRequestId = 2
+    }
+
+    private func writeCodexAppServerMessage(_ message: [String: Any], to handle: FileHandle) -> Bool {
+        guard JSONSerialization.isValidJSONObject(message),
+              var data = try? JSONSerialization.data(withJSONObject: message) else { return false }
+        data.append(0x0A)
+        return writeCodexAppServerData(data, to: handle.fileDescriptor)
+    }
+
+    private func writeCodexAppServerData(_ data: Data, to fd: Int32) -> Bool {
+        data.withUnsafeBytes { rawBuffer in
+            guard let baseAddress = rawBuffer.baseAddress else { return false }
+            var offset = 0
+            while offset < rawBuffer.count {
+                let written = Darwin.write(fd, baseAddress.advanced(by: offset), rawBuffer.count - offset)
+                if written > 0 {
+                    offset += written
+                } else if written == -1 && errno == EINTR {
+                    continue
+                } else {
+                    return false
+                }
+            }
+            return true
+        }
+    }
+
+    private func readCodexAppServerResponse(id: Int, from handle: FileHandle, deadline: Date) -> [String: Any]? {
+        let fd = handle.fileDescriptor
+        let oldFlags = fcntl(fd, F_GETFL)
+        if oldFlags >= 0 {
+            _ = fcntl(fd, F_SETFL, oldFlags | O_NONBLOCK)
+        }
+        defer {
+            if oldFlags >= 0 {
+                _ = fcntl(fd, F_SETFL, oldFlags)
+            }
+        }
+
+        var chunk = [UInt8](repeating: 0, count: 4096)
+
+        while Date() < deadline {
+            if let response = codexAppServerBufferedResponse(id: id) {
+                return response
+            }
+
+            let count = chunk.withUnsafeMutableBufferPointer { pointer -> Int in
+                guard let baseAddress = pointer.baseAddress else { return -1 }
+                return Darwin.read(fd, baseAddress, pointer.count)
+            }
+
+            if count > 0 {
+                codexAppServerReadBuffer.append(chunk, count: count)
+                if let response = codexAppServerBufferedResponse(id: id) {
+                    return response
+                }
+            } else if count == 0 {
+                return nil
+            } else if errno == EAGAIN || errno == EWOULDBLOCK {
+                usleep(20_000)
+            } else {
+                return nil
+            }
+        }
+
+        return nil
+    }
+
+    private func codexAppServerBufferedResponse(id: Int) -> [String: Any]? {
+        while let newlineIndex = codexAppServerReadBuffer.firstIndex(of: 0x0A) {
+            let lineData = codexAppServerReadBuffer[..<newlineIndex]
+            codexAppServerReadBuffer.removeSubrange(codexAppServerReadBuffer.startIndex...newlineIndex)
+            guard !lineData.isEmpty,
+                  let json = try? JSONSerialization.jsonObject(with: Data(lineData)) as? [String: Any],
+                  codexResponseId(json["id"]) == id else { continue }
+            return json
+        }
+        return nil
     }
 
     private func parseCodexSessionInfo(fileURL: URL, projectPath: String) -> SessionInfo? {
@@ -378,13 +694,15 @@ class ContextMonitor {
     }
 
     private func codexQuotaSnapshot(from rateLimits: [String: Any], timestamp: Date) -> QuotaMonitor.QuotaSnapshot? {
-        guard let primary = rateLimits["primary"] as? [String: Any],
-              let secondary = rateLimits["secondary"] as? [String: Any] else { return nil }
+        let primary = rateLimits["primary"] as? [String: Any]
+        let secondary = rateLimits["secondary"] as? [String: Any]
 
-        let primaryUsed = codexDouble(primary["used_percent"]) ?? 0
-        let secondaryUsed = codexDouble(secondary["used_percent"]) ?? 0
-        let primaryReset = codexDouble(primary["resets_at"]).map { Date(timeIntervalSince1970: $0) }
-        let secondaryReset = codexDouble(secondary["resets_at"]).map { Date(timeIntervalSince1970: $0) }
+        guard primary != nil || secondary != nil else { return nil }
+
+        let primaryUsed = codexDouble(primary?["used_percent"] ?? primary?["usedPercent"]) ?? 0
+        let secondaryUsed = codexDouble(secondary?["used_percent"] ?? secondary?["usedPercent"]) ?? 0
+        let primaryReset = codexDouble(primary?["resets_at"] ?? primary?["resetsAt"]).map { Date(timeIntervalSince1970: $0) }
+        let secondaryReset = codexDouble(secondary?["resets_at"] ?? secondary?["resetsAt"]).map { Date(timeIntervalSince1970: $0) }
 
         guard primaryUsed > 0 || secondaryUsed > 0 || primaryReset != nil || secondaryReset != nil else {
             return nil
@@ -420,6 +738,13 @@ class ContextMonitor {
         if let double = value as? Double { return double }
         if let int = value as? Int { return Double(int) }
         if let string = value as? String { return Double(string) }
+        return nil
+    }
+
+    private func codexResponseId(_ value: Any?) -> Int? {
+        if let int = value as? Int { return int }
+        if let double = value as? Double { return Int(double) }
+        if let string = value as? String { return Int(string) }
         return nil
     }
 

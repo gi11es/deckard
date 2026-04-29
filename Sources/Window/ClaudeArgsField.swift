@@ -5,6 +5,25 @@ import ObjectiveC
 /// A chip-based text field for entering Claude CLI arguments with autocomplete.
 final class ClaudeArgsField: NSView {
 
+    enum FlagSource {
+        case claude
+        case codex
+
+        var flags: [ClaudeFlag] {
+            switch self {
+            case .claude: return ClaudeCLIFlags.shared.flags
+            case .codex: return CodexCLIFlags.shared.flags
+            }
+        }
+
+        var didLoadNotification: Notification.Name {
+            switch self {
+            case .claude: return ClaudeCLIFlags.didLoadNotification
+            case .codex: return CodexCLIFlags.didLoadNotification
+            }
+        }
+    }
+
     var onChange: ((String) -> Void)?
 
     private var chips: [ArgsChip] = []
@@ -12,6 +31,7 @@ final class ClaudeArgsField: NSView {
     private var chipViews: [NSView] = []
     private var selectedChipIndex: Int?
     private var pendingFlag: ClaudeFlag?
+    private var flagSource: FlagSource = .claude
     private var chipContainerHeightConstraint: NSLayoutConstraint?
     private var lastLayoutWidth: CGFloat = 0
 
@@ -20,7 +40,8 @@ final class ClaudeArgsField: NSView {
         set { loadChips(from: newValue) }
     }
 
-    override init(frame frameRect: NSRect) {
+    init(frame frameRect: NSRect, flagSource: FlagSource = .claude) {
+        self.flagSource = flagSource
         super.init(frame: frameRect)
         setup()
     }
@@ -48,7 +69,7 @@ final class ClaudeArgsField: NSView {
         // Re-parse chips when CLI flags finish loading (they load async at startup).
         NotificationCenter.default.addObserver(
             self, selector: #selector(flagsDidLoad),
-            name: ClaudeCLIFlags.didLoadNotification, object: nil
+            name: flagSource.didLoadNotification, object: nil
         )
     }
 
@@ -79,7 +100,7 @@ final class ClaudeArgsField: NSView {
     // MARK: - Chip Management
 
     private func loadChips(from string: String) {
-        chips = ArgsChip.deserialize(string, knownFlags: ClaudeCLIFlags.shared.flags)
+        chips = ArgsChip.deserialize(string, knownFlags: flagSource.flags)
         rebuildChipViews()
     }
 
@@ -390,7 +411,7 @@ extension ClaudeArgsField: NSTextFieldDelegate, NSTableViewDataSource, NSTableVi
         let query = text.replacingOccurrences(of: #"^-{0,2}"#, with: "", options: .regularExpression)
         guard !query.isEmpty else {
             // Show all flags if user just typed "--"
-            let allFlags = ClaudeCLIFlags.shared.flags.filter { flag in
+            let allFlags = flagSource.flags.filter { flag in
                 !chips.contains(where: { $0.flag == flag.longName })
             }
             if allFlags.isEmpty {
@@ -410,7 +431,7 @@ extension ClaudeArgsField: NSTextFieldDelegate, NSTableViewDataSource, NSTableVi
         let addedFlagNames = Set(chips.map(\.flag))
         var scored: [(flag: ClaudeFlag, score: Double)] = []
 
-        for flag in ClaudeCLIFlags.shared.flags {
+        for flag in flagSource.flags {
             // Skip already-added flags
             if addedFlagNames.contains(flag.longName) { continue }
 

@@ -88,6 +88,7 @@ class ProjectItem {
     var tabs: [TabItem] = []
     var selectedTabIndex: Int = 0
     var defaultArgs: String?
+    var defaultCodexArgs: String?
 
     init(path: String) {
         self.id = UUID()
@@ -574,6 +575,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         if let snapshot = recentlyClosedProjects.first(where: { $0.path == project.path }) {
             recentlyClosedProjects.removeAll { $0.path == project.path }
             project.name = snapshot.name
+            project.defaultArgs = snapshot.defaultArgs
+            project.defaultCodexArgs = snapshot.defaultCodexArgs
             for ts in snapshot.tabs {
                 createTabInProject(project, kind: ts.kind, name: ts.name,
                                    sessionIdToResume: ts.kind.isAgent ? ts.sessionId : nil,
@@ -630,7 +633,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 ProjectTabState(id: tab.id.uuidString, name: tab.name,
                                 kind: tab.kind, sessionId: tab.sessionId,
                                 tmuxSessionName: tab.surface.tmuxSessionName)
-            }
+            },
+            defaultArgs: project.defaultArgs,
+            defaultCodexArgs: project.defaultCodexArgs
         )
         recentlyClosedProjects.removeAll { $0.path == project.path }
         recentlyClosedProjects.append(snapshot)
@@ -751,7 +756,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func createTabInProject(_ project: ProjectItem, kind: TabKind, name: String? = nil, sessionIdToResume: String? = nil, forkSession: Bool = false, tmuxSessionToResume: String? = nil, extraArgs: String? = nil) {
         let surface = TerminalSurface()
-        let discoveryStart = Date().addingTimeInterval(-2)
         let tabName: String
         if let name = name {
             tabName = name
@@ -800,15 +804,19 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             // clear hides the echoed command; exec replaces the shell.
             initialInput = "clear && exec claude\(claudeArgs)\n"
         } else if kind == .codex {
+            let resolvedArgs = extraArgs ?? project.defaultCodexArgs ?? UserDefaults.standard.string(forKey: "codexExtraArgs") ?? ""
+            let codexOptions = resolvedArgs.isEmpty ? "" : " \(resolvedArgs)"
             var codexArgs = ""
             if let sessionIdToResume {
                 if forkSession {
-                    codexArgs = " fork \(sessionIdToResume)"
+                    codexArgs = "\(codexOptions) fork \(sessionIdToResume)"
                 } else if ContextMonitor.shared.codexSessionFileURL(sessionId: sessionIdToResume) != nil {
-                    codexArgs = " resume \(sessionIdToResume)"
+                    codexArgs = "\(codexOptions) resume \(sessionIdToResume)"
                 } else {
                     tab.sessionId = nil
                 }
+            } else {
+                codexArgs = codexOptions
             }
             initialInput = "clear && exec codex\(codexArgs)\n"
         } else {
@@ -834,13 +842,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         tabCreationOrder.append(tab.id)
 
         if kind == .codex && (tab.sessionId == nil || forkSession) {
-            var excluded = Set(project.tabs.compactMap { $0.kind == .codex ? $0.sessionId : nil })
-            if let sessionIdToResume { excluded.insert(sessionIdToResume) }
-            scheduleCodexSessionDiscovery(forSurfaceId: tab.id, projectPath: project.path, after: discoveryStart, excluding: excluded)
+            scheduleCodexSessionDiscovery(forSurfaceId: tab.id, projectPath: project.path)
         }
     }
 
-    private func scheduleCodexSessionDiscovery(forSurfaceId surfaceId: UUID, projectPath: String, after date: Date, excluding excludedIds: Set<String>) {
+    private func scheduleCodexSessionDiscovery(forSurfaceId surfaceId: UUID, projectPath: String) {
         for delay in [1.0, 3.0, 8.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self,
@@ -848,17 +854,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                       tab.kind == .codex,
                       tab.sessionId == nil else { return }
 
-                let openCodexIds = Set(self.projects.flatMap { project in
-                    project.tabs.compactMap { other -> String? in
-                        guard other.id != surfaceId, other.kind == .codex else { return nil }
-                        return other.sessionId
-                    }
-                })
-                let excluded = excludedIds.union(openCodexIds)
-                guard let session = ContextMonitor.shared.latestCodexSession(
-                    forProjectPath: projectPath,
-                    after: date,
-                    excluding: excluded
+                guard let processId = ProcessMonitor.shared.shellPid(forSurface: surfaceId),
+                      let session = ContextMonitor.shared.codexSessionInfo(
+                        openedByProcessId: processId,
+                        projectPath: projectPath
                 ) else { return }
 
                 self.updateSessionId(forSurfaceId: surfaceId.uuidString, sessionId: session.sessionId)
@@ -898,6 +897,20 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 self.createTabInProject(project, kind: .claude, extraArgs: args)
                 self.finalizeTabCreation(in: project)
             }
+        } else if kind == .codex && UserDefaults.standard.bool(forKey: "promptForCodexSessionArgs") {
+            promptForCodexArgs(for: project) { [weak self] args in
+                guard let self else { return }
+                guard let args else {
+                    self.isCreatingTab = false
+                    return
+                }
+                guard self.projects.contains(where: { $0 === project }) else {
+                    self.isCreatingTab = false
+                    return
+                }
+                self.createTabInProject(project, kind: .codex, extraArgs: args)
+                self.finalizeTabCreation(in: project)
+            }
         } else {
             createTabInProject(project, kind: kind)
             finalizeTabCreation(in: project)
@@ -925,6 +938,34 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let field = ClaudeArgsField(frame: NSRect(x: 0, y: 0, width: 400, height: 60))
         field.stringValue = project.defaultArgs ?? UserDefaults.standard.string(forKey: "claudeExtraArgs") ?? ""
+        alert.accessoryView = field
+
+        guard let window else {
+            completion(nil)
+            return
+        }
+
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn {
+                completion(field.stringValue)
+            } else {
+                completion(nil)
+            }
+        }
+    }
+
+    private func promptForCodexArgs(for project: ProjectItem, completion: @escaping (String?) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Codex Arguments"
+        alert.informativeText = "Arguments passed to this session:"
+        alert.addButton(withTitle: "Start")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = ClaudeArgsField(
+            frame: NSRect(x: 0, y: 0, width: 400, height: 60),
+            flagSource: .codex
+        )
+        field.stringValue = project.defaultCodexArgs ?? UserDefaults.standard.string(forKey: "codexExtraArgs") ?? ""
         alert.accessoryView = field
 
         guard let window else {
@@ -1132,14 +1173,24 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     private func updateCodexUsage(for tab: TabItem) {
-        guard let sessionId = tab.sessionId else {
+        guard let project = currentProject else {
             quotaView.clear()
             return
         }
 
         let tabName = tab.name
         let tabId = tab.id
+        let initialSessionId = tab.sessionId
+        let projectPath = project.path
         DispatchQueue.global(qos: .utility).async {
+            var sessionId = initialSessionId
+            if sessionId == nil,
+               let processId = ProcessMonitor.shared.shellPid(forSurface: tabId) {
+                sessionId = ContextMonitor.shared.codexSessionInfo(
+                    openedByProcessId: processId,
+                    projectPath: projectPath
+                )?.sessionId
+            }
             let usage = ContextMonitor.shared.getCodexUsage(sessionId: sessionId)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
@@ -1148,6 +1199,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                       activeTab.id == tabId else {
                     DiagnosticLog.shared.log("context",
                         "updateCodexUsage: stale callback for \(tabName), ignoring")
+                    return
+                }
+
+                if let sessionId, activeTab.sessionId != sessionId {
+                    self.updateSessionId(forSurfaceId: tabId.uuidString, sessionId: sessionId)
                     return
                 }
 
@@ -1167,40 +1223,81 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Process Monitor
 
+    private struct CodexBadgePollTarget {
+        let surfaceId: UUID
+        let projectPath: String
+        let sessionId: String?
+        let processId: pid_t?
+    }
+
+    private struct CodexBadgePollResult {
+        let states: [UUID: ContextMonitor.CodexActivityInfo]
+        let discoveredSessionIds: [UUID: String]
+    }
+
     private func startProcessMonitor() {
         processMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
             // Build tab infos — order doesn't matter since PID matching
             // is done via control socket registration, not sorted order.
             var tabInfos: [ProcessMonitor.TabInfo] = []
+            var codexTargets: [CodexBadgePollTarget] = []
             for project in self.projects {
                 for tab in project.tabs {
                     tabInfos.append(ProcessMonitor.TabInfo(
                         surfaceId: tab.id, kind: tab.kind,
                         name: tab.name, projectPath: project.path))
+                    if tab.kind == .codex {
+                        codexTargets.append(CodexBadgePollTarget(
+                            surfaceId: tab.id,
+                            projectPath: project.path,
+                            sessionId: tab.sessionId,
+                            processId: ProcessMonitor.shared.shellPid(forSurface: tab.id)))
+                    }
                 }
             }
             DispatchQueue.global(qos: .utility).async {
                 let states = ProcessMonitor.shared.poll(tabs: tabInfos)
-                let codexStates = self.pollCodexBadgeStates()
+                let codexResult = self.pollCodexBadgeStates(for: codexTargets)
                 DispatchQueue.main.async {
+                    self.applyCodexSessionDiscoveries(codexResult.discoveredSessionIds)
                     self.applyTerminalBadgeStates(states)
-                    self.applyCodexBadgeStates(codexStates)
+                    self.applyCodexBadgeStates(codexResult.states)
                 }
             }
         }
     }
 
-    private func pollCodexBadgeStates() -> [UUID: ContextMonitor.CodexActivityInfo] {
+    private func pollCodexBadgeStates(for targets: [CodexBadgePollTarget]) -> CodexBadgePollResult {
         var states: [UUID: ContextMonitor.CodexActivityInfo] = [:]
-        for project in projects {
-            for tab in project.tabs where tab.kind == .codex {
-                guard let sessionId = tab.sessionId,
-                      let state = ContextMonitor.shared.codexActivityInfo(sessionId: sessionId) else { continue }
-                states[tab.id] = state
+        var discoveredSessionIds: [UUID: String] = [:]
+
+        for target in targets {
+            var sessionId = target.sessionId
+            if sessionId == nil,
+               let processId = target.processId,
+               let session = ContextMonitor.shared.codexSessionInfo(
+                    openedByProcessId: processId,
+                    projectPath: target.projectPath
+               ),
+               !discoveredSessionIds.values.contains(session.sessionId) {
+                sessionId = session.sessionId
+                discoveredSessionIds[target.surfaceId] = session.sessionId
             }
+
+            guard let sessionId,
+                  let state = ContextMonitor.shared.codexActivityInfo(sessionId: sessionId) else { continue }
+            states[target.surfaceId] = state
         }
-        return states
+
+        return CodexBadgePollResult(states: states, discoveredSessionIds: discoveredSessionIds)
+    }
+
+    private func applyCodexSessionDiscoveries(_ discoveredSessionIds: [UUID: String]) {
+        guard !discoveredSessionIds.isEmpty else { return }
+        for (surfaceId, sessionId) in discoveredSessionIds {
+            updateSessionId(forSurfaceId: surfaceId.uuidString, sessionId: sessionId)
+        }
     }
 
     private func applyCodexBadgeStates(_ states: [UUID: ContextMonitor.CodexActivityInfo]) {
@@ -1490,7 +1587,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                         tmuxSessionName: tab.surface.tmuxSessionName
                     )
                 },
-                defaultArgs: project.defaultArgs
+                defaultArgs: project.defaultArgs,
+                defaultCodexArgs: project.defaultCodexArgs
             )
         }
 
@@ -1543,6 +1641,32 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         let selectedIdx = min(max(state.selectedTabIndex, 0), projectStates.count - 1)
+        var codexRestoreCandidatesByPath: [String: [String]] = [:]
+        var usedCodexSessionIds = Set(projectStates.flatMap { project in
+            project.tabs.compactMap { tab in
+                tab.kind == .codex ? tab.sessionId : nil
+            }
+        })
+
+        func recoverCodexSessionId(for projectPath: String, tabName: String) -> String? {
+            let resolvedPath = (projectPath as NSString).resolvingSymlinksInPath
+            if codexRestoreCandidatesByPath[resolvedPath] == nil {
+                codexRestoreCandidatesByPath[resolvedPath] = ContextMonitor.shared
+                    .listCodexSessions(forProjectPath: resolvedPath)
+                    .map(\.sessionId)
+            }
+
+            while var candidates = codexRestoreCandidatesByPath[resolvedPath], !candidates.isEmpty {
+                let sessionId = candidates.removeFirst()
+                codexRestoreCandidatesByPath[resolvedPath] = candidates
+                guard usedCodexSessionIds.insert(sessionId).inserted else { continue }
+                DiagnosticLog.shared.log("restore",
+                    "recovered missing Codex session id for \(tabName)@\(resolvedPath): \(sessionId)")
+                return sessionId
+            }
+
+            return nil
+        }
 
         // Phase 1: Create the active project's active tab immediately so the user
         // sees a working terminal right away. Collect remaining tabs for Phase 2.
@@ -1552,17 +1676,23 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             let project = ProjectItem(path: ps.path)
             project.name = ps.name
             project.defaultArgs = ps.defaultArgs
+            project.defaultCodexArgs = ps.defaultCodexArgs
 
             let selTab = min(max(ps.selectedTabIndex, 0), max(ps.tabs.count - 1, 0))
 
             for (t, ts) in ps.tabs.enumerated() {
+                var restoredTab = ts
+                if restoredTab.kind == .codex, restoredTab.sessionId == nil {
+                    restoredTab.sessionId = recoverCodexSessionId(for: ps.path, tabName: restoredTab.name)
+                }
+
                 if i == selectedIdx && t == selTab {
                     // Create the active tab's surface synchronously
-                    createTabInProject(project, kind: ts.kind, name: ts.name,
-                                       sessionIdToResume: ts.kind.isAgent ? ts.sessionId : nil,
-                                       tmuxSessionToResume: ts.tmuxSessionName)
+                    createTabInProject(project, kind: restoredTab.kind, name: restoredTab.name,
+                                       sessionIdToResume: restoredTab.kind.isAgent ? restoredTab.sessionId : nil,
+                                       tmuxSessionToResume: restoredTab.tmuxSessionName)
                 } else {
-                    pending.append((project: project, tab: ts, originalIndex: t))
+                    pending.append((project: project, tab: restoredTab, originalIndex: t))
                 }
             }
 
