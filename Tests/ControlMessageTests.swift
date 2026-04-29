@@ -136,6 +136,32 @@ final class ControlMessageTests: XCTestCase {
         XCTAssertEqual(decoded.workingDirectory, "/home")
     }
 
+    func testCodexTabInfoRoundtripIncludesKind() throws {
+        let tab = TabInfo(
+            id: "t-codex",
+            name: "Project/Codex",
+            isClaude: false,
+            kind: "codex",
+            isMaster: false,
+            sessionId: "codex-session",
+            badgeState: "codexThinking",
+            workingDirectory: "/repo"
+        )
+
+        let data = try JSONEncoder().encode(tab)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let decoded = try JSONDecoder().decode(TabInfo.self, from: data)
+
+        XCTAssertEqual(json?["kind"] as? String, "codex")
+        XCTAssertEqual(decoded.id, "t-codex")
+        XCTAssertEqual(decoded.name, "Project/Codex")
+        XCTAssertFalse(decoded.isClaude)
+        XCTAssertEqual(decoded.kind, "codex")
+        XCTAssertEqual(decoded.sessionId, "codex-session")
+        XCTAssertEqual(decoded.badgeState, "codexThinking")
+        XCTAssertEqual(decoded.workingDirectory, "/repo")
+    }
+
     // MARK: - Optional fields
 
     func testControlMessageOptionalFields() throws {

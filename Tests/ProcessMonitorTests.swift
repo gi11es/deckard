@@ -94,4 +94,20 @@ final class ProcessMonitorTests: XCTestCase {
         XCTAssertEqual(tabInfo.name, "Claude")
         XCTAssertEqual(tabInfo.projectPath, "/Users/test/project")
     }
+
+    func testCodexTabInfoConstruction() {
+        let uuid = UUID()
+        let tabInfo = ProcessMonitor.TabInfo(
+            surfaceId: uuid,
+            kind: .codex,
+            name: "Codex",
+            projectPath: "/Users/test/project"
+        )
+
+        XCTAssertEqual(tabInfo.surfaceId, uuid)
+        XCTAssertEqual(tabInfo.kind, .codex)
+        XCTAssertFalse(tabInfo.isClaude)
+        XCTAssertEqual(tabInfo.name, "Codex")
+        XCTAssertEqual(tabInfo.projectPath, "/Users/test/project")
+    }
 }

@@ -18,7 +18,8 @@ final class SessionStateTests: XCTestCase {
                 selectedTabIndex: 0,
                 tabs: [
                     ProjectTabState(id: "tab-1", name: "Claude", isClaude: true, sessionId: "sess-1"),
-                    ProjectTabState(id: "tab-2", name: "Terminal", isClaude: false, sessionId: nil),
+                    ProjectTabState(id: "tab-2", name: "Codex", kind: .codex, sessionId: "codex-1"),
+                    ProjectTabState(id: "tab-3", name: "Terminal", isClaude: false, sessionId: nil),
                 ],
                 defaultArgs: "--permission-mode acceptEdits",
                 defaultCodexArgs: "--ask-for-approval never --sandbox workspace-write"
@@ -33,10 +34,14 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.selectedTabIndex, 3)
         XCTAssertEqual(decoded.defaultWorkingDirectory, "/Users/test/project")
         XCTAssertEqual(decoded.projects?.count, 1)
-        XCTAssertEqual(decoded.projects?[0].tabs.count, 2)
+        XCTAssertEqual(decoded.projects?[0].tabs.count, 3)
         XCTAssertEqual(decoded.projects?[0].tabs[0].isClaude, true)
         XCTAssertEqual(decoded.projects?[0].tabs[0].sessionId, "sess-1")
-        XCTAssertNil(decoded.projects?[0].tabs[1].sessionId)
+        XCTAssertEqual(decoded.projects?[0].tabs[1].kind, .codex)
+        XCTAssertEqual(decoded.projects?[0].tabs[1].isClaude, false)
+        XCTAssertEqual(decoded.projects?[0].tabs[1].sessionId, "codex-1")
+        XCTAssertEqual(decoded.projects?[0].tabs[2].kind, .terminal)
+        XCTAssertNil(decoded.projects?[0].tabs[2].sessionId)
         XCTAssertEqual(decoded.projects?[0].defaultArgs, "--permission-mode acceptEdits")
         XCTAssertEqual(decoded.projects?[0].defaultCodexArgs, "--ask-for-approval never --sandbox workspace-write")
     }
@@ -104,8 +109,62 @@ final class SessionStateTests: XCTestCase {
 
         XCTAssertEqual(decoded.id, "t1")
         XCTAssertEqual(decoded.name, "Claude")
+        XCTAssertEqual(decoded.kind, .claude)
         XCTAssertTrue(decoded.isClaude)
         XCTAssertEqual(decoded.sessionId, "s1")
+    }
+
+    func testProjectTabStateCodexRoundtrip() throws {
+        let tab = ProjectTabState(
+            id: "t-codex",
+            name: "Codex",
+            kind: .codex,
+            sessionId: "codex-session",
+            tmuxSessionName: "deckard-codex"
+        )
+
+        let data = try JSONEncoder().encode(tab)
+        let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: data)
+
+        XCTAssertEqual(json?["kind"] as? String, "codex")
+        XCTAssertEqual(json?["isClaude"] as? Bool, false)
+        XCTAssertEqual(decoded.id, "t-codex")
+        XCTAssertEqual(decoded.name, "Codex")
+        XCTAssertEqual(decoded.kind, .codex)
+        XCTAssertFalse(decoded.isClaude)
+        XCTAssertEqual(decoded.sessionId, "codex-session")
+        XCTAssertEqual(decoded.tmuxSessionName, "deckard-codex")
+    }
+
+    func testProjectTabStateDecodesCodexKindEvenWhenLegacyIsClaudeIsFalse() throws {
+        let json = """
+        {"id": "tab-codex", "name": "Codex", "kind": "codex", "isClaude": false, "sessionId": "codex-1"}
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: json)
+
+        XCTAssertEqual(decoded.kind, .codex)
+        XCTAssertFalse(decoded.isClaude)
+        XCTAssertEqual(decoded.sessionId, "codex-1")
+    }
+
+    func testProjectTabStateLegacyClaudeDecodeWithoutKind() throws {
+        let json = """
+        {"id": "tab-claude", "name": "Claude", "isClaude": true, "sessionId": "claude-1"}
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: json)
+
+        XCTAssertEqual(decoded.kind, .claude)
+        XCTAssertTrue(decoded.isClaude)
+        XCTAssertEqual(decoded.sessionId, "claude-1")
+    }
+
+    func testSessionCacheKeySeparatesCodexFromClaude() {
+        XCTAssertEqual(SessionManager.sessionCacheKey(sessionId: "shared-id", kind: .claude), "shared-id")
+        XCTAssertEqual(SessionManager.sessionCacheKey(sessionId: "shared-id", kind: .codex), "codex:shared-id")
+        XCTAssertEqual(SessionManager.sessionCacheKey(sessionId: "shared-id", kind: .terminal), "terminal:shared-id")
     }
 
     // MARK: - SessionManager save/load
