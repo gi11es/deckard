@@ -890,6 +890,8 @@ class BadgeShapeView: NSView {
 
     private let shapeLayer = CAShapeLayer()
     private var isPulseAnimationEnabled = false
+    private var pulseTimer: Timer?
+    private var pulseStartTime: TimeInterval = 0
 
     init(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
@@ -905,9 +907,15 @@ class BadgeShapeView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    deinit {
+        pulseTimer?.invalidate()
+    }
+
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if isPulseAnimationEnabled {
+        if window == nil {
+            stopPulseAnimation(resetOpacity: false)
+        } else if isPulseAnimationEnabled {
             startPulseAnimation()
         }
     }
@@ -917,8 +925,7 @@ class BadgeShapeView: NSView {
         if enabled {
             startPulseAnimation()
         } else {
-            shapeLayer.removeAnimation(forKey: Self.pulseAnimationKey)
-            shapeLayer.opacity = 1.0
+            stopPulseAnimation(resetOpacity: true)
         }
     }
 
@@ -930,8 +937,36 @@ class BadgeShapeView: NSView {
     }
 
     private func startPulseAnimation() {
+        stopPulseAnimation(resetOpacity: false)
+        pulseStartTime = CACurrentMediaTime()
+        let timer = Timer(timeInterval: 1.0 / 30.0, repeats: true) { [weak self] _ in
+            self?.updatePulseOpacity()
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        pulseTimer = timer
+        updatePulseOpacity()
+    }
+
+    private func stopPulseAnimation(resetOpacity: Bool) {
+        pulseTimer?.invalidate()
+        pulseTimer = nil
         shapeLayer.removeAnimation(forKey: Self.pulseAnimationKey)
-        shapeLayer.add(Self.makePulseAnimation(), forKey: Self.pulseAnimationKey)
+        if resetOpacity {
+            alphaValue = 1.0
+            shapeLayer.opacity = 1.0
+        }
+    }
+
+    private func updatePulseOpacity() {
+        let halfCycle: TimeInterval = 1.2
+        let cycle = halfCycle * 2
+        let elapsed = CACurrentMediaTime() - pulseStartTime
+        let position = elapsed.truncatingRemainder(dividingBy: cycle)
+        let rawProgress = position <= halfCycle
+            ? position / halfCycle
+            : (cycle - position) / halfCycle
+        let eased = 0.5 - 0.5 * cos(rawProgress * .pi)
+        alphaValue = CGFloat(1.0 - (0.7 * eased))
     }
 
     static func makePulseAnimation() -> CABasicAnimation {
