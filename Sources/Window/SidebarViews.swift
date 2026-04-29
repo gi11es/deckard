@@ -953,6 +953,7 @@ class BadgeShapeView: NSView {
         shapeLayer.removeAnimation(forKey: Self.pulseAnimationKey)
         if resetOpacity {
             alphaValue = 1.0
+            layer?.opacity = 1.0
             shapeLayer.opacity = 1.0
         }
     }
@@ -966,7 +967,10 @@ class BadgeShapeView: NSView {
             ? position / halfCycle
             : (cycle - position) / halfCycle
         let eased = 0.5 - 0.5 * cos(rawProgress * .pi)
-        alphaValue = CGFloat(1.0 - (0.7 * eased))
+        let opacity = Float(1.0 - (0.7 * eased))
+        alphaValue = CGFloat(opacity)
+        layer?.opacity = opacity
+        shapeLayer.opacity = opacity
     }
 
     static func makePulseAnimation() -> CABasicAnimation {
