@@ -168,6 +168,18 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
     // MARK: - Agents Pane
 
+    private struct AgentDefaultsSection {
+        let title: String
+        let fieldLabel: String
+        let defaultsKey: String
+        let flagSource: ClaudeArgsField.FlagSource
+        let help: String
+        let checkboxTitle: String
+        let checkboxHelp: String
+        let checkboxDefaultsKey: String
+        let checkboxAction: Selector
+    }
+
     private func makeAgentsPane() -> NSView {
         let pane = NSView()
 
@@ -177,7 +189,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         stack.spacing = 18
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        stack.addArrangedSubview(makeAgentDefaultsSection(
+        stack.addArrangedSubview(makeAgentDefaultsSection(AgentDefaultsSection(
             title: "Claude Code",
             fieldLabel: "Default arguments:",
             defaultsKey: "claudeExtraArgs",
@@ -187,9 +199,9 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
             checkboxHelp: "Show a dialog to set arguments when creating a new Claude tab.",
             checkboxDefaultsKey: "promptForSessionArgs",
             checkboxAction: #selector(perSessionArgsToggled(_:))
-        ))
+        )))
 
-        stack.addArrangedSubview(makeAgentDefaultsSection(
+        stack.addArrangedSubview(makeAgentDefaultsSection(AgentDefaultsSection(
             title: "Codex",
             fieldLabel: "Default parameters:",
             defaultsKey: "codexExtraArgs",
@@ -199,7 +211,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
             checkboxHelp: "Show a dialog to set parameters when creating a new Codex tab.",
             checkboxDefaultsKey: "promptForCodexSessionArgs",
             checkboxAction: #selector(codexPerSessionArgsToggled(_:))
-        ))
+        )))
 
         pane.addSubview(stack)
         NSLayoutConstraint.activate([
@@ -211,21 +223,11 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         return pane
     }
 
-    private func makeAgentDefaultsSection(
-        title: String,
-        fieldLabel: String,
-        defaultsKey: String,
-        flagSource: ClaudeArgsField.FlagSource,
-        help: String,
-        checkboxTitle: String,
-        checkboxHelp: String,
-        checkboxDefaultsKey: String,
-        checkboxAction: Selector
-    ) -> NSView {
+    private func makeAgentDefaultsSection(_ section: AgentDefaultsSection) -> NSView {
         let container = NSView()
         container.translatesAutoresizingMaskIntoConstraints = false
 
-        let titleLabel = NSTextField(labelWithString: title)
+        let titleLabel = NSTextField(labelWithString: section.title)
         titleLabel.font = .systemFont(ofSize: 13, weight: .semibold)
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
 
@@ -237,23 +239,23 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         grid.rowSpacing = 6
         grid.columnSpacing = 8
 
-        let argsLabel = NSTextField(labelWithString: fieldLabel)
+        let argsLabel = NSTextField(labelWithString: section.fieldLabel)
         argsLabel.alignment = .right
 
         let argsField = ClaudeArgsField(
             frame: NSRect(x: 0, y: 0, width: 400, height: 60),
-            flagSource: flagSource
+            flagSource: section.flagSource
         )
-        argsField.stringValue = UserDefaults.standard.string(forKey: defaultsKey) ?? ""
+        argsField.stringValue = UserDefaults.standard.string(forKey: section.defaultsKey) ?? ""
         argsField.translatesAutoresizingMaskIntoConstraints = false
         argsField.heightAnchor.constraint(greaterThanOrEqualToConstant: 42).isActive = true
         argsField.onChange = { newValue in
-            UserDefaults.standard.set(newValue, forKey: defaultsKey)
+            UserDefaults.standard.set(newValue, forKey: section.defaultsKey)
         }
 
         grid.addRow(with: [argsLabel, argsField])
 
-        let helpLabel = NSTextField(labelWithString: help)
+        let helpLabel = NSTextField(labelWithString: section.help)
         helpLabel.font = .systemFont(ofSize: 11)
         helpLabel.textColor = .secondaryLabelColor
         helpLabel.lineBreakMode = .byWordWrapping
@@ -261,11 +263,15 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         helpLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         grid.addRow(with: [NSGridCell.emptyContentView, helpLabel])
 
-        let perSessionCheck = NSButton(checkboxWithTitle: checkboxTitle, target: self, action: checkboxAction)
-        perSessionCheck.state = UserDefaults.standard.bool(forKey: checkboxDefaultsKey) ? .on : .off
+        let perSessionCheck = NSButton(
+            checkboxWithTitle: section.checkboxTitle,
+            target: self,
+            action: section.checkboxAction
+        )
+        perSessionCheck.state = UserDefaults.standard.bool(forKey: section.checkboxDefaultsKey) ? .on : .off
         grid.addRow(with: [NSGridCell.emptyContentView, perSessionCheck])
 
-        let perSessionHelp = NSTextField(labelWithString: checkboxHelp)
+        let perSessionHelp = NSTextField(labelWithString: section.checkboxHelp)
         perSessionHelp.font = .systemFont(ofSize: 11)
         perSessionHelp.textColor = .secondaryLabelColor
         grid.addRow(with: [NSGridCell.emptyContentView, perSessionHelp])
