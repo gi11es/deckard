@@ -6,6 +6,23 @@ import SwiftTerm
 /// LocalProcessTerminalView subclass that accepts file drags from Finder
 /// and pastes shell-escaped paths into the terminal.
 private class DeckardTerminalView: LocalProcessTerminalView {
+    private static let kittyCommandVPasteSequence = Array("\u{1B}[118;9u".utf8)
+    private static let imagePasteboardTypes: [NSPasteboard.PasteboardType] = [
+        .png,
+        .tiff
+    ]
+    private static let imageFileExtensions: Set<String> = [
+        "gif",
+        "heic",
+        "heif",
+        "jpeg",
+        "jpg",
+        "png",
+        "tif",
+        "tiff",
+        "webp"
+    ]
+
     override init(frame: CGRect) {
         super.init(frame: frame)
         registerForDraggedTypes([.fileURL])
@@ -24,6 +41,21 @@ private class DeckardTerminalView: LocalProcessTerminalView {
         return super.draggingEntered(sender)
     }
 
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        if Self.isPasteShortcut(event) {
+            paste(event)
+            return true
+        }
+        return super.performKeyEquivalent(with: event)
+    }
+
+    override func paste(_ sender: Any) {
+        if forwardImagePasteShortcutToTerminal() {
+            return
+        }
+        super.paste(sender)
+    }
+
     override func performDragOperation(_ sender: any NSDraggingInfo) -> Bool {
         guard let urls = sender.draggingPasteboard.readObjects(
             forClasses: [NSURL.self],
@@ -35,6 +67,33 @@ private class DeckardTerminalView: LocalProcessTerminalView {
         let escaped = urls.map { Self.shellEscape($0.path) }
         send(txt: escaped.joined(separator: " "))
         return true
+    }
+
+    private func forwardImagePasteShortcutToTerminal() -> Bool {
+        guard Self.pasteboardContainsImage(NSPasteboard.general) else { return false }
+        send(Self.kittyCommandVPasteSequence)
+        return true
+    }
+
+    private static func isPasteShortcut(_ event: NSEvent) -> Bool {
+        let flags = event.modifierFlags.intersection([.command, .shift, .option, .control])
+        return flags == .command && event.charactersIgnoringModifiers?.lowercased() == "v"
+    }
+
+    private static func pasteboardContainsImage(_ pasteboard: NSPasteboard) -> Bool {
+        if pasteboard.availableType(from: imagePasteboardTypes) != nil {
+            return true
+        }
+        if pasteboard.canReadObject(forClasses: [NSImage.self], options: nil) {
+            return true
+        }
+        guard let urls = pasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL] else {
+            return false
+        }
+        return urls.contains { imageFileExtensions.contains($0.pathExtension.lowercased()) }
     }
 
     /// Escape a file path for safe pasting into a shell.
