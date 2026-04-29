@@ -127,15 +127,12 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     }
 
     static func addPulseAnimation(to view: NSView) {
+        if let badgeView = view as? BadgeShapeView {
+            badgeView.setPulseAnimationEnabled(true)
+            return
+        }
         guard let layer = view.layer else { return }
-        let anim = CABasicAnimation(keyPath: "opacity")
-        anim.fromValue = 1.0
-        anim.toValue = 0.3
-        anim.duration = 1.2
-        anim.autoreverses = true
-        anim.repeatCount = .infinity
-        anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
-        layer.add(anim, forKey: "pulse")
+        layer.add(BadgeShapeView.makePulseAnimation(), forKey: BadgeShapeView.pulseAnimationKey)
     }
 
     static func tooltipForBadge(_ state: TabItem.BadgeState, activity: ProcessMonitor.ActivityInfo? = nil) -> String {
@@ -889,7 +886,10 @@ class AddTabButton: NSView {
 
 /// Draws a badge dot using a CAShapeLayer for customizable shapes.
 class BadgeShapeView: NSView {
+    static let pulseAnimationKey = "pulse"
+
     private let shapeLayer = CAShapeLayer()
+    private var isPulseAnimationEnabled = false
 
     init(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
@@ -905,11 +905,44 @@ class BadgeShapeView: NSView {
 
     required init?(coder: NSCoder) { fatalError() }
 
+    override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        if isPulseAnimationEnabled {
+            startPulseAnimation()
+        }
+    }
+
+    func setPulseAnimationEnabled(_ enabled: Bool) {
+        isPulseAnimationEnabled = enabled
+        if enabled {
+            startPulseAnimation()
+        } else {
+            shapeLayer.removeAnimation(forKey: Self.pulseAnimationKey)
+            shapeLayer.opacity = 1.0
+        }
+    }
+
     func updateAppearance(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
         let rect = CGRect(x: 0, y: 0, width: size, height: size)
         shapeLayer.path = Self.path(for: shape, in: rect)
         shapeLayer.fillColor = color.cgColor
         shapeLayer.frame = rect
+    }
+
+    private func startPulseAnimation() {
+        shapeLayer.removeAnimation(forKey: Self.pulseAnimationKey)
+        shapeLayer.add(Self.makePulseAnimation(), forKey: Self.pulseAnimationKey)
+    }
+
+    static func makePulseAnimation() -> CABasicAnimation {
+        let anim = CABasicAnimation(keyPath: "opacity")
+        anim.fromValue = 1.0
+        anim.toValue = 0.3
+        anim.duration = 1.2
+        anim.autoreverses = true
+        anim.repeatCount = .infinity
+        anim.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+        return anim
     }
 
     static func path(for shape: TabItem.BadgeShape, in rect: CGRect) -> CGPath {
