@@ -22,15 +22,25 @@ private class DeckardTerminalView: LocalProcessTerminalView {
         "tiff",
         "webp"
     ]
+    var handlesPasteShortcuts = true
+    private var pasteShortcutMonitor: Any?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
         registerForDraggedTypes([.fileURL])
+        installPasteShortcutMonitor()
     }
 
     required init?(coder: NSCoder) {
         super.init(coder: coder)
         registerForDraggedTypes([.fileURL])
+        installPasteShortcutMonitor()
+    }
+
+    deinit {
+        if let pasteShortcutMonitor {
+            NSEvent.removeMonitor(pasteShortcutMonitor)
+        }
     }
 
     override func draggingEntered(_ sender: any NSDraggingInfo) -> NSDragOperation {
@@ -67,6 +77,32 @@ private class DeckardTerminalView: LocalProcessTerminalView {
         let escaped = urls.map { Self.shellEscape($0.path) }
         send(txt: escaped.joined(separator: " "))
         return true
+    }
+
+    private func installPasteShortcutMonitor() {
+        pasteShortcutMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { [weak self] event in
+            guard let self,
+                  self.handlesPasteShortcuts,
+                  Self.isPasteShortcut(event),
+                  self.shouldHandlePasteShortcut(event) else {
+                return event
+            }
+
+            self.paste(event)
+            return nil
+        }
+    }
+
+    private func shouldHandlePasteShortcut(_ event: NSEvent) -> Bool {
+        guard event.window === window else { return false }
+        guard let firstResponder = window?.firstResponder else { return false }
+        if firstResponder === self {
+            return true
+        }
+        guard let responderView = firstResponder as? NSView else {
+            return false
+        }
+        return responderView == self || responderView.isDescendant(of: self)
     }
 
     private func forwardImagePasteShortcutToTerminal() -> Bool {
@@ -299,6 +335,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         // the command (e.g. user typing while a new Claude tab is starting).
         if let initialInput {
             pendingInitialInput = initialInput
+            terminalView.handlesPasteShortcuts = false
             let view = terminalView
             keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 // Swallow key events targeting our terminal view's window.
@@ -306,7 +343,9 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
                 return event
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
-                guard let self, let input = self.pendingInitialInput else { return }
+                guard let self else { return }
+                defer { self.terminalView.handlesPasteShortcuts = true }
+                guard let input = self.pendingInitialInput else { return }
                 self.pendingInitialInput = nil
                 if let monitor = self.keyEventMonitor {
                     NSEvent.removeMonitor(monitor)
