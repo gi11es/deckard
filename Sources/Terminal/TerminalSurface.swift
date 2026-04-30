@@ -23,7 +23,15 @@ private class DeckardTerminalView: LocalProcessTerminalView {
         "webp"
     ]
     var handlesPasteShortcuts = true
+    var stripsSynchronizedOutputSequences = false {
+        didSet {
+            if !stripsSynchronizedOutputSequences {
+                syncOutputFilterPendingBytes.removeAll(keepingCapacity: true)
+            }
+        }
+    }
     private var pasteShortcutMonitor: Any?
+    private var syncOutputFilterPendingBytes: [UInt8] = []
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -77,6 +85,19 @@ private class DeckardTerminalView: LocalProcessTerminalView {
         let escaped = urls.map { Self.shellEscape($0.path) }
         send(txt: escaped.joined(separator: " "))
         return true
+    }
+
+    override func dataReceived(slice: ArraySlice<UInt8>) {
+        guard stripsSynchronizedOutputSequences else {
+            super.dataReceived(slice: slice)
+            return
+        }
+
+        let filtered = TerminalOutputFilter.stripSynchronizedOutputSequences(
+            from: slice,
+            pending: &syncOutputFilterPendingBytes)
+        guard !filtered.isEmpty else { return }
+        feed(byteArray: filtered[...])
     }
 
     private func installPasteShortcutMonitor() {
@@ -145,6 +166,56 @@ private class DeckardTerminalView: LocalProcessTerminalView {
             result.append(ch)
         }
         return result
+    }
+}
+
+enum TerminalOutputFilter {
+    private static let synchronizedOutputSequences = [
+        Array("\u{1B}[?2026h".utf8),
+        Array("\u{1B}[?2026l".utf8),
+    ]
+
+    static func stripSynchronizedOutputSequences(
+        from slice: ArraySlice<UInt8>,
+        pending: inout [UInt8]
+    ) -> [UInt8] {
+        guard !slice.isEmpty || !pending.isEmpty else { return [] }
+
+        var bytes = pending
+        bytes.append(contentsOf: slice)
+        pending.removeAll(keepingCapacity: true)
+
+        var output: [UInt8] = []
+        output.reserveCapacity(bytes.count)
+
+        var index = 0
+        while index < bytes.count {
+            if let sequence = synchronizedOutputSequences.first(where: { matches($0, in: bytes, at: index) }) {
+                index += sequence.count
+                continue
+            }
+
+            let remaining = bytes[index...]
+            if synchronizedOutputSequences.contains(where: { sequence in
+                remaining.count < sequence.count && sequence.starts(with: remaining)
+            }) {
+                pending = Array(remaining)
+                break
+            }
+
+            output.append(bytes[index])
+            index += 1
+        }
+
+        return output
+    }
+
+    private static func matches(_ sequence: [UInt8], in bytes: [UInt8], at index: Int) -> Bool {
+        guard bytes.count - index >= sequence.count else { return false }
+        for offset in 0..<sequence.count where bytes[index + offset] != sequence[offset] {
+            return false
+        }
+        return true
     }
 }
 
@@ -250,6 +321,12 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
                     envVars: [String: String] = [:], initialInput: String? = nil,
                     tmuxSession: String? = nil) {
         let shell = command ?? ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+
+        // Codex emits DEC 2026 synchronized-output markers around frequent
+        // full-screen repaints. SwiftTerm snapshots the whole scrollback on
+        // every begin marker, which makes long-running Codex sessions sluggish.
+        terminalView.stripsSynchronizedOutputSequences =
+            envVars["DECKARD_SESSION_TYPE"] == "codex"
 
         // Build environment
         var env = ProcessInfo.processInfo.environment
@@ -541,6 +618,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     }
 
     func setTerminalTitle(source: LocalProcessTerminalView, title: String) {
+        guard self.title != title else { return }
         self.title = title
         NotificationCenter.default.post(
             name: .deckardSurfaceTitleChanged,

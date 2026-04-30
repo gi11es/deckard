@@ -1381,8 +1381,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     func setTitle(_ title: String, forSurfaceId surfaceId: UUID) {
         for project in projects {
             for tab in project.tabs where tab.surface.surfaceId == surfaceId {
+                guard tab.surface.title != title else { return }
                 tab.surface.title = title
-                rebuildTabBar()
                 return
             }
         }

@@ -46,6 +46,54 @@ final class TerminalSurfaceTests: XCTestCase {
         XCTAssertEqual(Notification.Name.deckardThemeChanged.rawValue, "deckardThemeChanged")
     }
 
+    // MARK: - Terminal output filtering
+
+    func testSynchronizedOutputFilterStripsCompleteSequences() {
+        var pending: [UInt8] = []
+        let bytes = Array("a\u{1B}[?2026hb\u{1B}[?2026lc".utf8)
+
+        let filtered = TerminalOutputFilter.stripSynchronizedOutputSequences(
+            from: bytes[...],
+            pending: &pending)
+
+        XCTAssertEqual(String(bytes: filtered, encoding: .utf8), "abc")
+        XCTAssertTrue(pending.isEmpty)
+    }
+
+    func testSynchronizedOutputFilterHandlesSplitSequences() {
+        var pending: [UInt8] = []
+        let first = Array("a\u{1B}[?20".utf8)
+        let second = Array("26hb".utf8)
+
+        let filteredFirst = TerminalOutputFilter.stripSynchronizedOutputSequences(
+            from: first[...],
+            pending: &pending)
+        let filteredSecond = TerminalOutputFilter.stripSynchronizedOutputSequences(
+            from: second[...],
+            pending: &pending)
+
+        XCTAssertEqual(String(bytes: filteredFirst, encoding: .utf8), "a")
+        XCTAssertEqual(String(bytes: filteredSecond, encoding: .utf8), "b")
+        XCTAssertTrue(pending.isEmpty)
+    }
+
+    func testSynchronizedOutputFilterPreservesNonMatchingEscapes() {
+        var pending: [UInt8] = []
+        let first = Array("a\u{1B}[?20".utf8)
+        let second = Array("25hb".utf8)
+
+        let filteredFirst = TerminalOutputFilter.stripSynchronizedOutputSequences(
+            from: first[...],
+            pending: &pending)
+        let filteredSecond = TerminalOutputFilter.stripSynchronizedOutputSequences(
+            from: second[...],
+            pending: &pending)
+
+        XCTAssertEqual(String(bytes: filteredFirst, encoding: .utf8), "a")
+        XCTAssertEqual(String(bytes: filteredSecond, encoding: .utf8), "\u{1B}[?2025hb")
+        XCTAssertTrue(pending.isEmpty)
+    }
+
     // MARK: - SurfaceId is UUID
 
     func testSurfaceIdIsUUID() {
