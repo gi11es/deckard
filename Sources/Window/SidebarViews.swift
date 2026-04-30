@@ -884,19 +884,20 @@ class AddTabButton: NSView {
 
 // MARK: - BadgeShapeView
 
-/// Draws a badge dot using a CAShapeLayer for customizable shapes.
+/// Draws a badge dot using AppKit so the same pulse path works in both tab bars.
 class BadgeShapeView: NSView {
     static let pulseAnimationKey = "pulse"
 
-    private let shapeLayer = CAShapeLayer()
+    private var shape: TabItem.BadgeShape
+    private var color: NSColor
     private var isPulseAnimationEnabled = false
     private var pulseTimer: Timer?
     private var pulseStartTime: TimeInterval = 0
 
     init(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
+        self.shape = shape
+        self.color = color
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
-        wantsLayer = true
-        layer?.addSublayer(shapeLayer)
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: size),
@@ -906,6 +907,8 @@ class BadgeShapeView: NSView {
     }
 
     required init?(coder: NSCoder) { fatalError() }
+
+    override var isOpaque: Bool { false }
 
     deinit {
         pulseTimer?.invalidate()
@@ -930,10 +933,18 @@ class BadgeShapeView: NSView {
     }
 
     func updateAppearance(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
-        let rect = CGRect(x: 0, y: 0, width: size, height: size)
-        shapeLayer.path = Self.path(for: shape, in: rect)
-        shapeLayer.fillColor = color.cgColor
-        shapeLayer.frame = rect
+        self.shape = shape
+        self.color = color
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext else { return }
+        context.saveGState()
+        context.addPath(Self.path(for: shape, in: bounds))
+        context.setFillColor(color.cgColor)
+        context.fillPath()
+        context.restoreGState()
     }
 
     private func startPulseAnimation() {
@@ -950,11 +961,10 @@ class BadgeShapeView: NSView {
     private func stopPulseAnimation(resetOpacity: Bool) {
         pulseTimer?.invalidate()
         pulseTimer = nil
-        shapeLayer.removeAnimation(forKey: Self.pulseAnimationKey)
+        layer?.removeAnimation(forKey: Self.pulseAnimationKey)
         if resetOpacity {
             alphaValue = 1.0
-            layer?.opacity = 1.0
-            shapeLayer.opacity = 1.0
+            needsDisplay = true
         }
     }
 
@@ -969,8 +979,7 @@ class BadgeShapeView: NSView {
         let eased = 0.5 - 0.5 * cos(rawProgress * .pi)
         let opacity = Float(1.0 - (0.7 * eased))
         alphaValue = CGFloat(opacity)
-        layer?.opacity = opacity
-        shapeLayer.opacity = opacity
+        needsDisplay = true
     }
 
     static func makePulseAnimation() -> CABasicAnimation {
