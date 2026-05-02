@@ -194,7 +194,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
             fieldLabel: "Default arguments:",
             defaultsKey: "claudeExtraArgs",
             flagSource: .claude,
-            help: "Arguments passed to every new Claude Code session. Can be overridden per project.",
+            help: "Arguments passed to every new Claude Code session. Can be overridden per workspace.",
             checkboxTitle: "Customize Claude arguments per session",
             checkboxHelp: "Show a dialog to set arguments when creating a new Claude tab.",
             checkboxDefaultsKey: "promptForSessionArgs",
@@ -206,7 +206,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
             fieldLabel: "Default parameters:",
             defaultsKey: "codexExtraArgs",
             flagSource: .codex,
-            help: "Codex CLI parameters passed to every new Codex session, such as model, effort, sandbox, and approval settings. Can be overridden per project.",
+            help: "Codex CLI parameters passed to every new Codex session, such as model, effort, sandbox, and approval settings. Can be overridden per workspace.",
             checkboxTitle: "Customize Codex parameters per session",
             checkboxHelp: "Show a dialog to set parameters when creating a new Codex tab.",
             checkboxDefaultsKey: "promptForCodexSessionArgs",
@@ -1075,7 +1075,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         grid.column(at: 2).width = 120
         grid.column(at: 3).width = 100
 
-        // Build right-column entries: reveal toggle first, then the project shortcuts
+        // Build right-column entries: reveal toggle first, then the workspace shortcuts
         let revealLabel = NSTextField(labelWithString: "Show Numbers")
         revealLabel.alignment = .right
         let revealToggle = RevealShortcutView()

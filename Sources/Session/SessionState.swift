@@ -21,7 +21,7 @@ enum TabKind: String, Codable, CaseIterable {
 /// Persisted state for Deckard — saved to ~/Library/Application Support/Deckard/state.json
 struct DeckardState: Codable {
     var version: Int = 3
-    var selectedTabIndex: Int = 0  // selected project index
+    var selectedTabIndex: Int = 0  // selected workspace index
     var defaultWorkingDirectory: String?
 
     // Legacy (v1) — kept for backward compat
@@ -30,7 +30,7 @@ struct DeckardState: Codable {
     var terminalTabCounter: Int?
     var masterSessionId: String?
 
-    // v2: project-based
+    // Workspaces (the on-disk key was "projects" in v2; CodingKeys reads both)
     var workspaces: [WorkspaceState]?
 
     // v3: sidebar groups (was "sidebarFolders" in v2-era state.json)
@@ -192,10 +192,10 @@ struct SidebarGroupState: Codable {
     }
 }
 
-/// A tagged union for sidebar ordering — either a group or an ungrouped project.
+/// A tagged union for sidebar ordering — either a group or an ungrouped workspace.
 enum SidebarOrderItem: Codable {
-    case group(String)    // group id
-    case project(String)  // project id
+    case group(String)      // group id
+    case workspace(String)  // workspace id
 
     private enum CodingKeys: String, CodingKey {
         case type, id
@@ -207,7 +207,10 @@ enum SidebarOrderItem: Codable {
         case .group(let id):
             try container.encode("group", forKey: .type)
             try container.encode(id, forKey: .id)
-        case .project(let id):
+        case .workspace(let id):
+            // Keep the on-disk discriminator as "project" — that is what every
+            // existing state.json contains. Users on this build still encode it
+            // unchanged so a downgrade keeps loading their workspaces.
             try container.encode("project", forKey: .type)
             try container.encode(id, forKey: .id)
         }
@@ -221,7 +224,7 @@ enum SidebarOrderItem: Codable {
         case "group", "folder":  // "folder" is the v2 legacy discriminator
             self = .group(id)
         case "project":
-            self = .project(id)
+            self = .workspace(id)
         default:
             throw DecodingError.dataCorruptedError(forKey: .type, in: container,
                 debugDescription: "Unknown sidebar order item type: \(type)")

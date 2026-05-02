@@ -102,7 +102,7 @@ final class SessionStateTests: XCTestCase {
 
     // MARK: - WorkspaceTabState Codable
 
-    func testProjectTabStateRoundtrip() throws {
+    func testWorkspaceTabStateRoundtrip() throws {
         let tab = WorkspaceTabState(id: "t1", name: "Claude", isClaude: true, sessionId: "s1")
         let data = try JSONEncoder().encode(tab)
         let decoded = try JSONDecoder().decode(WorkspaceTabState.self, from: data)
@@ -114,7 +114,7 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.sessionId, "s1")
     }
 
-    func testProjectTabStateCodexRoundtrip() throws {
+    func testWorkspaceTabStateCodexRoundtrip() throws {
         let tab = WorkspaceTabState(
             id: "t-codex",
             name: "Codex",
@@ -137,7 +137,7 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.tmuxSessionName, "deckard-codex")
     }
 
-    func testProjectTabStateDecodesCodexKindEvenWhenLegacyIsClaudeIsFalse() throws {
+    func testWorkspaceTabStateDecodesCodexKindEvenWhenLegacyIsClaudeIsFalse() throws {
         let json = """
         {"id": "tab-codex", "name": "Codex", "kind": "codex", "isClaude": false, "sessionId": "codex-1"}
         """.data(using: .utf8)!
@@ -149,7 +149,7 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.sessionId, "codex-1")
     }
 
-    func testProjectTabStateLegacyClaudeDecodeWithoutKind() throws {
+    func testWorkspaceTabStateLegacyClaudeDecodeWithoutKind() throws {
         let json = """
         {"id": "tab-claude", "name": "Claude", "isClaude": true, "sessionId": "claude-1"}
         """.data(using: .utf8)!

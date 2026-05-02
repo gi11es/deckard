@@ -156,11 +156,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func handleNewTab() {
-        windowController?.addTabToCurrentProject(kind: .claude)
+        windowController?.addTabToCurrentWorkspace(kind: .claude)
     }
 
     @objc private func handleNewCodexTab() {
-        windowController?.addTabToCurrentProject(kind: .codex)
+        windowController?.addTabToCurrentWorkspace(kind: .codex)
     }
 
     @objc private func handleCloseTab() {
@@ -246,19 +246,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         prevTabItem.setShortcut(for: .previousTab)
         fileMenu.addItem(prevTabItem)
 
-        let nextProjectItem = NSMenuItem(title: "Next Project", action: #selector(selectNextProject), keyEquivalent: "")
-        nextProjectItem.setShortcut(for: .nextWorkspace)
-        fileMenu.addItem(nextProjectItem)
+        let nextWorkspaceItem = NSMenuItem(title: "Next Workspace", action: #selector(selectNextWorkspace), keyEquivalent: "")
+        nextWorkspaceItem.setShortcut(for: .nextWorkspace)
+        fileMenu.addItem(nextWorkspaceItem)
 
-        let prevProjectItem = NSMenuItem(title: "Previous Project", action: #selector(selectPrevProject), keyEquivalent: "")
-        prevProjectItem.setShortcut(for: .previousWorkspace)
-        fileMenu.addItem(prevProjectItem)
+        let prevWorkspaceItem = NSMenuItem(title: "Previous Workspace", action: #selector(selectPrevWorkspace), keyEquivalent: "")
+        prevWorkspaceItem.setShortcut(for: .previousWorkspace)
+        fileMenu.addItem(prevWorkspaceItem)
         fileMenu.addItem(.separator())
 
-        // Cmd+1-9, Cmd+0 for direct project access
+        // Cmd+1-9, Cmd+0 for direct workspace access
         for i in 0..<tabShortcutNames.count {
             let displayNum = i + 1
-            let item = NSMenuItem(title: "Project \(displayNum)", action: #selector(selectTabByNumber(_:)), keyEquivalent: "")
+            let item = NSMenuItem(title: "Workspace \(displayNum)", action: #selector(selectTabByNumber(_:)), keyEquivalent: "")
             item.tag = i
             item.setShortcut(for: tabShortcutNames[i])
             fileMenu.addItem(item)
@@ -302,7 +302,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     private let projectPicker = WorkspacePicker()
 
-    func openProjectPicker() {
+    func openWorkspacePicker() {
         openWorkspace()
     }
 
@@ -314,15 +314,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func newClaudeTab() {
-        windowController?.addTabToCurrentProject(kind: .claude)
+        windowController?.addTabToCurrentWorkspace(kind: .claude)
     }
 
     @objc private func newCodexTab() {
-        windowController?.addTabToCurrentProject(kind: .codex)
+        windowController?.addTabToCurrentWorkspace(kind: .codex)
     }
 
     @objc private func newTerminalTab() {
-        windowController?.addTabToCurrentProject(kind: .terminal)
+        windowController?.addTabToCurrentWorkspace(kind: .terminal)
     }
 
     @objc private func closeCurrentTab() {
@@ -335,7 +335,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func exploreSessions() {
-        windowController?.exploreCurrentProjectSessions()
+        windowController?.exploreCurrentWorkspaceSessions()
     }
 
     @objc private func moveCurrentWorkspaceOutOfGroup() {
@@ -359,16 +359,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.selectPrevTab()
     }
 
-    @objc private func selectNextProject() {
-        windowController?.selectNextProject()
+    @objc private func selectNextWorkspace() {
+        windowController?.selectNextWorkspace()
     }
 
-    @objc private func selectPrevProject() {
-        windowController?.selectPrevProject()
+    @objc private func selectPrevWorkspace() {
+        windowController?.selectPrevWorkspace()
     }
 
     @objc private func selectTabByNumber(_ sender: NSMenuItem) {
-        windowController?.selectProject(byNumber: sender.tag)
+        windowController?.selectWorkspace(byNumber: sender.tag)
     }
 
     @objc private func createNewSidebarGroup() {

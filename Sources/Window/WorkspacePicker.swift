@@ -1,7 +1,7 @@
 import AppKit
 import Fuse
 
-/// A Spotlight-style project picker that appears when creating a new Claude tab.
+/// A Spotlight-style workspace picker that appears when creating a new Claude tab.
 /// Shows recent workspaces from ~/.claude/projects/, sorted by recency.
 class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate, NSWindowDelegate {
 
@@ -13,8 +13,8 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     private let scrollView: NSScrollView
     private var completion: Completion?
 
-    private var allProjects: [(path: String, lastUsed: Date)] = []
-    private var filteredProjects: [(path: String, lastUsed: Date)] = []
+    private var allWorkspaces: [(path: String, lastUsed: Date)] = []
+    private var filteredWorkspaces: [(path: String, lastUsed: Date)] = []
     private var spotlightSearch: Process?
     private var spotlightPipe: Pipe?
     private var keyMonitor: Any?
@@ -42,8 +42,8 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
         searchField.focusRingType = .none
         searchField.bezelStyle = .roundedBezel
 
-        // Table view for project list
-        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Project"))
+        // Table view for workspace list
+        let column = NSTableColumn(identifier: NSUserInterfaceItemIdentifier("Workspace"))
         column.title = ""
 
         tableView = NSTableView()
@@ -96,12 +96,12 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     func show(relativeTo window: NSWindow?, completion: @escaping Completion) {
         self.completion = completion
 
-        allProjects = Self.loadRecentProjects()
-        filteredProjects = allProjects
+        allWorkspaces = Self.loadRecentWorkspaces()
+        filteredWorkspaces = allWorkspaces
         tableView.reloadData()
 
         // Select first row
-        if !filteredProjects.isEmpty {
+        if !filteredWorkspaces.isEmpty {
             tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
 
@@ -165,8 +165,8 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
         removeKeyMonitor()
         let row = tableView.selectedRow
         let path: String
-        if row >= 0, row < filteredProjects.count {
-            path = filteredProjects[row].path
+        if row >= 0, row < filteredWorkspaces.count {
+            path = filteredWorkspaces[row].path
         } else {
             // Use the text field value as a raw path
             let text = searchField.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -182,25 +182,25 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     }
 
     private func moveSelection(by delta: Int) {
-        guard !filteredProjects.isEmpty else { return }
+        guard !filteredWorkspaces.isEmpty else { return }
         let current = tableView.selectedRow
-        let next = max(0, min(filteredProjects.count - 1, current + delta))
+        let next = max(0, min(filteredWorkspaces.count - 1, current + delta))
         tableView.selectRowIndexes(IndexSet(integer: next), byExtendingSelection: false)
         tableView.scrollRowToVisible(next)
     }
 
     private func autocompleteSelection() {
         var row = tableView.selectedRow
-        guard row >= 0, row < filteredProjects.count else { return }
+        guard row >= 0, row < filteredWorkspaces.count else { return }
         // If selected row is the typed directory itself, jump to first subfolder
         let currentInput = (searchField.stringValue as NSString).expandingTildeInPath
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let selectedPath = filteredProjects[row].path
+        let selectedPath = filteredWorkspaces[row].path
         if selectedPath.trimmingCharacters(in: CharacterSet(charactersIn: "/")) == currentInput,
-           row + 1 < filteredProjects.count {
+           row + 1 < filteredWorkspaces.count {
             row += 1
         }
-        let path = filteredProjects[row].path + "/"
+        let path = filteredWorkspaces[row].path + "/"
         searchField.stringValue = path
         // Move cursor to end
         searchField.currentEditor()?.selectedRange = NSRange(location: path.count, length: 0)
@@ -239,38 +239,38 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     func controlTextDidChange(_ obj: Notification) {
         let query = searchField.stringValue
         if query.isEmpty {
-            filteredProjects = allProjects
+            filteredWorkspaces = allWorkspaces
             cancelSpotlightSearch()
         } else if query.hasPrefix("/") || query.hasPrefix("~") {
             // Path-based autocomplete: list directories at the typed path
             cancelSpotlightSearch()
-            filteredProjects = listDirectories(at: query)
+            filteredWorkspaces = listDirectories(at: query)
         } else {
             // Fuzzy match on basename (primary) and full path (fallback)
-            var scored: [(project: (path: String, lastUsed: Date), score: Double)] = []
-            for project in allProjects {
-                let basename = (project.path as NSString).lastPathComponent
+            var scored: [(workspace: (path: String, lastUsed: Date), score: Double)] = []
+            for workspace in allWorkspaces {
+                let basename = (workspace.path as NSString).lastPathComponent
                 let bResult = fuse.search(query, in: basename)
-                let pResult = fuse.search(query, in: project.path)
+                let pResult = fuse.search(query, in: workspace.path)
                 let best: Double? = [bResult?.score, pResult?.score]
                     .compactMap { $0 }.min()
                 if let score = best {
-                    scored.append((project: project, score: score))
+                    scored.append((workspace: workspace, score: score))
                 }
             }
             scored.sort {
                 abs($0.score - $1.score) < 0.001
-                    ? $0.project.lastUsed > $1.project.lastUsed
+                    ? $0.workspace.lastUsed > $1.workspace.lastUsed
                     : $0.score < $1.score
             }
-            filteredProjects = scored.map { $0.project }
+            filteredWorkspaces = scored.map { $0.workspace }
 
             // Also search filesystem via mdfind (Spotlight)
             cancelSpotlightSearch()
             searchFilesystem(query: query)
         }
         tableView.reloadData()
-        if !filteredProjects.isEmpty {
+        if !filteredWorkspaces.isEmpty {
             tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
         }
     }
@@ -323,14 +323,14 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
         // Escape single quotes in the query to prevent Spotlight query injection.
         let escaped = query.replacingOccurrences(of: "'", with: "\\'")
         process.arguments = [
-            "kMDItemContentType == public.folder && kMDItemFSName == '*\(escaped)*'cd"
+            "kMDItemContentType == public.group && kMDItemFSName == '*\(escaped)*'cd"
         ]
 
         let pipe = Pipe()
         process.standardOutput = pipe
         process.standardError = FileHandle.nullDevice
 
-        let knownPaths = Set(allProjects.map { $0.path })
+        let knownPaths = Set(allWorkspaces.map { $0.path })
 
         pipe.fileHandleForReading.readabilityHandler = { [weak self] handle in
             let data = handle.availableData
@@ -351,7 +351,7 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
                     // Skip already-shown, already-open, or hidden paths
                     if knownPaths.contains(path) { continue }
                     if self.excludePaths.contains(path) { continue }
-                    if self.filteredProjects.contains(where: { $0.path == path }) { continue }
+                    if self.filteredWorkspaces.contains(where: { $0.path == path }) { continue }
                     if path.contains("/.") || path.contains("/Library/") { continue }
                     if path.contains("/node_modules/") || path.contains("/.git/") { continue }
 
@@ -362,12 +362,12 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
                     let best = [bResult?.score, pResult?.score].compactMap { $0 }.min()
                     guard best != nil else { continue }
 
-                    self.filteredProjects.append((path: path, lastUsed: .distantPast))
+                    self.filteredWorkspaces.append((path: path, lastUsed: .distantPast))
                     added = true
                 }
                 if added {
                     self.tableView.reloadData()
-                    if self.tableView.selectedRow < 0, !self.filteredProjects.isEmpty {
+                    if self.tableView.selectedRow < 0, !self.filteredWorkspaces.isEmpty {
                         self.tableView.selectRowIndexes(IndexSet(integer: 0), byExtendingSelection: false)
                     }
                 }
@@ -382,14 +382,14 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     // MARK: - NSTableViewDataSource
 
     func numberOfRows(in tableView: NSTableView) -> Int {
-        return filteredProjects.count
+        return filteredWorkspaces.count
     }
 
     // MARK: - NSTableViewDelegate
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
         let id = NSUserInterfaceItemIdentifier("ProjectCell")
-        let project = filteredProjects[row]
+        let workspace = filteredWorkspaces[row]
 
         let cell: NSTableCellView
         if let recycled = tableView.makeView(withIdentifier: id, owner: nil) as? NSTableCellView {
@@ -409,11 +409,11 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
             ])
         }
 
-        // Show shortened path: ~/Documents/project instead of /Users/gilles/Documents/project
+        // Show shortened path: ~/Documents/workspace instead of /Users/gilles/Documents/workspace
         let home = NSHomeDirectory()
-        let displayPath = project.path.hasPrefix(home)
-            ? "~" + project.path.dropFirst(home.count)
-            : project.path
+        let displayPath = workspace.path.hasPrefix(home)
+            ? "~" + workspace.path.dropFirst(home.count)
+            : workspace.path
 
         cell.textField?.stringValue = displayPath
         cell.textField?.font = .systemFont(ofSize: 13)
@@ -429,7 +429,7 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
 
     // MARK: - Load Projects
 
-    static func loadRecentProjects() -> [(path: String, lastUsed: Date)] {
+    static func loadRecentWorkspaces() -> [(path: String, lastUsed: Date)] {
         let projectsDir = NSHomeDirectory() + "/.claude/projects"
         let fm = FileManager.default
 
@@ -469,7 +469,7 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
         return results.map { (path: $0.path, lastUsed: $0.lastUsed) }
     }
 
-    /// Decode a Claude Code project directory name back to a filesystem path.
+    /// Decode a Claude Code workspace directory name back to a filesystem path.
     /// Claude encodes every non-`[A-Za-z0-9-]` character (including "/", ".", "_", spaces) as "-",
     /// so "-Users-tibor-code-trogulja-trogulja-github-io" must be decoded by figuring out which
     /// hyphens are path separators and which are encoded characters inside a single path component.

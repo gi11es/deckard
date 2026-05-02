@@ -22,7 +22,7 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertEqual(decoded.workspaceIds, ["proj-a", "proj-b", "proj-c"])
     }
 
-    func testSidebarGroupStateEmptyProjectIds() throws {
+    func testSidebarGroupStateEmptyWorkspaceIds() throws {
         let state = SidebarGroupState(
             id: "folder-empty",
             name: "Empty Folder",
@@ -50,17 +50,17 @@ final class SidebarGroupTests: XCTestCase {
         if case .group(let id) = decoded {
             XCTAssertEqual(id, "folder-abc")
         } else {
-            XCTFail("Expected .folder case, got \(decoded)")
+            XCTFail("Expected .group case, got \(decoded)")
         }
     }
 
-    func testSidebarOrderItemProjectRoundtrip() throws {
-        let item = SidebarOrderItem.project("proj-xyz")
+    func testSidebarOrderItemWorkspaceRoundtrip() throws {
+        let item = SidebarOrderItem.workspace("proj-xyz")
 
         let data = try JSONEncoder().encode(item)
         let decoded = try JSONDecoder().decode(SidebarOrderItem.self, from: data)
 
-        if case .project(let id) = decoded {
+        if case .workspace(let id) = decoded {
             XCTAssertEqual(id, "proj-xyz")
         } else {
             XCTFail("Expected .project case, got \(decoded)")
@@ -91,8 +91,8 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertEqual(dict?["id"], "f1")
     }
 
-    func testSidebarOrderItemProjectEncodedShape() throws {
-        let item = SidebarOrderItem.project("p1")
+    func testSidebarOrderItemWorkspaceEncodedShape() throws {
+        let item = SidebarOrderItem.workspace("p1")
         let data = try JSONEncoder().encode(item)
         let dict = try JSONSerialization.jsonObject(with: data) as? [String: String]
 
@@ -110,7 +110,7 @@ final class SidebarGroupTests: XCTestCase {
         ]
         state.sidebarOrder = [
             .group("f1"),
-            .project("p4"),
+            .workspace("p4"),
             .group("f2"),
         ]
         state.workspaces = [
@@ -134,9 +134,9 @@ final class SidebarGroupTests: XCTestCase {
         if case .group(let id) = decoded.sidebarOrder?[0] {
             XCTAssertEqual(id, "f1")
         } else {
-            XCTFail("Expected .folder at index 0")
+            XCTFail("Expected .group at index 0")
         }
-        if case .project(let id) = decoded.sidebarOrder?[1] {
+        if case .workspace(let id) = decoded.sidebarOrder?[1] {
             XCTAssertEqual(id, "p4")
         } else {
             XCTFail("Expected .project at index 1")
@@ -144,12 +144,12 @@ final class SidebarGroupTests: XCTestCase {
         if case .group(let id) = decoded.sidebarOrder?[2] {
             XCTAssertEqual(id, "f2")
         } else {
-            XCTFail("Expected .folder at index 2")
+            XCTFail("Expected .group at index 2")
         }
     }
 
     func testDeckardStateNilGroupsBackwardCompat() throws {
-        // Simulate a v2 state without folder fields
+        // Simulate a v2 state without group fields
         var state = DeckardState()
         state.workspaces = [
             WorkspaceState(id: "p1", path: "/test", name: "test", selectedTabIndex: 0, tabs: [])
@@ -170,12 +170,12 @@ final class SidebarGroupTests: XCTestCase {
             SidebarGroupState(id: "f1", name: "Folder", isCollapsed: false, workspaceIds: [])
         ]
         state.sidebarOrder = [
-            .project("p1"),
+            .workspace("p1"),
             .group("f1"),
-            .project("p2"),
-            .project("p3"),
+            .workspace("p2"),
+            .workspace("p3"),
             .group("f1"),  // duplicate folder reference (edge case)
-            .project("p4"),
+            .workspace("p4"),
         ]
 
         let data = try JSONEncoder().encode(state)
@@ -184,12 +184,12 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertEqual(decoded.sidebarOrder?.count, 6)
 
         // Verify alternating types
-        if case .project = decoded.sidebarOrder?[0] {} else { XCTFail("Expected .project at 0") }
-        if case .group = decoded.sidebarOrder?[1] {} else { XCTFail("Expected .folder at 1") }
-        if case .project = decoded.sidebarOrder?[2] {} else { XCTFail("Expected .project at 2") }
-        if case .project = decoded.sidebarOrder?[3] {} else { XCTFail("Expected .project at 3") }
-        if case .group = decoded.sidebarOrder?[4] {} else { XCTFail("Expected .folder at 4") }
-        if case .project = decoded.sidebarOrder?[5] {} else { XCTFail("Expected .project at 5") }
+        if case .workspace = decoded.sidebarOrder?[0] {} else { XCTFail("Expected .project at 0") }
+        if case .group = decoded.sidebarOrder?[1] {} else { XCTFail("Expected .group at 1") }
+        if case .workspace = decoded.sidebarOrder?[2] {} else { XCTFail("Expected .project at 2") }
+        if case .workspace = decoded.sidebarOrder?[3] {} else { XCTFail("Expected .project at 3") }
+        if case .group = decoded.sidebarOrder?[4] {} else { XCTFail("Expected .group at 4") }
+        if case .workspace = decoded.sidebarOrder?[5] {} else { XCTFail("Expected .project at 5") }
     }
 
     func testDeckardStateEmptyFoldersAndOrder() throws {
@@ -215,7 +215,7 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertNotEqual(folder.id, UUID()) // has a valid UUID
     }
 
-    func testSidebarGroupProjectIdsAddRemove() {
+    func testSidebarGroupWorkspaceIdsAddRemove() {
         let folder = SidebarGroup(name: "Folder")
         let id1 = UUID()
         let id2 = UUID()
@@ -268,16 +268,16 @@ final class SidebarGroupTests: XCTestCase {
             XCTAssertTrue(f === folder) // same reference
             XCTAssertEqual(f.name, "Test")
         } else {
-            XCTFail("Expected .folder case")
+            XCTFail("Expected .group case")
         }
     }
 
     func testSidebarItemProjectCase() {
-        let projectId = UUID()
-        let item = SidebarItem.project(projectId)
+        let workspaceId = UUID()
+        let item = SidebarItem.workspace(workspaceId)
 
-        if case .project(let id) = item {
-            XCTAssertEqual(id, projectId)
+        if case .workspace(let id) = item {
+            XCTAssertEqual(id, workspaceId)
         } else {
             XCTFail("Expected .project case")
         }
@@ -293,13 +293,13 @@ final class SidebarGroupTests: XCTestCase {
         if case .group(let f) = item {
             XCTAssertEqual(f.name, "After")
         } else {
-            XCTFail("Expected .folder case")
+            XCTFail("Expected .group case")
         }
     }
 
     // MARK: - WorkspaceTabState with tmuxSessionName
 
-    func testProjectTabStateWithTmuxSessionName() throws {
+    func testWorkspaceTabStateWithTmuxSessionName() throws {
         let tab = WorkspaceTabState(
             id: "tab-1",
             name: "Terminal",
@@ -318,7 +318,7 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertEqual(decoded.tmuxSessionName, "deckard-main-1")
     }
 
-    func testProjectTabStateWithNilTmuxSessionName() throws {
+    func testWorkspaceTabStateWithNilTmuxSessionName() throws {
         let tab = WorkspaceTabState(
             id: "tab-2",
             name: "Claude",
@@ -337,7 +337,7 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertNil(decoded.tmuxSessionName)
     }
 
-    func testProjectTabStateBackwardCompatNoTmuxField() throws {
+    func testWorkspaceTabStateBackwardCompatNoTmuxField() throws {
         // Simulate JSON without tmuxSessionName field (old format)
         let json = """
         {"id": "tab-3", "name": "Terminal", "isClaude": false}
@@ -390,10 +390,10 @@ final class SidebarGroupTests: XCTestCase {
     func testSidebarOrderItemArrayRoundtrip() throws {
         let items: [SidebarOrderItem] = [
             .group("f1"),
-            .project("p1"),
-            .project("p2"),
+            .workspace("p1"),
+            .workspace("p2"),
             .group("f2"),
-            .project("p3"),
+            .workspace("p3"),
         ]
 
         let data = try JSONEncoder().encode(items)
@@ -402,18 +402,18 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertEqual(decoded.count, 5)
 
         if case .group(let id) = decoded[0] { XCTAssertEqual(id, "f1") }
-        else { XCTFail("Expected .folder at 0") }
+        else { XCTFail("Expected .group at 0") }
 
-        if case .project(let id) = decoded[1] { XCTAssertEqual(id, "p1") }
+        if case .workspace(let id) = decoded[1] { XCTAssertEqual(id, "p1") }
         else { XCTFail("Expected .project at 1") }
 
-        if case .project(let id) = decoded[2] { XCTAssertEqual(id, "p2") }
+        if case .workspace(let id) = decoded[2] { XCTAssertEqual(id, "p2") }
         else { XCTFail("Expected .project at 2") }
 
         if case .group(let id) = decoded[3] { XCTAssertEqual(id, "f2") }
-        else { XCTFail("Expected .folder at 3") }
+        else { XCTFail("Expected .group at 3") }
 
-        if case .project(let id) = decoded[4] { XCTAssertEqual(id, "p3") }
+        if case .workspace(let id) = decoded[4] { XCTAssertEqual(id, "p3") }
         else { XCTFail("Expected .project at 4") }
     }
 
@@ -506,7 +506,7 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertEqual(decoded.count, 3)
         if case .group(let id) = decoded[0] { XCTAssertEqual(id, "f1") }
         else { XCTFail("Expected .group at 0") }
-        if case .project(let id) = decoded[1] { XCTAssertEqual(id, "p1") }
+        if case .workspace(let id) = decoded[1] { XCTAssertEqual(id, "p1") }
         else { XCTFail("Expected .project at 1") }
         if case .group(let id) = decoded[2] { XCTAssertEqual(id, "f2") }
         else { XCTFail("Expected .group at 2") }

@@ -4,7 +4,7 @@ import AppKit
 
 extension DeckardWindowController {
 
-    // MARK: - Tab Bar (horizontal tabs within selected project)
+    // MARK: - Tab Bar (horizontal tabs within selected workspace)
 
     var isTabEditing: Bool {
         tabBar.arrangedSubviews.contains { ($0 as? HorizontalTabView)?.isEditing == true }
@@ -31,10 +31,10 @@ extension DeckardWindowController {
         savedFirstResponder = window?.firstResponder
 
         tabBar.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        guard let project = currentWorkspace else { return }
+        guard let workspace = currentWorkspace else { return }
 
-        for (i, tab) in project.tabs.enumerated() {
-            let isSelected = (i == project.selectedTabIndex)
+        for (i, tab) in workspace.tabs.enumerated() {
+            let isSelected = (i == workspace.selectedTabIndex)
             let title = " \(tab.name) "
 
             let tabView = HorizontalTabView(
@@ -49,9 +49,9 @@ extension DeckardWindowController {
                 clickAction: #selector(tabBarClicked(_:))
             )
             tabView.onRename = { [weak self] newName in
-                guard let self = self, let project = self.currentWorkspace,
-                      i < project.tabs.count else { return }
-                let tab = project.tabs[i]
+                guard let self = self, let workspace = self.currentWorkspace,
+                      i < workspace.tabs.count else { return }
+                let tab = workspace.tabs[i]
                 tab.name = newName
                 if let sid = tab.sessionId, !sid.isEmpty {
                     SessionManager.shared.saveSessionName(sessionId: sid, kind: tab.kind, name: newName)
@@ -60,11 +60,11 @@ extension DeckardWindowController {
                 self.saveState()
             }
             tabView.onClearName = { [weak self] in
-                guard let self = self, let project = self.currentWorkspace,
-                      i < project.tabs.count else { return }
-                let tab = project.tabs[i]
+                guard let self = self, let workspace = self.currentWorkspace,
+                      i < workspace.tabs.count else { return }
+                let tab = workspace.tabs[i]
                 let base = tab.kind.displayName
-                let sameType = project.tabs.filter { $0.kind == tab.kind }
+                let sameType = workspace.tabs.filter { $0.kind == tab.kind }
                 tab.name = sameType.count <= 1 ? base : "\(base) #\(i + 1)"
                 self.rebuildTabBar()
                 self.saveState()
@@ -76,13 +76,13 @@ extension DeckardWindowController {
                 self.tabBarCloseClicked(btn)
             }
             tabView.onNewClaude = { [weak self] in
-                self?.addTabToCurrentProject(kind: .claude)
+                self?.addTabToCurrentWorkspace(kind: .claude)
             }
             tabView.onNewCodex = { [weak self] in
-                self?.addTabToCurrentProject(kind: .codex)
+                self?.addTabToCurrentWorkspace(kind: .codex)
             }
             tabView.onNewTerminal = { [weak self] in
-                self?.addTabToCurrentProject(kind: .terminal)
+                self?.addTabToCurrentWorkspace(kind: .terminal)
             }
             tabView.onEditingFinished = { [weak self] in
                 guard let self = self, self.needsTabBarRebuild else { return }
@@ -93,7 +93,7 @@ extension DeckardWindowController {
         }
 
         // Set up drag-to-reorder
-        tabBar.tabCount = project.tabs.count
+        tabBar.tabCount = workspace.tabs.count
         tabBar.registerForDraggedTypes([deckardTabDragType])
         tabBar.onReorder = { [weak self] from, to in
             self?.reorderTab(from: from, to: to)
@@ -101,9 +101,9 @@ extension DeckardWindowController {
 
         // Add "+" button
         let addButton = AddTabButton(
-            claudeAction: { [weak self] in self?.addTabToCurrentProject(kind: .claude) },
-            codexAction: { [weak self] in self?.addTabToCurrentProject(kind: .codex) },
-            terminalAction: { [weak self] in self?.addTabToCurrentProject(kind: .terminal) }
+            claudeAction: { [weak self] in self?.addTabToCurrentWorkspace(kind: .claude) },
+            codexAction: { [weak self] in self?.addTabToCurrentWorkspace(kind: .codex) },
+            terminalAction: { [weak self] in self?.addTabToCurrentWorkspace(kind: .terminal) }
         )
         tabBar.addArrangedSubview(addButton)
 
@@ -115,21 +115,21 @@ extension DeckardWindowController {
     }
 
     func reorderTab(from fromIndex: Int, to toIndex: Int) {
-        guard let project = currentWorkspace else { return }
+        guard let workspace = currentWorkspace else { return }
         guard fromIndex != toIndex,
-              fromIndex >= 0, fromIndex < project.tabs.count,
-              toIndex >= 0, toIndex <= project.tabs.count else { return }
+              fromIndex >= 0, fromIndex < workspace.tabs.count,
+              toIndex >= 0, toIndex <= workspace.tabs.count else { return }
 
-        let tab = project.tabs.remove(at: fromIndex)
+        let tab = workspace.tabs.remove(at: fromIndex)
         let insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex
-        project.tabs.insert(tab, at: min(insertAt, project.tabs.count))
+        workspace.tabs.insert(tab, at: min(insertAt, workspace.tabs.count))
 
-        if project.selectedTabIndex == fromIndex {
-            project.selectedTabIndex = insertAt
-        } else if fromIndex < project.selectedTabIndex && insertAt >= project.selectedTabIndex {
-            project.selectedTabIndex -= 1
-        } else if fromIndex > project.selectedTabIndex && insertAt <= project.selectedTabIndex {
-            project.selectedTabIndex += 1
+        if workspace.selectedTabIndex == fromIndex {
+            workspace.selectedTabIndex = insertAt
+        } else if fromIndex < workspace.selectedTabIndex && insertAt >= workspace.selectedTabIndex {
+            workspace.selectedTabIndex -= 1
+        } else if fromIndex > workspace.selectedTabIndex && insertAt <= workspace.selectedTabIndex {
+            workspace.selectedTabIndex += 1
         }
 
         rebuildTabBar()
@@ -142,27 +142,27 @@ extension DeckardWindowController {
     }
 
     @objc func tabBarCloseClicked(_ sender: NSButton) {
-        guard let project = currentWorkspace else { return }
+        guard let workspace = currentWorkspace else { return }
         let idx = sender.tag
-        guard idx >= 0, idx < project.tabs.count else { return }
+        guard idx >= 0, idx < workspace.tabs.count else { return }
 
-        let tab = project.tabs[idx]
+        let tab = workspace.tabs[idx]
         tab.surface.terminate()
         tabCreationOrder.removeAll { $0 == tab.id }
 
-        project.tabs.remove(at: idx)
+        workspace.tabs.remove(at: idx)
 
-        if project.tabs.isEmpty {
+        if workspace.tabs.isEmpty {
             currentTerminalView = nil
             showEmptyState()
             rebuildTabBar()
             rebuildSidebar()
         } else {
-            project.selectedTabIndex = min(idx, project.tabs.count - 1)
+            workspace.selectedTabIndex = min(idx, workspace.tabs.count - 1)
             rebuildTabBar()
             rebuildSidebar()
-            clearUnseenIfNeeded(project.tabs[project.selectedTabIndex])
-            showTab(project.tabs[project.selectedTabIndex])
+            clearUnseenIfNeeded(workspace.tabs[workspace.selectedTabIndex])
+            showTab(workspace.tabs[workspace.selectedTabIndex])
         }
         saveState()
     }

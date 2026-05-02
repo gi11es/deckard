@@ -12,9 +12,9 @@ final class SidebarGroupViewTests: XCTestCase {
         collapsed: Bool = false,
         origin: NSPoint = NSPoint(x: 0, y: 50)
     ) -> SidebarGroupView {
-        let folder = SidebarGroup(name: "Test Folder")
-        folder.isCollapsed = collapsed
-        let view = SidebarGroupView(folder: folder, projectCount: 2)
+        let group = SidebarGroup(name: "Test Folder")
+        group.isCollapsed = collapsed
+        let view = SidebarGroupView(group: group, projectCount: 2)
 
         // Embed in a parent so hitTest gets superview-relative points.
         let parent = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
@@ -93,7 +93,7 @@ final class SidebarGroupViewTests: XCTestCase {
         let imageView = view.subviews.compactMap { $0 as? NSImageView }.first!
 
         let imageBefore = imageView.image
-        view.folder.isCollapsed = true
+        view.group.isCollapsed = true
         view.updateChevron()
         let imageAfter = imageView.image
 
@@ -274,39 +274,39 @@ final class SidebarGroupViewTests: XCTestCase {
 
     // MARK: - groupToggleClicked guard
 
-    func testGroupToggleBlocksCollapseWhenContainingSelectedProject() {
-        let folder = SidebarGroup(name: "Active")
-        let projectId = UUID()
-        folder.workspaceIds = [projectId]
-        folder.isCollapsed = false
+    func testGroupToggleBlocksCollapseWhenContainingSelectedWorkspace() {
+        let group = SidebarGroup(name: "Active")
+        let workspaceId = UUID()
+        group.workspaceIds = [workspaceId]
+        group.isCollapsed = false
 
         // Simulate the guard logic from groupToggleClicked.
-        folder.isCollapsed.toggle()
-        // Guard: if collapsing a folder that contains the selected project, force expand.
-        let selectedProjectId = projectId  // selected project is inside this folder
-        if folder.isCollapsed, folder.workspaceIds.contains(selectedProjectId) {
-            folder.isCollapsed = false
+        group.isCollapsed.toggle()
+        // Guard: if collapsing a group that contains the selected project, force expand.
+        let selectedWorkspaceId = workspaceId  // selected workspace is inside this group
+        if group.isCollapsed, group.workspaceIds.contains(selectedWorkspaceId) {
+            group.isCollapsed = false
         }
 
-        XCTAssertFalse(folder.isCollapsed,
-                       "Folder containing the selected project should not stay collapsed")
+        XCTAssertFalse(group.isCollapsed,
+                       "Group containing the selected workspace should not stay collapsed")
     }
 
-    func testGroupToggleAllowsCollapseWhenNotContainingSelectedProject() {
-        let folder = SidebarGroup(name: "Other")
-        let projectId = UUID()
-        let otherProjectId = UUID()
-        folder.workspaceIds = [projectId]
-        folder.isCollapsed = false
+    func testGroupToggleAllowsCollapseWhenNotContainingSelectedWorkspace() {
+        let group = SidebarGroup(name: "Other")
+        let workspaceId = UUID()
+        let otherWorkspaceId = UUID()
+        group.workspaceIds = [workspaceId]
+        group.isCollapsed = false
 
-        folder.isCollapsed.toggle()
-        // Guard: selected project is NOT in this folder.
-        let selectedProjectId = otherProjectId
-        if folder.isCollapsed, folder.workspaceIds.contains(selectedProjectId) {
-            folder.isCollapsed = false
+        group.isCollapsed.toggle()
+        // Guard: selected project is NOT in this group.
+        let selectedWorkspaceId = otherWorkspaceId
+        if group.isCollapsed, group.workspaceIds.contains(selectedWorkspaceId) {
+            group.isCollapsed = false
         }
 
-        XCTAssertTrue(folder.isCollapsed,
-                      "Folder NOT containing the selected project should collapse normally")
+        XCTAssertTrue(group.isCollapsed,
+                      "Group NOT containing the selected workspace should collapse normally")
     }
 }

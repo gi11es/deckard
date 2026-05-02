@@ -68,7 +68,7 @@ final class WindowControllerLogicTests: XCTestCase {
 
     // MARK: - WorkspaceItem
 
-    func testProjectItemInit() {
+    func testWorkspaceItemInit() {
         let project = WorkspaceItem(path: "/Users/test/my-project")
         XCTAssertEqual(project.path, "/Users/test/my-project")
         XCTAssertEqual(project.name, "my-project")
@@ -76,14 +76,14 @@ final class WindowControllerLogicTests: XCTestCase {
         XCTAssertEqual(project.selectedTabIndex, 0)
     }
 
-    func testProjectItemNameIsBasename() {
+    func testWorkspaceItemNameIsBasename() {
         let project = WorkspaceItem(path: "/a/b/c/deep-folder")
         XCTAssertEqual(project.name, "deep-folder")
     }
 
     // MARK: - WorkspaceItem symlink resolution
 
-    func testProjectItemResolvesSymlinks() throws {
+    func testWorkspaceItemResolvesSymlinks() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-symlink-\(UUID().uuidString)"
         let realDir = tempDir + "/real-project"
         let linkDir = tempDir + "/linked-project"
@@ -96,7 +96,7 @@ final class WindowControllerLogicTests: XCTestCase {
         XCTAssertEqual(project.name, "real-project")
     }
 
-    func testProjectItemCanonicalPathIsIdempotent() throws {
+    func testWorkspaceItemCanonicalPathIsIdempotent() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-symlink-\(UUID().uuidString)"
         let realDir = tempDir + "/real-project"
         try FileManager.default.createDirectory(atPath: realDir, withIntermediateDirectories: true)
@@ -107,7 +107,7 @@ final class WindowControllerLogicTests: XCTestCase {
         XCTAssertEqual(project.path, realDir)
     }
 
-    func testProjectItemViaSymlinkMatchesCanonical() throws {
+    func testWorkspaceItemViaSymlinkMatchesCanonical() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-symlink-\(UUID().uuidString)"
         let realDir = tempDir + "/real-project"
         let linkDir = tempDir + "/linked-project"
@@ -121,7 +121,7 @@ final class WindowControllerLogicTests: XCTestCase {
                        "ProjectItems opened via symlink and canonical path should have the same path")
     }
 
-    func testProjectItemChainedSymlinks() throws {
+    func testWorkspaceItemChainedSymlinks() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-symlink-\(UUID().uuidString)"
         let realDir = tempDir + "/real-project"
         let link1 = tempDir + "/link1"
