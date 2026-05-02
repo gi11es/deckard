@@ -100,7 +100,7 @@ class ProjectItem {
 // MARK: - Sidebar Folder Model
 
 /// A folder in the sidebar that groups projects.
-class SidebarFolder {
+class SidebarGroup {
     let id: UUID
     var name: String
     var isCollapsed: Bool
@@ -121,9 +121,9 @@ class SidebarFolder {
     }
 }
 
-/// Ordered sidebar items: either a folder or an ungrouped project reference.
+/// Ordered sidebar items: either a group or an ungrouped project reference.
 enum SidebarItem {
-    case folder(SidebarFolder)
+    case group(SidebarGroup)
     case project(UUID)  // ProjectItem.id
 }
 
@@ -151,7 +151,7 @@ struct DefaultTabConfig {
 
 let deckardProjectDragType = NSPasteboard.PasteboardType("com.deckard.project-reorder")
 let deckardSidebarDragType = NSPasteboard.PasteboardType("com.deckard.sidebar-drag")
-let deckardFolderDragType = NSPasteboard.PasteboardType("com.deckard.folder-reorder")
+let deckardGroupDragType = NSPasteboard.PasteboardType("com.deckard.folder-reorder")
 
 
 private class CollapsibleSplitView: NSSplitView {
@@ -169,7 +169,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     var selectedProjectIndex: Int = -1
 
     // Sidebar folders
-    var sidebarFolders: [SidebarFolder] = []
+    var sidebarGroups: [SidebarGroup] = []
     var sidebarOrder: [SidebarItem] = []
 
     // Theme
@@ -410,7 +410,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Drop zone covers the entire sidebar area below the stack
         sidebarDropZone.translatesAutoresizingMaskIntoConstraints = false
-        sidebarDropZone.registerForDraggedTypes([deckardProjectDragType, deckardFolderDragType])
+        sidebarDropZone.registerForDraggedTypes([deckardProjectDragType, deckardGroupDragType])
         sidebarView.addSubview(sidebarDropZone)
 
         sidebarStackView.orientation = .vertical
@@ -613,10 +613,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         exploreSessionsMenuAction(fakeMenuItem)
     }
 
-    func moveCurrentProjectOutOfFolder() {
+    func moveCurrentProjectOutOfGroup() {
         guard selectedProjectIndex >= 0, selectedProjectIndex < projects.count else { return }
         let project = projects[selectedProjectIndex]
-        moveProjectOutOfFolder(projectId: project.id)
+        moveProjectOutOfGroup(projectId: project.id)
     }
 
     func closeProject(at index: Int) {
@@ -685,7 +685,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     /// Returns the index of the nearest project that is visible in the sidebar
     /// (i.e. top-level or inside a non-collapsed folder), or nil if none.
     private func nextVisibleProjectIndex(near index: Int) -> Int? {
-        let collapsedProjectIds = Set(sidebarFolders.filter(\.isCollapsed).flatMap(\.projectIds))
+        let collapsedProjectIds = Set(sidebarGroups.filter(\.isCollapsed).flatMap(\.projectIds))
         let clamped = min(index, projects.count - 1)
         // Search outward from `clamped`: check clamped, clamped-1, clamped+1, ...
         var lo = clamped, hi = clamped + 1
@@ -705,7 +705,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Auto-expand folder if the selected project is inside a collapsed one
         if autoExpandFolder {
-            for folder in sidebarFolders where folder.isCollapsed && folder.projectIds.contains(project.id) {
+            for folder in sidebarGroups where folder.isCollapsed && folder.projectIds.contains(project.id) {
                 folder.isCollapsed = false
                 rebuildSidebar()
             }
@@ -1593,8 +1593,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         // Persist sidebar folders
-        state.sidebarFolders = sidebarFolders.map { folder in
-            SidebarFolderState(
+        state.sidebarGroups = sidebarGroups.map { folder in
+            SidebarGroupState(
                 id: folder.id.uuidString,
                 name: folder.name,
                 isCollapsed: folder.isCollapsed,
@@ -1605,8 +1605,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Persist sidebar order
         state.sidebarOrder = sidebarOrder.compactMap { item in
             switch item {
-            case .folder(let folder):
-                return .folder(folder.id.uuidString)
+            case .group(let folder):
+                return .group(folder.id.uuidString)
             case .project(let pid):
                 return .project(pid.uuidString)
             }
@@ -1704,7 +1704,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // won't clamp selectedTabIndex before all tabs are inserted.
 
         // Restore sidebar folders
-        restoreSidebarFolders(from: state)
+        restoreSidebarGroups(from: state)
 
         rebuildSidebar()
         if selectedIdx >= 0 && selectedIdx < projects.count {
@@ -1715,7 +1715,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         createTabsProgressively(pending)
     }
 
-    private func restoreSidebarFolders(from state: DeckardState) {
+    private func restoreSidebarGroups(from state: DeckardState) {
         // During restore, ProjectItem gets a new UUID. Build a map from saved-id -> live ProjectItem.
         // Match by index (projects are created in the same order as projectStates) rather than
         // by path, because multiple projects can share the same path (e.g. ~/Downloads).
@@ -1727,17 +1727,17 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         // Restore folders
-        if let folderStates = state.sidebarFolders {
-            for fs in folderStates {
-                guard let folderId = UUID(uuidString: fs.id) else { continue }
+        if let groupStates = state.sidebarGroups {
+            for fs in groupStates {
+                guard let groupId = UUID(uuidString: fs.id) else { continue }
                 let resolvedIds = fs.projectIds.compactMap { savedIdToProject[$0]?.id }
-                let folder = SidebarFolder(
-                    id: folderId,
+                let folder = SidebarGroup(
+                    id: groupId,
                     name: fs.name,
                     isCollapsed: fs.isCollapsed,
                     projectIds: resolvedIds
                 )
-                sidebarFolders.append(folder)
+                sidebarGroups.append(folder)
             }
         }
 
@@ -1745,9 +1745,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         if let orderItems = state.sidebarOrder {
             sidebarOrder = orderItems.compactMap { item in
                 switch item {
-                case .folder(let idStr):
-                    if let folder = sidebarFolders.first(where: { $0.id.uuidString == idStr }) {
-                        return .folder(folder)
+                case .group(let idStr):
+                    if let folder = sidebarGroups.first(where: { $0.id.uuidString == idStr }) {
+                        return .group(folder)
                     }
                     return nil
                 case .project(let idStr):
@@ -1874,7 +1874,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             switch item {
             case .project(let id):
                 if let i = projects.firstIndex(where: { $0.id == id }) { indices.append(i) }
-            case .folder(let folder):
+            case .group(let folder):
                 guard !folder.isCollapsed else { continue }
                 for id in folder.projectIds {
                     if let i = projects.firstIndex(where: { $0.id == id }) { indices.append(i) }

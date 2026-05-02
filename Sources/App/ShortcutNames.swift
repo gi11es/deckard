@@ -14,8 +14,8 @@ extension KeyboardShortcuts.Name {
     static let previousProject = Self("previousProject", default: .init(.leftBracket, modifiers: [.command, .option]))
     static let toggleSidebar = Self("toggleSidebar", default: .init(.s, modifiers: [.command, .control]))
     static let exploreSessions = Self("exploreSessions", default: .init(.e, modifiers: [.command, .shift]))
-    static let newSidebarFolder = Self("newSidebarFolder", default: .init(.n, modifiers: [.command, .option]))
-    static let moveOutOfFolder = Self("moveOutOfFolder", default: .init(.u, modifiers: [.command, .option]))
+    static let newGroup = Self("newGroup", default: .init(.n, modifiers: [.command, .option]))
+    static let moveOutOfGroup = Self("moveOutOfGroup", default: .init(.u, modifiers: [.command, .option]))
     static let settings = Self("settings", default: .init(.comma, modifiers: .command))
     static let tab1 = Self("tab1", default: .init(.one, modifiers: .command))
     static let tab2 = Self("tab2", default: .init(.two, modifiers: .command))
@@ -48,8 +48,8 @@ let configurableShortcuts: [ShortcutEntry] = [
     ShortcutEntry(name: .previousProject, label: "Previous Workspace"),
     ShortcutEntry(name: .toggleSidebar, label: "Toggle Sidebar"),
     ShortcutEntry(name: .exploreSessions, label: "Explore Sessions"),
-    ShortcutEntry(name: .newSidebarFolder, label: "New Group"),
-    ShortcutEntry(name: .moveOutOfFolder, label: "Move Out of Group"),
+    ShortcutEntry(name: .newGroup, label: "New Group"),
+    ShortcutEntry(name: .moveOutOfGroup, label: "Move Out of Group"),
     ShortcutEntry(name: .settings, label: "Settings"),
     ShortcutEntry(name: .tab1, label: "Workspace 1"),
     ShortcutEntry(name: .tab2, label: "Workspace 2"),
@@ -66,6 +66,37 @@ let configurableShortcuts: [ShortcutEntry] = [
 let tabShortcutNames: [KeyboardShortcuts.Name] = [
     .tab1, .tab2, .tab3, .tab4, .tab5, .tab6, .tab7, .tab8, .tab9, .tab0,
 ]
+
+/// One-shot migration that copies user shortcut overrides from old identifier
+/// names to new ones, then deletes the old keys. Guarded by a UserDefaults
+/// flag so it only runs once. KeyboardShortcuts persists each override under
+/// `KeyboardShortcuts_<name>` (see KeyboardShortcuts.swift in the upstream).
+enum DeckardShortcutMigration {
+    static let migrationFlagKey = "shortcutsMigratedToGroupNames"
+
+    /// Old identifier → new identifier renames for the folder→group commit.
+    static let renames: [(oldName: String, newName: String)] = [
+        ("newSidebarFolder", "newGroup"),
+        ("moveOutOfFolder", "moveOutOfGroup"),
+    ]
+
+    static func migrate(defaults: UserDefaults = .standard) {
+        guard !defaults.bool(forKey: migrationFlagKey) else { return }
+        for (oldName, newName) in renames {
+            let oldKey = "KeyboardShortcuts_\(oldName)"
+            let newKey = "KeyboardShortcuts_\(newName)"
+            // Only carry over if the user actually set an override on the old name
+            // and hasn't already set one on the new name.
+            guard defaults.object(forKey: oldKey) != nil else { continue }
+            if defaults.object(forKey: newKey) == nil,
+               let value = defaults.object(forKey: oldKey) {
+                defaults.set(value, forKey: newKey)
+            }
+            defaults.removeObject(forKey: oldKey)
+        }
+        defaults.set(true, forKey: migrationFlagKey)
+    }
+}
 
 enum DeckardShortcutPolicy {
     static func disableGlobalHotKeys() {

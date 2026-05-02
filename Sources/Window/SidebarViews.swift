@@ -283,19 +283,19 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     }
 }
 
-// MARK: - SidebarFolderView
+// MARK: - SidebarGroupView
 
 /// A folder header row in the sidebar with disclosure triangle and name.
-class SidebarFolderView: NSView, NSTextFieldDelegate, NSDraggingSource {
-    let folder: SidebarFolder
+class SidebarGroupView: NSView, NSTextFieldDelegate, NSDraggingSource {
+    let folder: SidebarGroup
     private let disclosureImageView: NSImageView
     private let label: NSTextField
     private let badgeContainer: NSStackView
 
-    var onToggle: ((SidebarFolderView) -> Void)?
+    var onToggle: ((SidebarGroupView) -> Void)?
     var onRename: ((String) -> Void)?
     var onContextMenu: ((NSEvent) -> NSMenu?)?
-    var onDrop: ((SidebarFolderView, Int) -> Void)?  // folder, project index
+    var onDrop: ((SidebarGroupView, Int) -> Void)?  // folder, project index
 
     /// Row index in the sidebar stack view (set during rebuildSidebar).
     var rowIndex: Int = 0
@@ -317,7 +317,7 @@ class SidebarFolderView: NSView, NSTextFieldDelegate, NSDraggingSource {
         didSet { needsDisplay = true }
     }
 
-    init(folder: SidebarFolder, projectCount: Int) {
+    init(folder: SidebarGroup, projectCount: Int) {
         self.folder = folder
 
         disclosureImageView = NSImageView()
@@ -422,7 +422,7 @@ class SidebarFolderView: NSView, NSTextFieldDelegate, NSDraggingSource {
         dragStartPoint = nil
 
         let pb = NSPasteboardItem()
-        pb.setString("\(rowIndex)", forType: deckardFolderDragType)
+        pb.setString("\(rowIndex)", forType: deckardGroupDragType)
         let item = NSDraggingItem(pasteboardWriter: pb)
         item.setDraggingFrame(bounds, contents: snapshot())
         beginDraggingSession(with: [item], event: event, source: self)
@@ -518,7 +518,7 @@ class SidebarFolderView: NSView, NSTextFieldDelegate, NSDraggingSource {
 /// Covers the empty area below the project list; dropping here moves to end.
 class SidebarDropZone: NSView {
     var onDrop: ((Int) -> Void)?
-    var onFolderDrop: ((Int) -> Void)?  // folder row index dropped to bottom
+    var onGroupDrop: ((Int) -> Void)?  // folder row index dropped to bottom
     var onContextMenu: ((NSEvent) -> NSMenu?)?
     weak var sidebarStackView: ReorderableStackView?
 
@@ -530,7 +530,7 @@ class SidebarDropZone: NSView {
 
     private func acceptsDrag(_ sender: NSDraggingInfo) -> Bool {
         let types = sender.draggingPasteboard.types ?? []
-        return types.contains(deckardProjectDragType) || types.contains(deckardFolderDragType)
+        return types.contains(deckardProjectDragType) || types.contains(deckardGroupDragType)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
@@ -560,9 +560,9 @@ class SidebarDropZone: NSView {
             onDrop?(fromIndex)
             return true
         }
-        if let fromStr = sender.draggingPasteboard.string(forType: deckardFolderDragType),
+        if let fromStr = sender.draggingPasteboard.string(forType: deckardGroupDragType),
            let fromRow = Int(fromStr) {
-            onFolderDrop?(fromRow)
+            onGroupDrop?(fromRow)
             return true
         }
         return false
@@ -575,8 +575,8 @@ class SidebarDropZone: NSView {
 /// Supports project drag (reorder/drop onto folder) and folder drag (reorder folders).
 class ReorderableStackView: NSStackView {
     var onReorder: ((Int, Int, Bool) -> Void)?
-    var onDropOntoFolder: ((SidebarFolderView, Int) -> Void)?
-    var onFolderReorder: ((Int, Int) -> Void)?
+    var onDropOntoGroup: ((SidebarGroupView, Int) -> Void)?
+    var onGroupReorder: ((Int, Int) -> Void)?
 
     private let dropIndicator: NSView = {
         let v = NSView()
@@ -587,7 +587,7 @@ class ReorderableStackView: NSStackView {
     }()
     private var currentDropIndex: Int = -1
     private var currentDropForceFullWidth: Bool = false
-    private weak var highlightedFolder: SidebarFolderView?
+    private weak var highlightedGroup: SidebarGroupView?
 
     private func dropIndex(for sender: NSDraggingInfo) -> Int {
         let location = convert(sender.draggingLocation, from: nil)
@@ -599,14 +599,14 @@ class ReorderableStackView: NSStackView {
         return arrangedSubviews.count
     }
 
-    /// Returns the SidebarFolderView at the drag location, if the cursor is
+    /// Returns the SidebarGroupView at the drag location, if the cursor is
     /// within the center region of a folder row. The top and bottom edges
     /// (6px each) are reserved for between-item line indicator drops.
-    private func folderView(at sender: NSDraggingInfo) -> SidebarFolderView? {
+    private func folderView(at sender: NSDraggingInfo) -> SidebarGroupView? {
         let location = convert(sender.draggingLocation, from: nil)
         let edgeInset: CGFloat = 6
         for view in arrangedSubviews {
-            guard let fv = view as? SidebarFolderView else { continue }
+            guard let fv = view as? SidebarGroupView else { continue }
             let innerTop = fv.frame.maxY - edgeInset
             let innerBottom = fv.frame.minY + edgeInset
             if location.y <= innerTop && location.y >= innerBottom {
@@ -617,9 +617,9 @@ class ReorderableStackView: NSStackView {
     }
 
     private func clearFolderHighlight() {
-        if let prev = highlightedFolder {
+        if let prev = highlightedGroup {
             prev.isDropTarget = false
-            highlightedFolder = nil
+            highlightedGroup = nil
         }
     }
 
@@ -676,7 +676,7 @@ class ReorderableStackView: NSStackView {
     }
 
     private func acceptsFolderDrag(_ sender: NSDraggingInfo) -> Bool {
-        sender.draggingPasteboard.types?.contains(deckardFolderDragType) == true
+        sender.draggingPasteboard.types?.contains(deckardGroupDragType) == true
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
@@ -725,7 +725,7 @@ class ReorderableStackView: NSStackView {
                 // (after the folder + all its children)
                 best = i
                 // Find end of this folder's children
-                if view is SidebarFolderView {
+                if view is SidebarGroupView {
                     var end = i + 1
                     while end < arrangedSubviews.count,
                           let r = arrangedSubviews[end] as? VerticalTabRowView, r.indent > 0 {
@@ -745,10 +745,10 @@ class ReorderableStackView: NSStackView {
             // Hovering over a folder row — highlight it, hide the line indicator
             dropIndicator.isHidden = true
             currentDropIndex = -1
-            if highlightedFolder !== fv {
+            if highlightedGroup !== fv {
                 clearFolderHighlight()
                 fv.isDropTarget = true
-                highlightedFolder = fv
+                highlightedGroup = fv
             }
         } else {
             // Not over a folder — show the line indicator
@@ -781,7 +781,7 @@ class ReorderableStackView: NSStackView {
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        let wasOnFolder = highlightedFolder
+        let wasOnFolder = highlightedGroup
         let wasForceFullWidth = currentDropForceFullWidth
         hideIndicator()
 
@@ -790,7 +790,7 @@ class ReorderableStackView: NSStackView {
            let fromIndex = Int(fromStr) {
             // If dropped on a highlighted folder, route to folder drop handler
             if let fv = wasOnFolder {
-                onDropOntoFolder?(fv, fromIndex)
+                onDropOntoGroup?(fv, fromIndex)
                 return true
             }
             let toIndex = dropIndex(for: sender)
@@ -799,11 +799,11 @@ class ReorderableStackView: NSStackView {
         }
 
         // Handle folder drag
-        if let fromStr = sender.draggingPasteboard.string(forType: deckardFolderDragType),
+        if let fromStr = sender.draggingPasteboard.string(forType: deckardGroupDragType),
            let fromRow = Int(fromStr) {
             let toRow = dropIndex(for: sender)
             if toRow != fromRow {
-                onFolderReorder?(fromRow, toRow)
+                onGroupReorder?(fromRow, toRow)
             }
             return true
         }

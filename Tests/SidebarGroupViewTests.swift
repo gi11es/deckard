@@ -2,19 +2,19 @@ import XCTest
 import AppKit
 @testable import Deckard
 
-final class SidebarFolderViewTests: XCTestCase {
+final class SidebarGroupViewTests: XCTestCase {
 
     // MARK: - Helpers
 
-    /// Create a SidebarFolderView with a known frame inside a parent view
+    /// Create a SidebarGroupView with a known frame inside a parent view
     /// so that hitTest receives meaningful superview-relative coordinates.
-    private func makeFolderView(
+    private func makeGroupView(
         collapsed: Bool = false,
         origin: NSPoint = NSPoint(x: 0, y: 50)
-    ) -> SidebarFolderView {
-        let folder = SidebarFolder(name: "Test Folder")
+    ) -> SidebarGroupView {
+        let folder = SidebarGroup(name: "Test Folder")
         folder.isCollapsed = collapsed
-        let view = SidebarFolderView(folder: folder, projectCount: 2)
+        let view = SidebarGroupView(folder: folder, projectCount: 2)
 
         // Embed in a parent so hitTest gets superview-relative points.
         let parent = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
@@ -27,7 +27,7 @@ final class SidebarFolderViewTests: XCTestCase {
     // MARK: - hitTest
 
     func testHitTestReturnsSelfWhenNotEditing() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         // Point inside the view's frame (superview coordinates).
         let point = NSPoint(x: 10, y: view.frame.midY)
         let result = view.hitTest(point)
@@ -35,7 +35,7 @@ final class SidebarFolderViewTests: XCTestCase {
     }
 
     func testHitTestReturnsNilOutsideFrame() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         // Point outside the view's frame.
         let point = NSPoint(x: 10, y: view.frame.maxY + 50)
         let result = view.hitTest(point)
@@ -44,7 +44,7 @@ final class SidebarFolderViewTests: XCTestCase {
 
     func testHitTestUsesFrameNotBounds() {
         // Place the view at a non-zero origin to verify frame (not bounds) is used.
-        let view = makeFolderView(origin: NSPoint(x: 0, y: 100))
+        let view = makeGroupView(origin: NSPoint(x: 0, y: 100))
         XCTAssertEqual(view.frame.origin.y, 100)
 
         // Point at y=110 is inside frame (100..128) but outside bounds (0..28).
@@ -59,7 +59,7 @@ final class SidebarFolderViewTests: XCTestCase {
     }
 
     func testHitTestDelegatesToSuperWhenEditing() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         // Start editing to flip isEditingName.
         view.startEditing()
         XCTAssertTrue(view.isEditingName)
@@ -74,8 +74,8 @@ final class SidebarFolderViewTests: XCTestCase {
     // MARK: - Chevron image
 
     func testChevronImageReflectsCollapsedState() {
-        let expandedView = makeFolderView(collapsed: false)
-        let collapsedView = makeFolderView(collapsed: true)
+        let expandedView = makeGroupView(collapsed: false)
+        let collapsedView = makeGroupView(collapsed: true)
 
         // Access the image via the accessibilityDescription to verify it was set.
         // Both should have images (we can't easily compare SF Symbol names).
@@ -89,7 +89,7 @@ final class SidebarFolderViewTests: XCTestCase {
     }
 
     func testUpdateChevronChangesImage() {
-        let view = makeFolderView(collapsed: false)
+        let view = makeGroupView(collapsed: false)
         let imageView = view.subviews.compactMap { $0 as? NSImageView }.first!
 
         let imageBefore = imageView.image
@@ -105,7 +105,7 @@ final class SidebarFolderViewTests: XCTestCase {
     // MARK: - mouseDown: chevron area fires onToggle immediately
 
     func testMouseDownOnChevronAreaCallsOnToggle() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         var toggleCount = 0
         view.onToggle = { _ in toggleCount += 1 }
 
@@ -127,7 +127,7 @@ final class SidebarFolderViewTests: XCTestCase {
     }
 
     func testMouseDownOnChevronAreaDoesNotSetDragStartPoint() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         view.onToggle = { _ in }
 
         let event = NSEvent.mouseEvent(
@@ -165,7 +165,7 @@ final class SidebarFolderViewTests: XCTestCase {
     }
 
     func testRapidChevronClicksDoNotTriggerEditing() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         var toggleCount = 0
         view.onToggle = { _ in toggleCount += 1 }
 
@@ -191,7 +191,7 @@ final class SidebarFolderViewTests: XCTestCase {
     // MARK: - mouseDown: label area uses mouseUp for toggle
 
     func testMouseDownOnLabelAreaDoesNotCallOnToggle() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         var toggleCount = 0
         view.onToggle = { _ in toggleCount += 1 }
 
@@ -213,7 +213,7 @@ final class SidebarFolderViewTests: XCTestCase {
     }
 
     func testMouseUpOnLabelAreaCallsOnToggle() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         var toggleCount = 0
         view.onToggle = { _ in toggleCount += 1 }
 
@@ -251,7 +251,7 @@ final class SidebarFolderViewTests: XCTestCase {
     // MARK: - Double-click on label starts editing
 
     func testDoubleClickOnLabelStartsEditing() {
-        let view = makeFolderView()
+        let view = makeGroupView()
         var toggleCount = 0
         view.onToggle = { _ in toggleCount += 1 }
 
@@ -272,15 +272,15 @@ final class SidebarFolderViewTests: XCTestCase {
         XCTAssertEqual(toggleCount, 0, "Double-click on label should not toggle")
     }
 
-    // MARK: - folderToggleClicked guard
+    // MARK: - groupToggleClicked guard
 
-    func testFolderToggleBlocksCollapseWhenContainingSelectedProject() {
-        let folder = SidebarFolder(name: "Active")
+    func testGroupToggleBlocksCollapseWhenContainingSelectedProject() {
+        let folder = SidebarGroup(name: "Active")
         let projectId = UUID()
         folder.projectIds = [projectId]
         folder.isCollapsed = false
 
-        // Simulate the guard logic from folderToggleClicked.
+        // Simulate the guard logic from groupToggleClicked.
         folder.isCollapsed.toggle()
         // Guard: if collapsing a folder that contains the selected project, force expand.
         let selectedProjectId = projectId  // selected project is inside this folder
@@ -292,8 +292,8 @@ final class SidebarFolderViewTests: XCTestCase {
                        "Folder containing the selected project should not stay collapsed")
     }
 
-    func testFolderToggleAllowsCollapseWhenNotContainingSelectedProject() {
-        let folder = SidebarFolder(name: "Other")
+    func testGroupToggleAllowsCollapseWhenNotContainingSelectedProject() {
+        let folder = SidebarGroup(name: "Other")
         let projectId = UUID()
         let otherProjectId = UUID()
         folder.projectIds = [projectId]

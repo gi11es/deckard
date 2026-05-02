@@ -19,7 +19,7 @@ extension DeckardWindowController {
             if case .project(let id) = item, id == projectId { return true }
             return false
         }
-        for folder in sidebarFolders {
+        for folder in sidebarGroups {
             folder.projectIds.removeAll { $0 == projectId }
         }
     }
@@ -39,7 +39,7 @@ extension DeckardWindowController {
     /// True when any sidebar row is being inline-edited (rename).
     private var isSidebarEditing: Bool {
         sidebarStackView.arrangedSubviews.contains { view in
-            if let fv = view as? SidebarFolderView, fv.isEditingName { return true }
+            if let fv = view as? SidebarGroupView, fv.isEditingName { return true }
             if let rv = view as? VerticalTabRowView, rv.isEditingName { return true }
             return false
         }
@@ -109,20 +109,20 @@ extension DeckardWindowController {
                 sidebarRowToProjectIndex[rowIndex] = pi
                 rowIndex += 1
 
-            case .folder(let folder):
+            case .group(let folder):
                 // Folder header
-                let folderView = SidebarFolderView(
+                let folderView = SidebarGroupView(
                     folder: folder,
                     projectCount: folder.projectIds.count
                 )
                 folderView.onToggle = { [weak self] fv in
-                    self?.folderToggleClicked(fv)
+                    self?.groupToggleClicked(fv)
                 }
                 folderView.onDrop = { [weak self] fv, fromIndex in
                     guard let self else { return }
                     guard fromIndex >= 0, fromIndex < self.projects.count else { return }
                     let project = self.projects[fromIndex]
-                    self.moveProjectIntoFolder(projectId: project.id, folder: fv.folder)
+                    self.moveProjectIntoGroup(projectId: project.id, folder: fv.folder)
                 }
 
                 // Aggregate badge infos from all projects in the folder
@@ -143,7 +143,7 @@ extension DeckardWindowController {
                 }
                 folderView.onContextMenu = { [weak self] event in
                     guard let self = self else { return nil }
-                    return self.buildFolderContextMenu(for: folder)
+                    return self.buildGroupContextMenu(for: folder)
                 }
                 folderView.rowIndex = rowIndex
                 sidebarStackView.addArrangedSubview(folderView)
@@ -188,22 +188,22 @@ extension DeckardWindowController {
             }
         }
 
-        sidebarStackView.registerForDraggedTypes([deckardProjectDragType, deckardSidebarDragType, deckardFolderDragType])
+        sidebarStackView.registerForDraggedTypes([deckardProjectDragType, deckardSidebarDragType, deckardGroupDragType])
         sidebarStackView.onReorder = { [weak self] from, to, forceTopLevel in
             self?.handleSidebarDragReorder(fromProjectIndex: from, toRow: to, forceTopLevel: forceTopLevel)
         }
-        sidebarStackView.onDropOntoFolder = { [weak self] folderView, fromIndex in
+        sidebarStackView.onDropOntoGroup = { [weak self] folderView, fromIndex in
             folderView.onDrop?(folderView, fromIndex)
         }
-        sidebarStackView.onFolderReorder = { [weak self] fromRow, toRow in
-            self?.handleFolderDragReorder(fromRow: fromRow, toRow: toRow)
+        sidebarStackView.onGroupReorder = { [weak self] fromRow, toRow in
+            self?.handleGroupDragReorder(fromRow: fromRow, toRow: toRow)
         }
         sidebarDropZone.onDrop = { [weak self] fromIndex in
             guard let self = self, fromIndex >= 0, fromIndex < self.projects.count else { return }
             let project = self.projects[fromIndex]
             // If the project was inside a folder, move it out first
-            if self.sidebarFolders.contains(where: { $0.projectIds.contains(project.id) }) {
-                self.moveProjectOutOfFolder(projectId: project.id)
+            if self.sidebarGroups.contains(where: { $0.projectIds.contains(project.id) }) {
+                self.moveProjectOutOfGroup(projectId: project.id)
             }
             // Move the sidebarOrder item to the end
             self.sidebarOrder.removeAll { item in
@@ -213,14 +213,14 @@ extension DeckardWindowController {
             self.sidebarOrder.append(.project(project.id))
             self.reorderProject(from: fromIndex, to: self.projects.count)
         }
-        sidebarDropZone.onFolderDrop = { [weak self] fromRow in
+        sidebarDropZone.onGroupDrop = { [weak self] fromRow in
             guard let self else { return }
             // Move folder to end of sidebarOrder
             let infos = self.sidebarRowInfos()
             guard fromRow >= 0, fromRow < infos.count, infos[fromRow].isFolder,
-                  let folderId = infos[fromRow].folderId else { return }
+                  let groupId = infos[fromRow].groupId else { return }
             guard let orderIdx = self.sidebarOrder.firstIndex(where: {
-                if case .folder(let f) = $0, f.id == folderId { return true }
+                if case .group(let f) = $0, f.id == groupId { return true }
                 return false
             }) else { return }
             let item = self.sidebarOrder.remove(at: orderIdx)
@@ -231,7 +231,7 @@ extension DeckardWindowController {
         sidebarDropZone.sidebarStackView = sidebarStackView
         sidebarDropZone.onContextMenu = { [weak self] event in
             let menu = NSMenu()
-            let item = NSMenuItem(title: "New Group", action: #selector(self?.sidebarEmptyContextNewFolder), keyEquivalent: "")
+            let item = NSMenuItem(title: "New Group", action: #selector(self?.sidebarEmptyContextNewGroup), keyEquivalent: "")
             item.target = self
             menu.addItem(item)
             return menu
@@ -269,10 +269,10 @@ extension DeckardWindowController {
     struct SidebarRowInfo {
         var sidebarOrderIndex: Int
         var isFolder: Bool
-        var parentFolder: SidebarFolder?
+        var parentFolder: SidebarGroup?
         var childIndexInFolder: Int?
         var projectId: UUID?
-        var folderId: UUID?
+        var groupId: UUID?
     }
 
     func sidebarRowInfos() -> [SidebarRowInfo] {
@@ -283,18 +283,18 @@ extension DeckardWindowController {
                 infos.append(SidebarRowInfo(
                     sidebarOrderIndex: orderIdx, isFolder: false,
                     parentFolder: nil, childIndexInFolder: nil,
-                    projectId: pid, folderId: nil))
-            case .folder(let folder):
+                    projectId: pid, groupId: nil))
+            case .group(let folder):
                 infos.append(SidebarRowInfo(
                     sidebarOrderIndex: orderIdx, isFolder: true,
                     parentFolder: nil, childIndexInFolder: nil,
-                    projectId: nil, folderId: folder.id))
+                    projectId: nil, groupId: folder.id))
                 if !folder.isCollapsed {
                     for (ci, pid) in folder.projectIds.enumerated() {
                         infos.append(SidebarRowInfo(
                             sidebarOrderIndex: orderIdx, isFolder: false,
                             parentFolder: folder, childIndexInFolder: ci,
-                            projectId: pid, folderId: nil))
+                            projectId: pid, groupId: nil))
                     }
                 }
             }
@@ -313,8 +313,8 @@ extension DeckardWindowController {
         let infos = sidebarRowInfos()
         guard toRow >= 0, toRow < infos.count else {
             // Drop past the end — move to top level at the end
-            let wasInFolder = sidebarFolders.contains { $0.projectIds.contains(draggedProject.id) }
-            if wasInFolder { moveProjectOutOfFolder(projectId: draggedProject.id) }
+            let wasInFolder = sidebarGroups.contains { $0.projectIds.contains(draggedProject.id) }
+            if wasInFolder { moveProjectOutOfGroup(projectId: draggedProject.id) }
             sidebarOrder.removeAll { if case .project(let id) = $0, id == draggedProject.id { return true }; return false }
             sidebarOrder.append(.project(draggedProject.id))
             rebuildSidebar()
@@ -325,12 +325,12 @@ extension DeckardWindowController {
         let toInfo = infos[toRow]
 
         // Note: dropping directly *onto* a folder header (with highlight) is
-        // handled separately via onDropOntoFolder in performDragOperation.
+        // handled separately via onDropOntoGroup in performDragOperation.
         // Here we only handle line-indicator (between-items) drops.
 
         // Determine the target folder: either the row itself is a folder child,
         // or the row above is (dropping after the last child in a folder).
-        let effectiveFolder: SidebarFolder?
+        let effectiveFolder: SidebarGroup?
         let effectiveChildIndex: Int?
         if let pf = toInfo.parentFolder {
             effectiveFolder = pf
@@ -345,7 +345,7 @@ extension DeckardWindowController {
         }
 
         // Dropping between items inside the same folder → reorder within folder
-        let sourceFolder = sidebarFolders.first { $0.projectIds.contains(draggedProject.id) }
+        let sourceFolder = sidebarGroups.first { $0.projectIds.contains(draggedProject.id) }
         if let targetFolder = effectiveFolder, let sf = sourceFolder, sf.id == targetFolder.id {
             // Reorder within the same folder
             guard let fromIdx = sf.projectIds.firstIndex(of: draggedProject.id),
@@ -410,26 +410,26 @@ extension DeckardWindowController {
 
     // MARK: - Folder Management
 
-    @objc func sidebarEmptyContextNewFolder() {
-        createSidebarFolder()
+    @objc func sidebarEmptyContextNewGroup() {
+        createSidebarGroup()
     }
 
-    func createSidebarFolder(name: String = "New Group") {
-        let folder = SidebarFolder(name: name)
-        sidebarFolders.append(folder)
-        sidebarOrder.append(.folder(folder))
+    func createSidebarGroup(name: String = "New Group") {
+        let folder = SidebarGroup(name: name)
+        sidebarGroups.append(folder)
+        sidebarOrder.append(.group(folder))
         rebuildSidebar()
         saveState()
         // Start editing the name immediately
-        if let folderView = sidebarStackView.arrangedSubviews.compactMap({ $0 as? SidebarFolderView }).last {
+        if let folderView = sidebarStackView.arrangedSubviews.compactMap({ $0 as? SidebarGroupView }).last {
             folderView.startEditing()
         }
     }
 
-    func deleteSidebarFolder(_ folder: SidebarFolder) {
+    func deleteSidebarGroup(_ folder: SidebarGroup) {
         // Move all projects inside the folder back to top level (ungrouped)
         let orderIndex = sidebarOrder.firstIndex(where: {
-            if case .folder(let f) = $0, f.id == folder.id { return true }
+            if case .group(let f) = $0, f.id == folder.id { return true }
             return false
         })
 
@@ -443,18 +443,18 @@ extension DeckardWindowController {
             }
         }
 
-        sidebarFolders.removeAll { $0.id == folder.id }
+        sidebarGroups.removeAll { $0.id == folder.id }
         rebuildSidebar()
         saveState()
     }
 
-    func moveProjectIntoFolder(projectId: UUID, folder: SidebarFolder) {
+    func moveProjectIntoGroup(projectId: UUID, folder: SidebarGroup) {
         // Remove project from current location (top-level or another folder)
         sidebarOrder.removeAll { item in
             if case .project(let id) = item, id == projectId { return true }
             return false
         }
-        for f in sidebarFolders where f.id != folder.id {
+        for f in sidebarGroups where f.id != folder.id {
             f.projectIds.removeAll { $0 == projectId }
         }
 
@@ -470,14 +470,14 @@ extension DeckardWindowController {
         saveState()
     }
 
-    func moveProjectOutOfFolder(projectId: UUID) {
+    func moveProjectOutOfGroup(projectId: UUID) {
         // Find which folder contains this project
-        guard let folder = sidebarFolders.first(where: { $0.projectIds.contains(projectId) }) else { return }
+        guard let folder = sidebarGroups.first(where: { $0.projectIds.contains(projectId) }) else { return }
         folder.projectIds.removeAll { $0 == projectId }
 
         // Insert as ungrouped project right after the folder in sidebarOrder
         if let folderIdx = sidebarOrder.firstIndex(where: {
-            if case .folder(let f) = $0, f.id == folder.id { return true }
+            if case .group(let f) = $0, f.id == folder.id { return true }
             return false
         }) {
             sidebarOrder.insert(.project(projectId), at: folderIdx + 1)
@@ -489,7 +489,7 @@ extension DeckardWindowController {
         saveState()
     }
 
-    func folderToggleClicked(_ sender: SidebarFolderView) {
+    func groupToggleClicked(_ sender: SidebarGroupView) {
         let wasCollapsed = sender.folder.isCollapsed
         sender.folder.isCollapsed.toggle()
 
@@ -500,7 +500,7 @@ extension DeckardWindowController {
         }
 
         DiagnosticLog.shared.log("sidebar",
-            "folderToggle: \(sender.folder.name) was=\(wasCollapsed) now=\(sender.folder.isCollapsed) projects=\(sender.folder.projectIds.count)")
+            "groupToggle: \(sender.folder.name) was=\(wasCollapsed) now=\(sender.folder.isCollapsed) projects=\(sender.folder.projectIds.count)")
 
         rebuildSidebar()
         saveState()
@@ -508,14 +508,14 @@ extension DeckardWindowController {
 
     /// Handle drag-reorder of a folder row.
     /// `fromRow` is the row index of the dragged folder, `toRow` is the drop target row.
-    func handleFolderDragReorder(fromRow: Int, toRow: Int) {
+    func handleGroupDragReorder(fromRow: Int, toRow: Int) {
         let infos = sidebarRowInfos()
         guard fromRow >= 0, fromRow < infos.count, infos[fromRow].isFolder,
-              let folderId = infos[fromRow].folderId else { return }
+              let groupId = infos[fromRow].groupId else { return }
 
         // Find the folder's index in sidebarOrder
         guard let fromOrderIdx = sidebarOrder.firstIndex(where: {
-            if case .folder(let f) = $0, f.id == folderId { return true }
+            if case .group(let f) = $0, f.id == groupId { return true }
             return false
         }) else { return }
 
@@ -539,17 +539,17 @@ extension DeckardWindowController {
 
     // MARK: - Folder Context Menu
 
-    func buildFolderContextMenu(for folder: SidebarFolder) -> NSMenu {
+    func buildGroupContextMenu(for folder: SidebarGroup) -> NSMenu {
         let menu = NSMenu()
 
-        let renameItem = NSMenuItem(title: "Rename Group", action: #selector(renameFolderMenuAction(_:)), keyEquivalent: "")
+        let renameItem = NSMenuItem(title: "Rename Group", action: #selector(renameGroupMenuAction(_:)), keyEquivalent: "")
         renameItem.target = self
         renameItem.representedObject = folder
         menu.addItem(renameItem)
 
         menu.addItem(.separator())
 
-        let deleteItem = NSMenuItem(title: "Delete Group", action: #selector(deleteFolderMenuAction(_:)), keyEquivalent: "")
+        let deleteItem = NSMenuItem(title: "Delete Group", action: #selector(deleteGroupMenuAction(_:)), keyEquivalent: "")
         deleteItem.target = self
         deleteItem.representedObject = folder
         menu.addItem(deleteItem)
@@ -557,20 +557,20 @@ extension DeckardWindowController {
         return menu
     }
 
-    @objc func renameFolderMenuAction(_ sender: NSMenuItem) {
-        guard let folder = sender.representedObject as? SidebarFolder else { return }
-        // Find the SidebarFolderView for this folder and start editing
+    @objc func renameGroupMenuAction(_ sender: NSMenuItem) {
+        guard let folder = sender.representedObject as? SidebarGroup else { return }
+        // Find the SidebarGroupView for this folder and start editing
         for view in sidebarStackView.arrangedSubviews {
-            if let fv = view as? SidebarFolderView, fv.folder.id == folder.id {
+            if let fv = view as? SidebarGroupView, fv.folder.id == folder.id {
                 fv.startEditing()
                 break
             }
         }
     }
 
-    @objc func deleteFolderMenuAction(_ sender: NSMenuItem) {
-        guard let folder = sender.representedObject as? SidebarFolder else { return }
-        deleteSidebarFolder(folder)
+    @objc func deleteGroupMenuAction(_ sender: NSMenuItem) {
+        guard let folder = sender.representedObject as? SidebarGroup else { return }
+        deleteSidebarGroup(folder)
     }
 
     // MARK: - Project Context Menu
@@ -597,21 +597,21 @@ extension DeckardWindowController {
         menu.addItem(.separator())
 
         // Folder options
-        let isInFolder = sidebarFolders.contains { $0.projectIds.contains(project.id) }
+        let isInFolder = sidebarGroups.contains { $0.projectIds.contains(project.id) }
 
         if isInFolder {
-            let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveProjectOutOfFolderAction(_:)), keyEquivalent: "")
-            moveOutItem.setShortcut(for: .moveOutOfFolder)
+            let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveProjectOutOfGroupAction(_:)), keyEquivalent: "")
+            moveOutItem.setShortcut(for: .moveOutOfGroup)
             moveOutItem.target = self
             moveOutItem.representedObject = project
             menu.addItem(moveOutItem)
-        } else if !sidebarFolders.isEmpty {
+        } else if !sidebarGroups.isEmpty {
             let moveToItem = NSMenuItem(title: "Move to Group", action: nil, keyEquivalent: "")
             let moveSubmenu = NSMenu()
-            for folder in sidebarFolders {
-                let item = NSMenuItem(title: folder.name, action: #selector(moveProjectToFolderAction(_:)), keyEquivalent: "")
+            for folder in sidebarGroups {
+                let item = NSMenuItem(title: folder.name, action: #selector(moveProjectToGroupAction(_:)), keyEquivalent: "")
                 item.target = self
-                item.representedObject = MoveToFolderInfo(project: project, folder: folder)
+                item.representedObject = MoveToGroupInfo(project: project, folder: folder)
                 moveSubmenu.addItem(item)
             }
             moveToItem.submenu = moveSubmenu
@@ -620,8 +620,8 @@ extension DeckardWindowController {
 
         menu.addItem(.separator())
 
-        let newFolderItem = NSMenuItem(title: "New Group", action: #selector(newFolderMenuAction), keyEquivalent: "")
-        newFolderItem.setShortcut(for: .newSidebarFolder)
+        let newFolderItem = NSMenuItem(title: "New Group", action: #selector(newGroupMenuAction), keyEquivalent: "")
+        newFolderItem.setShortcut(for: .newGroup)
         newFolderItem.target = self
         menu.addItem(newFolderItem)
 
@@ -636,27 +636,27 @@ extension DeckardWindowController {
         return menu
     }
 
-    class MoveToFolderInfo {
+    class MoveToGroupInfo {
         let project: ProjectItem
-        let folder: SidebarFolder
-        init(project: ProjectItem, folder: SidebarFolder) {
+        let folder: SidebarGroup
+        init(project: ProjectItem, folder: SidebarGroup) {
             self.project = project
             self.folder = folder
         }
     }
 
-    @objc func moveProjectToFolderAction(_ sender: NSMenuItem) {
-        guard let info = sender.representedObject as? MoveToFolderInfo else { return }
-        moveProjectIntoFolder(projectId: info.project.id, folder: info.folder)
+    @objc func moveProjectToGroupAction(_ sender: NSMenuItem) {
+        guard let info = sender.representedObject as? MoveToGroupInfo else { return }
+        moveProjectIntoGroup(projectId: info.project.id, folder: info.folder)
     }
 
-    @objc func moveProjectOutOfFolderAction(_ sender: NSMenuItem) {
+    @objc func moveProjectOutOfGroupAction(_ sender: NSMenuItem) {
         guard let project = sender.representedObject as? ProjectItem else { return }
-        moveProjectOutOfFolder(projectId: project.id)
+        moveProjectOutOfGroup(projectId: project.id)
     }
 
-    @objc func newFolderMenuAction() {
-        createSidebarFolder()
+    @objc func newGroupMenuAction() {
+        createSidebarGroup()
     }
 
     @objc func closeProjectMenuAction(_ sender: NSMenuItem) {
@@ -764,7 +764,7 @@ extension DeckardWindowController {
         for view in sidebarStackView.arrangedSubviews {
             if let row = view as? VerticalTabRowView {
                 row.isSelected = (row.index == selectedProjectIndex)
-            } else if let fv = view as? SidebarFolderView {
+            } else if let fv = view as? SidebarGroupView {
                 // Highlight folder if it contains the selected project
                 fv.isContainingSelected = fv.folder.projectIds.contains(currentProjectId) && fv.folder.isCollapsed
             }

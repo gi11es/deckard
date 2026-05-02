@@ -54,8 +54,8 @@
 		AA1C0001AA1C0001AA1C0001 /* DeckardHooksInstallerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1C0002AA1C0002AA1C0002 /* DeckardHooksInstallerTests.swift */; };
 		AA1D0001AA1D0001AA1D0001 /* CrashReporterTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1D0002AA1D0002AA1D0002 /* CrashReporterTests.swift */; };
 		AA1E0001AA1E0001AA1E0001 /* ControlSocketTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1E0002AA1E0002AA1E0002 /* ControlSocketTests.swift */; };
-		AA1F0001AA1F0001AA1F0001 /* SidebarFolderTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1F0002AA1F0002AA1F0002 /* SidebarFolderTests.swift */; };
-		AA200001AA200001AA200001 /* SidebarFolderViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA200002AA200002AA200002 /* SidebarFolderViewTests.swift */; };
+		AA1F0001AA1F0001AA1F0001 /* SidebarGroupTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1F0002AA1F0002AA1F0002 /* SidebarGroupTests.swift */; };
+		AA200001AA200001AA200001 /* SidebarGroupViewTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA200002AA200002AA200002 /* SidebarGroupViewTests.swift */; };
 		QA200002QA200002QA200002 /* QuotaMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = QA200001QA200001QA200001 /* QuotaMonitor.swift */; };
 		QA200004QA200004QA200004 /* QuotaView.swift in Sources */ = {isa = PBXBuildFile; fileRef = QA200003QA200003QA200003 /* QuotaView.swift */; };
 		QA200006QA200006QA200006 /* QuotaMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = QA200005QA200005QA200005 /* QuotaMonitorTests.swift */; };
@@ -66,6 +66,7 @@
 		CF000001CF000001CF000001 /* ClaudeCLIFlags.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000002CF000002CF000002 /* ClaudeCLIFlags.swift */; };
 		CAF00001CAF00001CAF00001 /* ClaudeArgsField.swift in Sources */ = {isa = PBXBuildFile; fileRef = CAF00002CAF00002CAF00002 /* ClaudeArgsField.swift */; };
 		CF000003CF000003CF000003 /* ClaudeCLIFlagsTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = CF000004CF000004CF000004 /* ClaudeCLIFlagsTests.swift */; };
+		5C000001500000015C000001 /* ShortcutMigrationTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5C000002500000025C000002 /* ShortcutMigrationTests.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -116,8 +117,8 @@
 		AA1C0002AA1C0002AA1C0002 /* DeckardHooksInstallerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DeckardHooksInstallerTests.swift; sourceTree = "<group>"; };
 		AA1D0002AA1D0002AA1D0002 /* CrashReporterTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashReporterTests.swift; sourceTree = "<group>"; };
 		AA1E0002AA1E0002AA1E0002 /* ControlSocketTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ControlSocketTests.swift; sourceTree = "<group>"; };
-		AA1F0002AA1F0002AA1F0002 /* SidebarFolderTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarFolderTests.swift; sourceTree = "<group>"; };
-		AA200002AA200002AA200002 /* SidebarFolderViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarFolderViewTests.swift; sourceTree = "<group>"; };
+		AA1F0002AA1F0002AA1F0002 /* SidebarGroupTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarGroupTests.swift; sourceTree = "<group>"; };
+		AA200002AA200002AA200002 /* SidebarGroupViewTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarGroupViewTests.swift; sourceTree = "<group>"; };
 		QA200001QA200001QA200001 /* QuotaMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaMonitor.swift; sourceTree = "<group>"; };
 		QA200003QA200003QA200003 /* QuotaView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaView.swift; sourceTree = "<group>"; };
 		QA200005QA200005QA200005 /* QuotaMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QuotaMonitorTests.swift; sourceTree = "<group>"; };
@@ -127,6 +128,7 @@
 		SE00000ASE00000ASE00000A /* SessionExplorerTimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionExplorerTimelineView.swift; sourceTree = "<group>"; };
 		CF000002CF000002CF000002 /* ClaudeCLIFlags.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCLIFlags.swift; sourceTree = "<group>"; };
 		CF000004CF000004CF000004 /* ClaudeCLIFlagsTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeCLIFlagsTests.swift; sourceTree = "<group>"; };
+		5C000002500000025C000002 /* ShortcutMigrationTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShortcutMigrationTests.swift; sourceTree = "<group>"; };
 		CAF00002CAF00002CAF00002 /* ClaudeArgsField.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ClaudeArgsField.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -280,8 +282,8 @@
 				AA180002AA180002AA180002 /* ProcessMonitorTests.swift */,
 				QA200005QA200005QA200005 /* QuotaMonitorTests.swift */,
 				AA130002AA130002AA130002 /* SessionStateTests.swift */,
-				AA1F0002AA1F0002AA1F0002 /* SidebarFolderTests.swift */,
-				AA200002AA200002AA200002 /* SidebarFolderViewTests.swift */,
+				AA1F0002AA1F0002AA1F0002 /* SidebarGroupTests.swift */,
+				AA200002AA200002AA200002 /* SidebarGroupViewTests.swift */,
 				TE000001TE000001TE000001 /* SmokeTests.swift */,
 				AA120002AA120002AA120002 /* TerminalColorSchemeTests.swift */,
 				AA1A0002AA1A0002AA1A0002 /* TerminalSurfaceTests.swift */,
@@ -289,6 +291,7 @@
 				AA140002AA140002AA140002 /* ThemeManagerTests.swift */,
 				AA1B0002AA1B0002AA1B0002 /* WindowControllerLogicTests.swift */,
 				CF000004CF000004CF000004 /* ClaudeCLIFlagsTests.swift */,
+				5C000002500000025C000002 /* ShortcutMigrationTests.swift */,
 			);
 			path = Tests;
 			sourceTree = "<group>";
@@ -471,10 +474,11 @@
 				AA1C0001AA1C0001AA1C0001 /* DeckardHooksInstallerTests.swift in Sources */,
 				AA1D0001AA1D0001AA1D0001 /* CrashReporterTests.swift in Sources */,
 				AA1E0001AA1E0001AA1E0001 /* ControlSocketTests.swift in Sources */,
-				AA1F0001AA1F0001AA1F0001 /* SidebarFolderTests.swift in Sources */,
-				AA200001AA200001AA200001 /* SidebarFolderViewTests.swift in Sources */,
+				AA1F0001AA1F0001AA1F0001 /* SidebarGroupTests.swift in Sources */,
+				AA200001AA200001AA200001 /* SidebarGroupViewTests.swift in Sources */,
 				QA200006QA200006QA200006 /* QuotaMonitorTests.swift in Sources */,
 				CF000003CF000003CF000003 /* ClaudeCLIFlagsTests.swift in Sources */,
+				5C000001500000015C000001 /* ShortcutMigrationTests.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

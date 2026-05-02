@@ -31,6 +31,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ThemeManager.shared.applySavedTheme()
         log.log("startup", "Loaded \(ThemeManager.shared.availableThemes.count) themes, current: \(ThemeManager.shared.currentThemeName ?? "default")")
 
+        // Migrate any user shortcut overrides from old identifier names before
+        // anything reads from KeyboardShortcuts.
+        DeckardShortcutMigration.migrate()
+
         // Set up the main menu.
         log.log("startup", "Setting up main menu...")
         setupMainMenu()
@@ -215,13 +219,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         closeItem.setShortcut(for: .closeTab)
         fileMenu.addItem(closeItem)
 
-        let newFolderItem = NSMenuItem(title: "New Group", action: #selector(createNewSidebarFolder), keyEquivalent: "")
-        newFolderItem.setShortcut(for: .newSidebarFolder)
+        let newFolderItem = NSMenuItem(title: "New Group", action: #selector(createNewSidebarGroup), keyEquivalent: "")
+        newFolderItem.setShortcut(for: .newGroup)
         newFolderItem.target = self
         fileMenu.addItem(newFolderItem)
 
-        let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveCurrentProjectOutOfFolder), keyEquivalent: "")
-        moveOutItem.setShortcut(for: .moveOutOfFolder)
+        let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveCurrentProjectOutOfGroup), keyEquivalent: "")
+        moveOutItem.setShortcut(for: .moveOutOfGroup)
         moveOutItem.target = self
         fileMenu.addItem(moveOutItem)
 
@@ -334,8 +338,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.exploreCurrentProjectSessions()
     }
 
-    @objc private func moveCurrentProjectOutOfFolder() {
-        windowController?.moveCurrentProjectOutOfFolder()
+    @objc private func moveCurrentProjectOutOfGroup() {
+        windowController?.moveCurrentProjectOutOfGroup()
     }
 
     @objc private func closeCurrentProject() {
@@ -367,8 +371,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.selectProject(byNumber: sender.tag)
     }
 
-    @objc private func createNewSidebarFolder() {
-        windowController?.createSidebarFolder()
+    @objc private func createNewSidebarGroup() {
+        windowController?.createSidebarGroup()
     }
 
     @objc private func toggleSidebar() {

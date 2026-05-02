@@ -20,7 +20,7 @@ enum TabKind: String, Codable, CaseIterable {
 
 /// Persisted state for Deckard — saved to ~/Library/Application Support/Deckard/state.json
 struct DeckardState: Codable {
-    var version: Int = 2
+    var version: Int = 3
     var selectedTabIndex: Int = 0  // selected project index
     var defaultWorkingDirectory: String?
 
@@ -33,9 +33,49 @@ struct DeckardState: Codable {
     // v2: project-based
     var projects: [ProjectState]?
 
-    // v3: sidebar folders
-    var sidebarFolders: [SidebarFolderState]?
+    // v3: sidebar groups (was "sidebarFolders" in v2-era state.json)
+    var sidebarGroups: [SidebarGroupState]?
     var sidebarOrder: [SidebarOrderItem]?
+
+    init() {}
+
+    private enum CodingKeys: String, CodingKey {
+        case version, selectedTabIndex, defaultWorkingDirectory
+        case tabs, claudeTabCounter, terminalTabCounter, masterSessionId
+        case projects
+        case sidebarGroups, sidebarOrder
+        // Legacy key — read on decode, never written.
+        case sidebarFolders
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        version = try c.decodeIfPresent(Int.self, forKey: .version) ?? 2
+        selectedTabIndex = try c.decodeIfPresent(Int.self, forKey: .selectedTabIndex) ?? 0
+        defaultWorkingDirectory = try c.decodeIfPresent(String.self, forKey: .defaultWorkingDirectory)
+        tabs = try c.decodeIfPresent([TabState].self, forKey: .tabs)
+        claudeTabCounter = try c.decodeIfPresent(Int.self, forKey: .claudeTabCounter)
+        terminalTabCounter = try c.decodeIfPresent(Int.self, forKey: .terminalTabCounter)
+        masterSessionId = try c.decodeIfPresent(String.self, forKey: .masterSessionId)
+        projects = try c.decodeIfPresent([ProjectState].self, forKey: .projects)
+        sidebarGroups = try c.decodeIfPresent([SidebarGroupState].self, forKey: .sidebarGroups)
+            ?? c.decodeIfPresent([SidebarGroupState].self, forKey: .sidebarFolders)
+        sidebarOrder = try c.decodeIfPresent([SidebarOrderItem].self, forKey: .sidebarOrder)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(version, forKey: .version)
+        try c.encode(selectedTabIndex, forKey: .selectedTabIndex)
+        try c.encodeIfPresent(defaultWorkingDirectory, forKey: .defaultWorkingDirectory)
+        try c.encodeIfPresent(tabs, forKey: .tabs)
+        try c.encodeIfPresent(claudeTabCounter, forKey: .claudeTabCounter)
+        try c.encodeIfPresent(terminalTabCounter, forKey: .terminalTabCounter)
+        try c.encodeIfPresent(masterSessionId, forKey: .masterSessionId)
+        try c.encodeIfPresent(projects, forKey: .projects)
+        try c.encodeIfPresent(sidebarGroups, forKey: .sidebarGroups)
+        try c.encodeIfPresent(sidebarOrder, forKey: .sidebarOrder)
+    }
 }
 
 struct TabState: Codable {
@@ -111,16 +151,16 @@ struct ProjectTabState: Codable {
     }
 }
 
-struct SidebarFolderState: Codable {
+struct SidebarGroupState: Codable {
     var id: String
     var name: String
     var isCollapsed: Bool
     var projectIds: [String]
 }
 
-/// A tagged union for sidebar ordering — either a folder or an ungrouped project.
+/// A tagged union for sidebar ordering — either a group or an ungrouped project.
 enum SidebarOrderItem: Codable {
-    case folder(String)   // folder id
+    case group(String)    // group id
     case project(String)  // project id
 
     private enum CodingKeys: String, CodingKey {
@@ -130,8 +170,8 @@ enum SidebarOrderItem: Codable {
     func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         switch self {
-        case .folder(let id):
-            try container.encode("folder", forKey: .type)
+        case .group(let id):
+            try container.encode("group", forKey: .type)
             try container.encode(id, forKey: .id)
         case .project(let id):
             try container.encode("project", forKey: .type)
@@ -144,8 +184,8 @@ enum SidebarOrderItem: Codable {
         let type = try container.decode(String.self, forKey: .type)
         let id = try container.decode(String.self, forKey: .id)
         switch type {
-        case "folder":
-            self = .folder(id)
+        case "group", "folder":  // "folder" is the v2 legacy discriminator
+            self = .group(id)
         case "project":
             self = .project(id)
         default:

@@ -51,7 +51,7 @@ final class SessionStateTests: XCTestCase {
         let data = try JSONEncoder().encode(state)
         let decoded = try JSONDecoder().decode(DeckardState.self, from: data)
 
-        XCTAssertEqual(decoded.version, 2)
+        XCTAssertEqual(decoded.version, 3)
         XCTAssertEqual(decoded.selectedTabIndex, 0)
         XCTAssertNil(decoded.defaultWorkingDirectory)
         XCTAssertNil(decoded.projects)
@@ -219,7 +219,7 @@ final class SessionStateTests: XCTestCase {
 
     func testDefaultValues() {
         let state = DeckardState()
-        XCTAssertEqual(state.version, 2)
+        XCTAssertEqual(state.version, 3)
         XCTAssertEqual(state.selectedTabIndex, 0)
         XCTAssertNil(state.defaultWorkingDirectory)
         XCTAssertNil(state.tabs)
@@ -306,7 +306,7 @@ final class SessionStateTests: XCTestCase {
         // New ProjectItem (opened via symlink, but path is resolved)
         let project = ProjectItem(path: linkDir)
 
-        // restoreSidebarFolders resolves ps.path before comparison
+        // restoreSidebarGroups resolves ps.path before comparison
         let resolvedOldPath = (oldProjectState.path as NSString).resolvingSymlinksInPath
         XCTAssertEqual(project.path, resolvedOldPath,
                        "Migration: resolved old state path must match new ProjectItem.path")
