@@ -1,7 +1,7 @@
 import AppKit
 import KeyboardShortcuts
 
-/// Format a tooltip with the current shortcut, e.g. "Open Folder (Cmd+O)"
+/// Format a tooltip with the current shortcut, e.g. "Open Workspace (Cmd+O)"
 @MainActor
 func shortcutTooltip(_ label: String, for name: KeyboardShortcuts.Name) -> String {
     if let shortcut = KeyboardShortcuts.getShortcut(for: name) {

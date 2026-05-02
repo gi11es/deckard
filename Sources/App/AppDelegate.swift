@@ -192,7 +192,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let fileMenuItem = NSMenuItem()
         let fileMenu = NSMenu(title: "File")
 
-        let openItem = NSMenuItem(title: "Open Folder...", action: #selector(openProject), keyEquivalent: "")
+        let openItem = NSMenuItem(title: "Open Workspace...", action: #selector(openProject), keyEquivalent: "")
         openItem.setShortcut(for: .openFolder)
         fileMenu.addItem(openItem)
         fileMenu.addItem(.separator())
@@ -215,12 +215,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         closeItem.setShortcut(for: .closeTab)
         fileMenu.addItem(closeItem)
 
-        let newFolderItem = NSMenuItem(title: "New Sidebar Folder", action: #selector(createNewSidebarFolder), keyEquivalent: "")
+        let newFolderItem = NSMenuItem(title: "New Group", action: #selector(createNewSidebarFolder), keyEquivalent: "")
         newFolderItem.setShortcut(for: .newSidebarFolder)
         newFolderItem.target = self
         fileMenu.addItem(newFolderItem)
 
-        let moveOutItem = NSMenuItem(title: "Move Out of Folder", action: #selector(moveCurrentProjectOutOfFolder), keyEquivalent: "")
+        let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveCurrentProjectOutOfFolder), keyEquivalent: "")
         moveOutItem.setShortcut(for: .moveOutOfFolder)
         moveOutItem.target = self
         fileMenu.addItem(moveOutItem)
@@ -229,7 +229,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         exploreSessionsItem.setShortcut(for: .exploreSessions)
         fileMenu.addItem(exploreSessionsItem)
 
-        let closeProjectItem = NSMenuItem(title: "Close Folder", action: #selector(closeCurrentProject), keyEquivalent: "")
+        let closeProjectItem = NSMenuItem(title: "Close Workspace", action: #selector(closeCurrentProject), keyEquivalent: "")
         closeProjectItem.setShortcut(for: .closeFolder)
         fileMenu.addItem(closeProjectItem)
         fileMenu.addItem(.separator())

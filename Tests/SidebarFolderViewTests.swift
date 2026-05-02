@@ -84,8 +84,8 @@ final class SidebarFolderViewTests: XCTestCase {
         let collapsedDesc = collapsedView.subviews
             .compactMap { $0 as? NSImageView }.first?.image?.accessibilityDescription
 
-        XCTAssertEqual(expandedDesc, "Toggle folder")
-        XCTAssertEqual(collapsedDesc, "Toggle folder")
+        XCTAssertEqual(expandedDesc, "Toggle group")
+        XCTAssertEqual(collapsedDesc, "Toggle group")
     }
 
     func testUpdateChevronChangesImage() {

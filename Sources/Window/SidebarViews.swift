@@ -72,7 +72,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         wantsLayer = true
 
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.toolTip = shortcutTooltip("Close Folder", for: .closeFolder)
+        label.toolTip = shortcutTooltip("Close Workspace", for: .closeFolder)
         badgeContainer.translatesAutoresizingMaskIntoConstraints = false
         shortcutOverlay.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
@@ -322,7 +322,7 @@ class SidebarFolderView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
         disclosureImageView = NSImageView()
         disclosureImageView.image = NSImage(systemSymbolName: folder.isCollapsed ? "chevron.right" : "chevron.down",
-                                            accessibilityDescription: "Toggle folder")
+                                            accessibilityDescription: "Toggle group")
         disclosureImageView.contentTintColor = ThemeManager.shared.currentColors.secondaryText
         disclosureImageView.imageAlignment = .alignCenter
 
@@ -386,7 +386,7 @@ class SidebarFolderView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
     func updateChevron() {
         disclosureImageView.image = NSImage(systemSymbolName: folder.isCollapsed ? "chevron.right" : "chevron.down",
-                                            accessibilityDescription: "Toggle folder")
+                                            accessibilityDescription: "Toggle group")
     }
 
     override func mouseDown(with event: NSEvent) {

@@ -231,7 +231,7 @@ extension DeckardWindowController {
         sidebarDropZone.sidebarStackView = sidebarStackView
         sidebarDropZone.onContextMenu = { [weak self] event in
             let menu = NSMenu()
-            let item = NSMenuItem(title: "New Folder", action: #selector(self?.sidebarEmptyContextNewFolder), keyEquivalent: "")
+            let item = NSMenuItem(title: "New Group", action: #selector(self?.sidebarEmptyContextNewFolder), keyEquivalent: "")
             item.target = self
             menu.addItem(item)
             return menu
@@ -414,7 +414,7 @@ extension DeckardWindowController {
         createSidebarFolder()
     }
 
-    func createSidebarFolder(name: String = "New Folder") {
+    func createSidebarFolder(name: String = "New Group") {
         let folder = SidebarFolder(name: name)
         sidebarFolders.append(folder)
         sidebarOrder.append(.folder(folder))
@@ -542,14 +542,14 @@ extension DeckardWindowController {
     func buildFolderContextMenu(for folder: SidebarFolder) -> NSMenu {
         let menu = NSMenu()
 
-        let renameItem = NSMenuItem(title: "Rename Folder", action: #selector(renameFolderMenuAction(_:)), keyEquivalent: "")
+        let renameItem = NSMenuItem(title: "Rename Group", action: #selector(renameFolderMenuAction(_:)), keyEquivalent: "")
         renameItem.target = self
         renameItem.representedObject = folder
         menu.addItem(renameItem)
 
         menu.addItem(.separator())
 
-        let deleteItem = NSMenuItem(title: "Delete Folder", action: #selector(deleteFolderMenuAction(_:)), keyEquivalent: "")
+        let deleteItem = NSMenuItem(title: "Delete Group", action: #selector(deleteFolderMenuAction(_:)), keyEquivalent: "")
         deleteItem.target = self
         deleteItem.representedObject = folder
         menu.addItem(deleteItem)
@@ -600,13 +600,13 @@ extension DeckardWindowController {
         let isInFolder = sidebarFolders.contains { $0.projectIds.contains(project.id) }
 
         if isInFolder {
-            let moveOutItem = NSMenuItem(title: "Move Out of Folder", action: #selector(moveProjectOutOfFolderAction(_:)), keyEquivalent: "")
+            let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveProjectOutOfFolderAction(_:)), keyEquivalent: "")
             moveOutItem.setShortcut(for: .moveOutOfFolder)
             moveOutItem.target = self
             moveOutItem.representedObject = project
             menu.addItem(moveOutItem)
         } else if !sidebarFolders.isEmpty {
-            let moveToItem = NSMenuItem(title: "Move to Folder", action: nil, keyEquivalent: "")
+            let moveToItem = NSMenuItem(title: "Move to Group", action: nil, keyEquivalent: "")
             let moveSubmenu = NSMenu()
             for folder in sidebarFolders {
                 let item = NSMenuItem(title: folder.name, action: #selector(moveProjectToFolderAction(_:)), keyEquivalent: "")
@@ -620,14 +620,14 @@ extension DeckardWindowController {
 
         menu.addItem(.separator())
 
-        let newFolderItem = NSMenuItem(title: "New Folder", action: #selector(newFolderMenuAction), keyEquivalent: "")
+        let newFolderItem = NSMenuItem(title: "New Group", action: #selector(newFolderMenuAction), keyEquivalent: "")
         newFolderItem.setShortcut(for: .newSidebarFolder)
         newFolderItem.target = self
         menu.addItem(newFolderItem)
 
         menu.addItem(.separator())
 
-        let closeItem = NSMenuItem(title: "Close Folder", action: #selector(closeProjectMenuAction(_:)), keyEquivalent: "")
+        let closeItem = NSMenuItem(title: "Close Workspace", action: #selector(closeProjectMenuAction(_:)), keyEquivalent: "")
         closeItem.setShortcut(for: .closeFolder)
         closeItem.target = self
         closeItem.representedObject = project

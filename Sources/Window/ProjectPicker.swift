@@ -36,7 +36,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
 
         // Search field
         searchField = NSTextField()
-        searchField.placeholderString = "Open Folder..."
+        searchField.placeholderString = "Open Workspace..."
         searchField.font = .systemFont(ofSize: 16)
         searchField.translatesAutoresizingMaskIntoConstraints = false
         searchField.focusRingType = .none
