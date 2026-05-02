@@ -6,10 +6,33 @@ import SwiftTerm
 /// LocalProcessTerminalView subclass that accepts file drags from Finder
 /// and pastes shell-escaped paths into the terminal.
 private class DeckardTerminalView: LocalProcessTerminalView {
-    private static let kittyCommandVPasteSequence = Array("\u{1B}[118;9u".utf8)
+    private enum ImagePasteShortcut {
+        /// Empty bracketed paste — Claude Code on macOS treats an empty paste
+        /// as a hint to read the system pasteboard for an image.
+        case emptyBracketedPaste
+        case controlV
+
+        var sequence: [UInt8] {
+            switch self {
+            case .emptyBracketedPaste:
+                return DeckardTerminalView.emptyBracketedPasteSequence
+            case .controlV:
+                return [0x16]
+            }
+        }
+    }
+
+    private static let emptyBracketedPasteSequence =
+        Array("\u{1B}[200~\u{1B}[201~".utf8)
     private static let imagePasteboardTypes: [NSPasteboard.PasteboardType] = [
         .png,
-        .tiff
+        .tiff,
+        NSPasteboard.PasteboardType("public.image"),
+        NSPasteboard.PasteboardType("public.jpeg"),
+        NSPasteboard.PasteboardType("public.heic"),
+        NSPasteboard.PasteboardType("public.heif"),
+        NSPasteboard.PasteboardType("com.compuserve.gif"),
+        NSPasteboard.PasteboardType("org.webmproject.webp")
     ]
     private static let imageFileExtensions: Set<String> = [
         "gif",
@@ -23,6 +46,7 @@ private class DeckardTerminalView: LocalProcessTerminalView {
         "webp"
     ]
     var handlesPasteShortcuts = true
+    private var imagePasteShortcut: ImagePasteShortcut = .emptyBracketedPaste
     var stripsSynchronizedOutputSequences = false {
         didSet {
             if !stripsSynchronizedOutputSequences {
@@ -32,6 +56,10 @@ private class DeckardTerminalView: LocalProcessTerminalView {
     }
     private var pasteShortcutMonitor: Any?
     private var syncOutputFilterPendingBytes: [UInt8] = []
+
+    func configureImagePasteShortcut(sessionType: String?) {
+        imagePasteShortcut = sessionType == "codex" ? .controlV : .emptyBracketedPaste
+    }
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -61,6 +89,7 @@ private class DeckardTerminalView: LocalProcessTerminalView {
 
     override func performKeyEquivalent(with event: NSEvent) -> Bool {
         if Self.isPasteShortcut(event) {
+            guard handlesPasteShortcuts else { return true }
             paste(event)
             return true
         }
@@ -116,6 +145,7 @@ private class DeckardTerminalView: LocalProcessTerminalView {
 
     private func shouldHandlePasteShortcut(_ event: NSEvent) -> Bool {
         guard event.window === window else { return false }
+        if hasFocus { return true }
         guard let firstResponder = window?.firstResponder else { return false }
         if firstResponder === self {
             return true
@@ -128,7 +158,7 @@ private class DeckardTerminalView: LocalProcessTerminalView {
 
     private func forwardImagePasteShortcutToTerminal() -> Bool {
         guard Self.pasteboardContainsImage(NSPasteboard.general) else { return false }
-        send(Self.kittyCommandVPasteSequence)
+        send(imagePasteShortcut.sequence)
         return true
     }
 
@@ -325,8 +355,9 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         // Codex emits DEC 2026 synchronized-output markers around frequent
         // full-screen repaints. SwiftTerm snapshots the whole scrollback on
         // every begin marker, which makes long-running Codex sessions sluggish.
-        terminalView.stripsSynchronizedOutputSequences =
-            envVars["DECKARD_SESSION_TYPE"] == "codex"
+        let sessionType = envVars["DECKARD_SESSION_TYPE"]
+        terminalView.stripsSynchronizedOutputSequences = sessionType == "codex"
+        terminalView.configureImagePasteShortcut(sessionType: sessionType)
 
         // Build environment
         var env = ProcessInfo.processInfo.environment
