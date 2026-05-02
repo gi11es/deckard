@@ -81,7 +81,7 @@ class TabItem {
 }
 
 /// A project in the vertical sidebar — contains horizontal tabs.
-class ProjectItem {
+class WorkspaceItem {
     let id: UUID
     var path: String
     var name: String  // basename of path
@@ -99,32 +99,32 @@ class ProjectItem {
 
 // MARK: - Sidebar Folder Model
 
-/// A folder in the sidebar that groups projects.
+/// A folder in the sidebar that groups workspaces.
 class SidebarGroup {
     let id: UUID
     var name: String
     var isCollapsed: Bool
-    var projectIds: [UUID]  // references to ProjectItem.id
+    var workspaceIds: [UUID]  // references to WorkspaceItem.id
 
     init(name: String) {
         self.id = UUID()
         self.name = name
         self.isCollapsed = false
-        self.projectIds = []
+        self.workspaceIds = []
     }
 
-    init(id: UUID, name: String, isCollapsed: Bool, projectIds: [UUID]) {
+    init(id: UUID, name: String, isCollapsed: Bool, workspaceIds: [UUID]) {
         self.id = id
         self.name = name
         self.isCollapsed = isCollapsed
-        self.projectIds = projectIds
+        self.workspaceIds = workspaceIds
     }
 }
 
 /// Ordered sidebar items: either a group or an ungrouped project reference.
 enum SidebarItem {
     case group(SidebarGroup)
-    case project(UUID)  // ProjectItem.id
+    case project(UUID)  // WorkspaceItem.id
 }
 
 // MARK: - Default Tab Configuration
@@ -149,7 +149,7 @@ struct DefaultTabConfig {
 
 // MARK: - Window Controller
 
-let deckardProjectDragType = NSPasteboard.PasteboardType("com.deckard.project-reorder")
+let deckardWorkspaceDragType = NSPasteboard.PasteboardType("com.deckard.project-reorder")
 let deckardSidebarDragType = NSPasteboard.PasteboardType("com.deckard.sidebar-drag")
 let deckardGroupDragType = NSPasteboard.PasteboardType("com.deckard.folder-reorder")
 
@@ -165,8 +165,8 @@ private class CollapsibleSplitView: NSSplitView {
 }
 
 class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
-    var projects: [ProjectItem] = []
-    var selectedProjectIndex: Int = -1
+    var workspaces: [WorkspaceItem] = []
+    var selectedWorkspaceIndex: Int = -1
 
     // Sidebar folders
     var sidebarGroups: [SidebarGroup] = []
@@ -198,8 +198,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     private let sidebarWidth: CGFloat = 210
     private var sidebarInitialized = false
     private var sidebarWidthBeforeCollapse: CGFloat = 210
-    /// Recently closed projects — stored so reopening the same path restores tabs.
-    private var recentlyClosedProjects: [ProjectState] = []
+    /// Recently closed workspaces — stored so reopening the same path restores tabs.
+    private var recentlyClosedProjects: [WorkspaceState] = []
     var isRestoring = false
     /// Tabs in the order they were created (for ProcessMonitor PID matching).
     var tabCreationOrder: [UUID] = []
@@ -272,8 +272,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             return event
         }
 
-        // If no projects after restore, auto-show the project picker
-        if projects.isEmpty {
+        // If no workspaces after restore, auto-show the project picker
+        if workspaces.isEmpty {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                 AppDelegate.shared?.openProjectPicker()
             }
@@ -368,7 +368,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     private func restoreFirstResponderAfterWake() {
-        guard let project = currentProject else { return }
+        guard let project = currentWorkspace else { return }
         let idx = project.selectedTabIndex
         guard idx >= 0, idx < project.tabs.count else { return }
         let tab = project.tabs[idx]
@@ -410,7 +410,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Drop zone covers the entire sidebar area below the stack
         sidebarDropZone.translatesAutoresizingMaskIntoConstraints = false
-        sidebarDropZone.registerForDraggedTypes([deckardProjectDragType, deckardGroupDragType])
+        sidebarDropZone.registerForDraggedTypes([deckardWorkspaceDragType, deckardGroupDragType])
         sidebarView.addSubview(sidebarDropZone)
 
         sidebarStackView.orientation = .vertical
@@ -563,12 +563,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Project Management
 
-    func openProjectPaths() -> [String] {
-        return projects.map { $0.path }
+    func openWorkspacePaths() -> [String] {
+        return workspaces.map { $0.path }
     }
 
-    func openProject(path: String) {
-        let project = ProjectItem(path: path)
+    func openWorkspace(path: String) {
+        let project = WorkspaceItem(path: path)
 
         // Check if we have a recently closed snapshot — restore tabs from it
         // Use project.path (symlinks resolved) so symlinked paths match canonical ones.
@@ -593,44 +593,44 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
         }
 
-        projects.append(project)
+        workspaces.append(project)
         sidebarOrder.append(.project(project.id))
         rebuildSidebar()
-        selectProject(at: projects.count - 1)
+        selectProject(at: workspaces.count - 1)
         if !isRestoring { saveState() }
     }
 
-    func closeCurrentProject() {
-        guard selectedProjectIndex >= 0, selectedProjectIndex < projects.count else { return }
-        closeProject(at: selectedProjectIndex)
+    func closeCurrentWorkspace() {
+        guard selectedWorkspaceIndex >= 0, selectedWorkspaceIndex < workspaces.count else { return }
+        closeProject(at: selectedWorkspaceIndex)
     }
 
     func exploreCurrentProjectSessions() {
-        guard selectedProjectIndex >= 0, selectedProjectIndex < projects.count else { return }
-        let project = projects[selectedProjectIndex]
+        guard selectedWorkspaceIndex >= 0, selectedWorkspaceIndex < workspaces.count else { return }
+        let project = workspaces[selectedWorkspaceIndex]
         let fakeMenuItem = NSMenuItem()
         fakeMenuItem.representedObject = project
         exploreSessionsMenuAction(fakeMenuItem)
     }
 
-    func moveCurrentProjectOutOfGroup() {
-        guard selectedProjectIndex >= 0, selectedProjectIndex < projects.count else { return }
-        let project = projects[selectedProjectIndex]
-        moveProjectOutOfGroup(projectId: project.id)
+    func moveCurrentWorkspaceOutOfGroup() {
+        guard selectedWorkspaceIndex >= 0, selectedWorkspaceIndex < workspaces.count else { return }
+        let project = workspaces[selectedWorkspaceIndex]
+        moveWorkspaceOutOfGroup(projectId: project.id)
     }
 
     func closeProject(at index: Int) {
-        guard index >= 0, index < projects.count else { return }
-        let project = projects[index]
+        guard index >= 0, index < workspaces.count else { return }
+        let project = workspaces[index]
 
         // Save project state for potential restoration
-        let snapshot = ProjectState(
+        let snapshot = WorkspaceState(
             id: project.id.uuidString,
             path: project.path,
             name: project.name,
             selectedTabIndex: project.selectedTabIndex,
             tabs: project.tabs.map { tab in
-                ProjectTabState(id: tab.id.uuidString, name: tab.name,
+                WorkspaceTabState(id: tab.id.uuidString, name: tab.name,
                                 kind: tab.kind, sessionId: tab.sessionId,
                                 tmuxSessionName: tab.surface.tmuxSessionName)
             },
@@ -659,20 +659,20 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
         }
 
-        projects.remove(at: index)
+        workspaces.remove(at: index)
         removeSidebarReference(projectId: project.id)
         rebuildSidebar()
 
-        if projects.isEmpty {
-            selectedProjectIndex = -1
+        if workspaces.isEmpty {
+            selectedWorkspaceIndex = -1
             currentTerminalView?.removeFromSuperview()
             currentTerminalView = nil
             rebuildTabBar()
         } else if let next = nextVisibleProjectIndex(near: index) {
             selectProject(at: next, autoExpandFolder: false)
         } else {
-            // All remaining projects are inside collapsed folders — show empty state.
-            selectedProjectIndex = -1
+            // All remaining workspaces are inside collapsed folders — show empty state.
+            selectedWorkspaceIndex = -1
             currentTerminalView?.removeFromSuperview()
             currentTerminalView = nil
             rebuildTabBar()
@@ -685,27 +685,27 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     /// Returns the index of the nearest project that is visible in the sidebar
     /// (i.e. top-level or inside a non-collapsed folder), or nil if none.
     private func nextVisibleProjectIndex(near index: Int) -> Int? {
-        let collapsedProjectIds = Set(sidebarGroups.filter(\.isCollapsed).flatMap(\.projectIds))
-        let clamped = min(index, projects.count - 1)
+        let collapsedProjectIds = Set(sidebarGroups.filter(\.isCollapsed).flatMap(\.workspaceIds))
+        let clamped = min(index, workspaces.count - 1)
         // Search outward from `clamped`: check clamped, clamped-1, clamped+1, ...
         var lo = clamped, hi = clamped + 1
-        while lo >= 0 || hi < projects.count {
-            if lo >= 0, !collapsedProjectIds.contains(projects[lo].id) { return lo }
-            if hi < projects.count, !collapsedProjectIds.contains(projects[hi].id) { return hi }
+        while lo >= 0 || hi < workspaces.count {
+            if lo >= 0, !collapsedProjectIds.contains(workspaces[lo].id) { return lo }
+            if hi < workspaces.count, !collapsedProjectIds.contains(workspaces[hi].id) { return hi }
             lo -= 1; hi += 1
         }
         return nil
     }
 
     func selectProject(at index: Int, autoExpandFolder: Bool = true) {
-        guard index >= 0, index < projects.count else { return }
-        selectedProjectIndex = index
+        guard index >= 0, index < workspaces.count else { return }
+        selectedWorkspaceIndex = index
 
-        let project = projects[index]
+        let project = workspaces[index]
 
         // Auto-expand folder if the selected project is inside a collapsed one
         if autoExpandFolder {
-            for folder in sidebarGroups where folder.isCollapsed && folder.projectIds.contains(project.id) {
+            for folder in sidebarGroups where folder.isCollapsed && folder.workspaceIds.contains(project.id) {
                 folder.isCollapsed = false
                 rebuildSidebar()
             }
@@ -750,11 +750,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    func createTabInProject(_ project: ProjectItem, isClaude: Bool, name: String? = nil, sessionIdToResume: String? = nil, forkSession: Bool = false, tmuxSessionToResume: String? = nil, extraArgs: String? = nil) {
+    func createTabInProject(_ project: WorkspaceItem, isClaude: Bool, name: String? = nil, sessionIdToResume: String? = nil, forkSession: Bool = false, tmuxSessionToResume: String? = nil, extraArgs: String? = nil) {
         createTabInProject(project, kind: isClaude ? .claude : .terminal, name: name, sessionIdToResume: sessionIdToResume, forkSession: forkSession, tmuxSessionToResume: tmuxSessionToResume, extraArgs: extraArgs)
     }
 
-    func createTabInProject(_ project: ProjectItem, kind: TabKind, name: String? = nil, sessionIdToResume: String? = nil, forkSession: Bool = false, tmuxSessionToResume: String? = nil, extraArgs: String? = nil) {
+    func createTabInProject(_ project: WorkspaceItem, kind: TabKind, name: String? = nil, sessionIdToResume: String? = nil, forkSession: Bool = false, tmuxSessionToResume: String? = nil, extraArgs: String? = nil) {
         let surface = TerminalSurface()
         let tabName: String
         if let name = name {
@@ -876,11 +876,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         guard !isCreatingTab else { return }
         isCreatingTab = true
 
-        guard selectedProjectIndex >= 0, selectedProjectIndex < projects.count else {
+        guard selectedWorkspaceIndex >= 0, selectedWorkspaceIndex < workspaces.count else {
             isCreatingTab = false
             return
         }
-        let project = projects[selectedProjectIndex]
+        let project = workspaces[selectedWorkspaceIndex]
 
         if kind == .claude && UserDefaults.standard.bool(forKey: "promptForSessionArgs") {
             promptForClaudeArgs(for: project) { [weak self] args in
@@ -890,7 +890,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                     self.isCreatingTab = false
                     return
                 }
-                guard self.projects.contains(where: { $0 === project }) else {
+                guard self.workspaces.contains(where: { $0 === project }) else {
                     self.isCreatingTab = false
                     return
                 }
@@ -904,7 +904,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                     self.isCreatingTab = false
                     return
                 }
-                guard self.projects.contains(where: { $0 === project }) else {
+                guard self.workspaces.contains(where: { $0 === project }) else {
                     self.isCreatingTab = false
                     return
                 }
@@ -917,7 +917,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    private func finalizeTabCreation(in project: ProjectItem) {
+    private func finalizeTabCreation(in project: WorkspaceItem) {
         project.selectedTabIndex = project.tabs.count - 1
         rebuildTabBar()
         rebuildSidebar()
@@ -929,7 +929,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    private func promptForClaudeArgs(for project: ProjectItem, completion: @escaping (String?) -> Void) {
+    private func promptForClaudeArgs(for project: WorkspaceItem, completion: @escaping (String?) -> Void) {
         let alert = NSAlert()
         alert.messageText = "Claude Code Arguments"
         alert.informativeText = "Arguments passed to this session:"
@@ -954,7 +954,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    private func promptForCodexArgs(for project: ProjectItem, completion: @escaping (String?) -> Void) {
+    private func promptForCodexArgs(for project: WorkspaceItem, completion: @escaping (String?) -> Void) {
         let alert = NSAlert()
         alert.messageText = "Codex Arguments"
         alert.informativeText = "Arguments passed to this session:"
@@ -983,7 +983,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     func closeCurrentTab() {
-        guard let project = currentProject else { return }
+        guard let project = currentWorkspace else { return }
         let idx = project.selectedTabIndex
         guard idx >= 0, idx < project.tabs.count else { return }
 
@@ -1030,7 +1030,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     func selectTabInProject(at tabIndex: Int) {
-        guard let project = currentProject else { return }
+        guard let project = currentWorkspace else { return }
         guard tabIndex >= 0, tabIndex < project.tabs.count else { return }
         project.selectedTabIndex = tabIndex
         clearUnseenIfNeeded(project.tabs[tabIndex])
@@ -1042,7 +1042,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     /// Called from HorizontalTabView.mouseDown so the terminal switch
     /// is not lost if an async rebuild destroys the view before mouseUp.
     func switchToTab(at tabIndex: Int) {
-        guard let project = currentProject else { return }
+        guard let project = currentWorkspace else { return }
         guard tabIndex >= 0, tabIndex < project.tabs.count else { return }
         guard tabIndex != project.selectedTabIndex else { return }
         project.selectedTabIndex = tabIndex
@@ -1051,18 +1051,18 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     func selectNextTab() {
-        guard let project = currentProject, !project.tabs.isEmpty else { return }
+        guard let project = currentWorkspace, !project.tabs.isEmpty else { return }
         selectTabInProject(at: (project.selectedTabIndex + 1) % project.tabs.count)
     }
 
     func selectPrevTab() {
-        guard let project = currentProject, !project.tabs.isEmpty else { return }
+        guard let project = currentWorkspace, !project.tabs.isEmpty else { return }
         selectTabInProject(at: (project.selectedTabIndex - 1 + project.tabs.count) % project.tabs.count)
     }
 
-    var currentProject: ProjectItem? {
-        guard selectedProjectIndex >= 0, selectedProjectIndex < projects.count else { return nil }
-        return projects[selectedProjectIndex]
+    var currentWorkspace: WorkspaceItem? {
+        guard selectedWorkspaceIndex >= 0, selectedWorkspaceIndex < workspaces.count else { return nil }
+        return workspaces[selectedWorkspaceIndex]
     }
 
     func showTab(_ tab: TabItem) {
@@ -1138,9 +1138,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private func updateContextUsage(for tab: TabItem) {
         guard let sessionId = tab.sessionId,
-              let project = currentProject else {
+              let project = currentWorkspace else {
             DiagnosticLog.shared.log("context",
-                "updateContextUsage: skipped — sessionId=\(tab.sessionId ?? "nil") project=\(currentProject != nil)")
+                "updateContextUsage: skipped — sessionId=\(tab.sessionId ?? "nil") project=\(currentWorkspace != nil)")
             quotaView.updateContext(usage: nil, tabName: nil)
             return
         }
@@ -1148,14 +1148,14 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let tabName = tab.name
         let tabId = tab.id
         let projectPath = project.path
-        let allPaths = projects.map { $0.path }
+        let allPaths = workspaces.map { $0.path }
         DispatchQueue.global(qos: .utility).async {
             let usage = ContextMonitor.shared.getUsage(sessionId: sessionId, projectPath: projectPath)
             let rate = QuotaMonitor.shared.computeTokenRate(projectPaths: allPaths)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 // Only update if this tab is still the active one
-                guard let project = self.currentProject,
+                guard let project = self.currentWorkspace,
                       let activeTab = project.tabs[safe: project.selectedTabIndex],
                       activeTab.id == tabId else {
                     DiagnosticLog.shared.log("context",
@@ -1173,7 +1173,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     private func updateCodexUsage(for tab: TabItem) {
-        guard let project = currentProject else {
+        guard let project = currentWorkspace else {
             quotaView.clear()
             return
         }
@@ -1194,7 +1194,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             let usage = ContextMonitor.shared.getCodexUsage(sessionId: sessionId)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
-                guard let project = self.currentProject,
+                guard let project = self.currentWorkspace,
                       let activeTab = project.tabs[safe: project.selectedTabIndex],
                       activeTab.id == tabId else {
                     DiagnosticLog.shared.log("context",
@@ -1242,7 +1242,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             // is done via control socket registration, not sorted order.
             var tabInfos: [ProcessMonitor.TabInfo] = []
             var codexTargets: [CodexBadgePollTarget] = []
-            for project in self.projects {
+            for project in self.workspaces {
                 for tab in project.tabs {
                     tabInfos.append(ProcessMonitor.TabInfo(
                         surfaceId: tab.id, kind: tab.kind,
@@ -1302,7 +1302,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private func applyCodexBadgeStates(_ states: [UUID: ContextMonitor.CodexActivityInfo]) {
         var changed = false
-        for project in projects {
+        for project in workspaces {
             for tab in project.tabs where tab.kind == .codex {
                 guard let state = states[tab.id] else { continue }
 
@@ -1336,7 +1336,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private func applyTerminalBadgeStates(_ states: [UUID: ProcessMonitor.ActivityInfo]) {
         var changed = false
-        for project in projects {
+        for project in workspaces {
             for tab in project.tabs where tab.isTerminal {
                 let activity = states[tab.id] ?? ProcessMonitor.ActivityInfo()
 
@@ -1379,7 +1379,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     func setTitle(_ title: String, forSurfaceId surfaceId: UUID) {
-        for project in projects {
+        for project in workspaces {
             for tab in project.tabs where tab.surface.surfaceId == surfaceId {
                 guard tab.surface.title != title else { return }
                 tab.surface.title = title
@@ -1389,7 +1389,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     func handleSurfaceClosedById(_ surfaceId: UUID) {
-        for (pi, project) in projects.enumerated() {
+        for (pi, project) in workspaces.enumerated() {
             if let ti = project.tabs.firstIndex(where: { $0.id == surfaceId }) {
                 let tab = project.tabs[ti]
 
@@ -1408,14 +1408,14 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
                 project.tabs.remove(at: ti)
 
-                if project.tabs.isEmpty && pi == selectedProjectIndex {
+                if project.tabs.isEmpty && pi == selectedWorkspaceIndex {
                     currentTerminalView?.removeFromSuperview()
                     currentTerminalView = nil
                     rebuildTabBar()
                     rebuildSidebar()
                 } else if project.tabs.isEmpty {
                     rebuildSidebar()
-                } else if pi == selectedProjectIndex {
+                } else if pi == selectedWorkspaceIndex {
                     project.selectedTabIndex = min(project.selectedTabIndex, project.tabs.count - 1)
                     rebuildTabBar()
                     rebuildSidebar()
@@ -1433,7 +1433,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func tabForSurfaceId(_ surfaceIdStr: String) -> TabItem? {
         guard let surfaceId = UUID(uuidString: surfaceIdStr) else { return nil }
-        for project in projects {
+        for project in workspaces {
             if let tab = project.tabs.first(where: { $0.id == surfaceId }) {
                 return tab
             }
@@ -1448,7 +1448,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func isTabFocused(_ surfaceIdStr: String) -> Bool {
         guard let surfaceId = UUID(uuidString: surfaceIdStr) else { return false }
-        guard let project = currentProject else { return false }
+        guard let project = currentWorkspace else { return false }
         let idx = project.selectedTabIndex
         guard idx >= 0, idx < project.tabs.count else { return false }
         return project.tabs[idx].id == surfaceId && (window?.isKeyWindow ?? false)
@@ -1458,14 +1458,14 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     /// regardless of whether the Deckard window is in the foreground.
     func isTabVisible(_ surfaceIdStr: String) -> Bool {
         guard let surfaceId = UUID(uuidString: surfaceIdStr) else { return false }
-        guard let project = currentProject else { return false }
+        guard let project = currentWorkspace else { return false }
         let idx = project.selectedTabIndex
         guard idx >= 0, idx < project.tabs.count else { return false }
         return project.tabs[idx].id == surfaceId
     }
 
     func focusTabById(_ tabId: UUID) {
-        for (pi, project) in projects.enumerated() {
+        for (pi, project) in workspaces.enumerated() {
             if let ti = project.tabs.firstIndex(where: { $0.id == tabId }) {
                 selectProject(at: pi)
                 selectTabInProject(at: ti)
@@ -1484,7 +1484,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         SessionManager.shared.saveSessionName(sessionId: sessionId, kind: tab.kind, name: tab.name)
         saveState()
         // Start watching if this is the currently displayed tab
-        if let project = currentProject,
+        if let project = currentWorkspace,
            let idx = project.tabs.firstIndex(where: { $0.id == tab.id }),
            idx == project.selectedTabIndex {
             refreshContextBar(for: tab)
@@ -1520,7 +1520,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func listTabInfo() -> [TabInfo] {
         var result: [TabInfo] = []
-        for project in projects {
+        for project in workspaces {
             for tab in project.tabs {
                 result.append(TabInfo(
                     id: tab.id.uuidString,
@@ -1558,8 +1558,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func captureState() -> DeckardState {
         var state = DeckardState()
-        state.selectedTabIndex = selectedProjectIndex
-        state.tabs = projects.map { project in
+        state.selectedTabIndex = selectedWorkspaceIndex
+        state.tabs = workspaces.map { project in
             // Store project-level info; individual tabs stored in a new field
             TabState(
                 id: project.id.uuidString,
@@ -1571,15 +1571,15 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 workingDirectory: project.path
             )
         }
-        // Store full project data in the new projects field
-        state.projects = projects.map { project in
-            ProjectState(
+        // Store full project data in the new workspaces field
+        state.workspaces = workspaces.map { project in
+            WorkspaceState(
                 id: project.id.uuidString,
                 path: project.path,
                 name: project.name,
                 selectedTabIndex: project.selectedTabIndex,
                 tabs: project.tabs.map { tab in
-                    ProjectTabState(
+                    WorkspaceTabState(
                         id: tab.id.uuidString,
                         name: tab.name,
                         kind: tab.kind,
@@ -1598,7 +1598,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 id: folder.id.uuidString,
                 name: folder.name,
                 isCollapsed: folder.isCollapsed,
-                projectIds: folder.projectIds.map { $0.uuidString }
+                workspaceIds: folder.workspaceIds.map { $0.uuidString }
             )
         }
 
@@ -1621,7 +1621,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private func restoreOrCreateInitial() {
         guard let state = SessionManager.shared.load(),
-              let projectStates = state.projects, !projectStates.isEmpty else {
+              let projectStates = state.workspaces, !projectStates.isEmpty else {
             // Nothing to restore — start autosave immediately
             SessionManager.shared.startAutosave { [weak self] in
                 self?.captureState() ?? DeckardState()
@@ -1670,10 +1670,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         // Phase 1: Create the active project's active tab immediately so the user
         // sees a working terminal right away. Collect remaining tabs for Phase 2.
-        var pending: [(project: ProjectItem, tab: ProjectTabState, originalIndex: Int)] = []
+        var pending: [(project: WorkspaceItem, tab: WorkspaceTabState, originalIndex: Int)] = []
 
         for (i, ps) in projectStates.enumerated() {
-            let project = ProjectItem(path: ps.path)
+            let project = WorkspaceItem(path: ps.path)
             project.name = ps.name
             project.defaultArgs = ps.defaultArgs
             project.defaultCodexArgs = ps.defaultCodexArgs
@@ -1697,7 +1697,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
 
             project.selectedTabIndex = selTab
-            projects.append(project)
+            workspaces.append(project)
         }
 
         // Keep isRestoring = true until Phase 2 finishes, so selectProject
@@ -1707,7 +1707,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         restoreSidebarGroups(from: state)
 
         rebuildSidebar()
-        if selectedIdx >= 0 && selectedIdx < projects.count {
+        if selectedIdx >= 0 && selectedIdx < workspaces.count {
             selectProject(at: selectedIdx)
         }
 
@@ -1716,26 +1716,26 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     private func restoreSidebarGroups(from state: DeckardState) {
-        // During restore, ProjectItem gets a new UUID. Build a map from saved-id -> live ProjectItem.
-        // Match by index (projects are created in the same order as projectStates) rather than
-        // by path, because multiple projects can share the same path (e.g. ~/Downloads).
-        guard let projectStates = state.projects else { return }
-        var savedIdToProject: [String: ProjectItem] = [:]
+        // During restore, WorkspaceItem gets a new UUID. Build a map from saved-id -> live WorkspaceItem.
+        // Match by index (workspaces are created in the same order as projectStates) rather than
+        // by path, because multiple workspaces can share the same path (e.g. ~/Downloads).
+        guard let projectStates = state.workspaces else { return }
+        var savedIdToProject: [String: WorkspaceItem] = [:]
         for (i, ps) in projectStates.enumerated() {
-            guard i < projects.count else { continue }
-            savedIdToProject[ps.id] = projects[i]
+            guard i < workspaces.count else { continue }
+            savedIdToProject[ps.id] = workspaces[i]
         }
 
         // Restore folders
         if let groupStates = state.sidebarGroups {
             for fs in groupStates {
                 guard let groupId = UUID(uuidString: fs.id) else { continue }
-                let resolvedIds = fs.projectIds.compactMap { savedIdToProject[$0]?.id }
+                let resolvedIds = fs.workspaceIds.compactMap { savedIdToProject[$0]?.id }
                 let folder = SidebarGroup(
                     id: groupId,
                     name: fs.name,
                     isCollapsed: fs.isCollapsed,
-                    projectIds: resolvedIds
+                    workspaceIds: resolvedIds
                 )
                 sidebarGroups.append(folder)
             }
@@ -1759,10 +1759,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
         }
 
-        // If no saved order, ensureSidebarOrder() will build one from projects
+        // If no saved order, ensureSidebarOrder() will build one from workspaces
     }
 
-    private func createTabsProgressively(_ remaining: [(project: ProjectItem, tab: ProjectTabState, originalIndex: Int)]) {
+    private func createTabsProgressively(_ remaining: [(project: WorkspaceItem, tab: WorkspaceTabState, originalIndex: Int)]) {
         guard let first = remaining.first else {
             // All tabs created — rebuild UI to reflect the full state
             isRestoring = false
@@ -1779,7 +1779,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             // Dump tab creation order -> PID mapping for diagnostics
             let mapping = tabCreationOrder.enumerated().map { (i, id) -> String in
                 var label = "?"
-                for project in projects {
+                for project in workspaces {
                     if let tab = project.tabs.first(where: { $0.id == id }) {
                         label = "\(tab.kind.rawValue.prefix(1).uppercased()):\(tab.name)@\(project.name)"
                         break
@@ -1832,7 +1832,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     @objc private func quotaDidChange() {
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
-            guard let project = self.currentProject,
+            guard let project = self.currentWorkspace,
                   let activeTab = project.tabs[safe: project.selectedTabIndex],
                   activeTab.kind == .claude else { return }
             self.quotaView.update(
@@ -1858,7 +1858,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         rebuildTabBar()
 
         // Apply color scheme to all terminal surfaces
-        for project in projects {
+        for project in workspaces {
             for tab in project.tabs {
                 tab.surface.applyColorScheme(scheme)
             }
@@ -1868,16 +1868,16 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     // MARK: - Navigation
 
     /// Project indices matching visible sidebar rows (skips collapsed folders).
-    func projectIndicesInSidebarOrder() -> [Int] {
+    func workspaceIndicesInSidebarOrder() -> [Int] {
         var indices: [Int] = []
         for item in sidebarOrder {
             switch item {
             case .project(let id):
-                if let i = projects.firstIndex(where: { $0.id == id }) { indices.append(i) }
+                if let i = workspaces.firstIndex(where: { $0.id == id }) { indices.append(i) }
             case .group(let folder):
                 guard !folder.isCollapsed else { continue }
-                for id in folder.projectIds {
-                    if let i = projects.firstIndex(where: { $0.id == id }) { indices.append(i) }
+                for id in folder.workspaceIds {
+                    if let i = workspaces.firstIndex(where: { $0.id == id }) { indices.append(i) }
                 }
             }
         }
@@ -1885,27 +1885,27 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     }
 
     func selectNextProject() {
-        let ordered = projectIndicesInSidebarOrder()
+        let ordered = workspaceIndicesInSidebarOrder()
         guard !ordered.isEmpty else { return }
-        let cur = ordered.firstIndex(of: selectedProjectIndex) ?? -1
+        let cur = ordered.firstIndex(of: selectedWorkspaceIndex) ?? -1
         selectProject(at: ordered[(cur + 1) % ordered.count])
     }
 
     func selectPrevProject() {
-        let ordered = projectIndicesInSidebarOrder()
+        let ordered = workspaceIndicesInSidebarOrder()
         guard !ordered.isEmpty else { return }
-        let cur = ordered.firstIndex(of: selectedProjectIndex) ?? ordered.count
+        let cur = ordered.firstIndex(of: selectedWorkspaceIndex) ?? ordered.count
         selectProject(at: ordered[(cur - 1 + ordered.count) % ordered.count])
     }
 
     func selectProject(byNumber n: Int) {
-        let ordered = projectIndicesInSidebarOrder()
+        let ordered = workspaceIndicesInSidebarOrder()
         guard n >= 0, n < ordered.count else { return }
         selectProject(at: ordered[n])
     }
 
     func updateShortcutIndicators(commandHeld: Bool) {
-        let ordered = commandHeld ? projectIndicesInSidebarOrder() : []
+        let ordered = commandHeld ? workspaceIndicesInSidebarOrder() : []
         for view in sidebarStackView.arrangedSubviews {
             guard let row = view as? VerticalTabRowView else { continue }
             if let pos = ordered.firstIndex(of: row.index), pos < 10 {

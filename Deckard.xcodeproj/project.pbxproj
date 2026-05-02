@@ -21,7 +21,7 @@
 		432752F9187D2E815F617B96 /* main.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88AA91CDBC6DDE958543FB29 /* main.swift */; };
 		63A33F81DE38406C15D1259A /* SettingsWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD37F7C8CC5243DCF0A1346E /* SettingsWindow.swift */; };
 		TC100001TC100001TC100001 /* ThemeCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = TC100002TC100002TC100002 /* ThemeCardView.swift */; };
-		70265FBBA52FB6E60AE4EFFE /* ProjectPicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE07F0C0F9D62925EF195F7 /* ProjectPicker.swift */; };
+		70265FBBA52FB6E60AE4EFFE /* WorkspacePicker.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4BE07F0C0F9D62925EF195F7 /* WorkspacePicker.swift */; };
 		7E500DC8ECF3F7D073A098A4 /* ControlSocket.swift in Sources */ = {isa = PBXBuildFile; fileRef = D08100E22096E7498D571A20 /* ControlSocket.swift */; };
 
 		A0FF9B9E99BC8B33FDCAB7E5 /* HookHandler.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4A2B375A023FEBCB272DCFD7 /* HookHandler.swift */; };
@@ -73,7 +73,7 @@
 
 
 		4A2B375A023FEBCB272DCFD7 /* HookHandler.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookHandler.swift; sourceTree = "<group>"; };
-		4BE07F0C0F9D62925EF195F7 /* ProjectPicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectPicker.swift; sourceTree = "<group>"; };
+		4BE07F0C0F9D62925EF195F7 /* WorkspacePicker.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WorkspacePicker.swift; sourceTree = "<group>"; };
 		6C2CC70A6932271D0EE46154 /* Deckard-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = "Deckard-Bridging-Header.h"; sourceTree = "<group>"; };
 		7BE2AA0719D32ACCD1549184 /* SessionState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionState.swift; sourceTree = "<group>"; };
 		7F505D5B7348F40C2CBD6F83 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
@@ -216,7 +216,7 @@
 				QA200003QA200003QA200003 /* QuotaView.swift */,
 				SV000002SV000002SV000002 /* SidebarViews.swift */,
 				TV000002TV000002TV000002 /* TabBarViews.swift */,
-				4BE07F0C0F9D62925EF195F7 /* ProjectPicker.swift */,
+				4BE07F0C0F9D62925EF195F7 /* WorkspacePicker.swift */,
 				DD37F7C8CC5243DCF0A1346E /* SettingsWindow.swift */,
 				TC100002TC100002TC100002 /* ThemeCardView.swift */,
 				CAF00002CAF00002CAF00002 /* ClaudeArgsField.swift */,
@@ -429,7 +429,7 @@
 				SV000001SV000001SV000001 /* SidebarViews.swift in Sources */,
 				TV000001TV000001TV000001 /* TabBarViews.swift in Sources */,
 				A0FF9B9E99BC8B33FDCAB7E5 /* HookHandler.swift in Sources */,
-				70265FBBA52FB6E60AE4EFFE /* ProjectPicker.swift in Sources */,
+				70265FBBA52FB6E60AE4EFFE /* WorkspacePicker.swift in Sources */,
 				2D322E22D0679FD39D688539 /* SessionState.swift in Sources */,
 				63A33F81DE38406C15D1259A /* SettingsWindow.swift in Sources */,
 				TC100001TC100001TC100001 /* ThemeCardView.swift in Sources */,

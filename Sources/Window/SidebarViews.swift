@@ -26,7 +26,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     private var dragStartPoint: NSPoint?
     private var leadingConstraint: NSLayoutConstraint?
 
-    /// Leading indent (used for projects inside folders).
+    /// Leading indent (used for workspaces inside folders).
     var indent: CGFloat = 0 {
         didSet { leadingConstraint?.constant = 8 + indent }
     }
@@ -72,7 +72,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         wantsLayer = true
 
         label.translatesAutoresizingMaskIntoConstraints = false
-        label.toolTip = shortcutTooltip("Close Workspace", for: .closeFolder)
+        label.toolTip = shortcutTooltip("Close Workspace", for: .closeWorkspace)
         badgeContainer.translatesAutoresizingMaskIntoConstraints = false
         shortcutOverlay.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
@@ -215,7 +215,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         dragStartPoint = nil
 
         let pb = NSPasteboardItem()
-        pb.setString("\(index)", forType: deckardProjectDragType)
+        pb.setString("\(index)", forType: deckardWorkspaceDragType)
         let item = NSDraggingItem(pasteboardWriter: pb)
         item.setDraggingFrame(bounds, contents: snapshot())
         beginDraggingSession(with: [item], event: event, source: self)
@@ -307,7 +307,7 @@ class SidebarGroupView: NSView, NSTextFieldDelegate, NSDraggingSource {
         didSet { needsDisplay = true }
     }
 
-    /// Badge info aggregated from all projects in the folder.
+    /// Badge info aggregated from all workspaces in the folder.
     var badgeInfos: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?)] = [] {
         didSet { updateBadgeDots() }
     }
@@ -530,7 +530,7 @@ class SidebarDropZone: NSView {
 
     private func acceptsDrag(_ sender: NSDraggingInfo) -> Bool {
         let types = sender.draggingPasteboard.types ?? []
-        return types.contains(deckardProjectDragType) || types.contains(deckardGroupDragType)
+        return types.contains(deckardWorkspaceDragType) || types.contains(deckardGroupDragType)
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
@@ -555,7 +555,7 @@ class SidebarDropZone: NSView {
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         sidebarStackView?.hideIndicator()
-        if let fromStr = sender.draggingPasteboard.string(forType: deckardProjectDragType),
+        if let fromStr = sender.draggingPasteboard.string(forType: deckardWorkspaceDragType),
            let fromIndex = Int(fromStr) {
             onDrop?(fromIndex)
             return true
@@ -672,7 +672,7 @@ class ReorderableStackView: NSStackView {
     }
 
     private func acceptsProjectDrag(_ sender: NSDraggingInfo) -> Bool {
-        sender.draggingPasteboard.types?.contains(deckardProjectDragType) == true
+        sender.draggingPasteboard.types?.contains(deckardWorkspaceDragType) == true
     }
 
     private func acceptsFolderDrag(_ sender: NSDraggingInfo) -> Bool {
@@ -786,7 +786,7 @@ class ReorderableStackView: NSStackView {
         hideIndicator()
 
         // Handle project drag
-        if let fromStr = sender.draggingPasteboard.string(forType: deckardProjectDragType),
+        if let fromStr = sender.draggingPasteboard.string(forType: deckardWorkspaceDragType),
            let fromIndex = Int(fromStr) {
             // If dropped on a highlighted folder, route to folder drop handler
             if let fv = wasOnFolder {

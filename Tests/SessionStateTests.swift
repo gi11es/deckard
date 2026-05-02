@@ -10,16 +10,16 @@ final class SessionStateTests: XCTestCase {
         state.version = 2
         state.selectedTabIndex = 3
         state.defaultWorkingDirectory = "/Users/test/project"
-        state.projects = [
-            ProjectState(
+        state.workspaces = [
+            WorkspaceState(
                 id: "proj-1",
                 path: "/Users/test/project",
                 name: "project",
                 selectedTabIndex: 0,
                 tabs: [
-                    ProjectTabState(id: "tab-1", name: "Claude", isClaude: true, sessionId: "sess-1"),
-                    ProjectTabState(id: "tab-2", name: "Codex", kind: .codex, sessionId: "codex-1"),
-                    ProjectTabState(id: "tab-3", name: "Terminal", isClaude: false, sessionId: nil),
+                    WorkspaceTabState(id: "tab-1", name: "Claude", isClaude: true, sessionId: "sess-1"),
+                    WorkspaceTabState(id: "tab-2", name: "Codex", kind: .codex, sessionId: "codex-1"),
+                    WorkspaceTabState(id: "tab-3", name: "Terminal", isClaude: false, sessionId: nil),
                 ],
                 defaultArgs: "--permission-mode acceptEdits",
                 defaultCodexArgs: "--ask-for-approval never --sandbox workspace-write"
@@ -33,17 +33,17 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.version, 2)
         XCTAssertEqual(decoded.selectedTabIndex, 3)
         XCTAssertEqual(decoded.defaultWorkingDirectory, "/Users/test/project")
-        XCTAssertEqual(decoded.projects?.count, 1)
-        XCTAssertEqual(decoded.projects?[0].tabs.count, 3)
-        XCTAssertEqual(decoded.projects?[0].tabs[0].isClaude, true)
-        XCTAssertEqual(decoded.projects?[0].tabs[0].sessionId, "sess-1")
-        XCTAssertEqual(decoded.projects?[0].tabs[1].kind, .codex)
-        XCTAssertEqual(decoded.projects?[0].tabs[1].isClaude, false)
-        XCTAssertEqual(decoded.projects?[0].tabs[1].sessionId, "codex-1")
-        XCTAssertEqual(decoded.projects?[0].tabs[2].kind, .terminal)
-        XCTAssertNil(decoded.projects?[0].tabs[2].sessionId)
-        XCTAssertEqual(decoded.projects?[0].defaultArgs, "--permission-mode acceptEdits")
-        XCTAssertEqual(decoded.projects?[0].defaultCodexArgs, "--ask-for-approval never --sandbox workspace-write")
+        XCTAssertEqual(decoded.workspaces?.count, 1)
+        XCTAssertEqual(decoded.workspaces?[0].tabs.count, 3)
+        XCTAssertEqual(decoded.workspaces?[0].tabs[0].isClaude, true)
+        XCTAssertEqual(decoded.workspaces?[0].tabs[0].sessionId, "sess-1")
+        XCTAssertEqual(decoded.workspaces?[0].tabs[1].kind, .codex)
+        XCTAssertEqual(decoded.workspaces?[0].tabs[1].isClaude, false)
+        XCTAssertEqual(decoded.workspaces?[0].tabs[1].sessionId, "codex-1")
+        XCTAssertEqual(decoded.workspaces?[0].tabs[2].kind, .terminal)
+        XCTAssertNil(decoded.workspaces?[0].tabs[2].sessionId)
+        XCTAssertEqual(decoded.workspaces?[0].defaultArgs, "--permission-mode acceptEdits")
+        XCTAssertEqual(decoded.workspaces?[0].defaultCodexArgs, "--ask-for-approval never --sandbox workspace-write")
     }
 
     func testEmptyStateRoundtrip() throws {
@@ -54,25 +54,25 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.version, 3)
         XCTAssertEqual(decoded.selectedTabIndex, 0)
         XCTAssertNil(decoded.defaultWorkingDirectory)
-        XCTAssertNil(decoded.projects)
+        XCTAssertNil(decoded.workspaces)
     }
 
     func testMultipleProjectsRoundtrip() throws {
         var state = DeckardState()
-        state.projects = [
-            ProjectState(id: "p1", path: "/path/a", name: "a", selectedTabIndex: 0, tabs: []),
-            ProjectState(id: "p2", path: "/path/b", name: "b", selectedTabIndex: 1, tabs: [
-                ProjectTabState(id: "t1", name: "Claude", isClaude: true, sessionId: nil),
+        state.workspaces = [
+            WorkspaceState(id: "p1", path: "/path/a", name: "a", selectedTabIndex: 0, tabs: []),
+            WorkspaceState(id: "p2", path: "/path/b", name: "b", selectedTabIndex: 1, tabs: [
+                WorkspaceTabState(id: "t1", name: "Claude", isClaude: true, sessionId: nil),
             ]),
-            ProjectState(id: "p3", path: "/path/c", name: "c", selectedTabIndex: 0, tabs: []),
+            WorkspaceState(id: "p3", path: "/path/c", name: "c", selectedTabIndex: 0, tabs: []),
         ]
 
         let data = try JSONEncoder().encode(state)
         let decoded = try JSONDecoder().decode(DeckardState.self, from: data)
 
-        XCTAssertEqual(decoded.projects?.count, 3)
-        XCTAssertEqual(decoded.projects?[1].name, "b")
-        XCTAssertEqual(decoded.projects?[1].tabs.count, 1)
+        XCTAssertEqual(decoded.workspaces?.count, 3)
+        XCTAssertEqual(decoded.workspaces?[1].name, "b")
+        XCTAssertEqual(decoded.workspaces?[1].tabs.count, 1)
     }
 
     // MARK: - TabState (legacy v1) Codable
@@ -100,12 +100,12 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.workingDirectory, "/tmp")
     }
 
-    // MARK: - ProjectTabState Codable
+    // MARK: - WorkspaceTabState Codable
 
     func testProjectTabStateRoundtrip() throws {
-        let tab = ProjectTabState(id: "t1", name: "Claude", isClaude: true, sessionId: "s1")
+        let tab = WorkspaceTabState(id: "t1", name: "Claude", isClaude: true, sessionId: "s1")
         let data = try JSONEncoder().encode(tab)
-        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: data)
+        let decoded = try JSONDecoder().decode(WorkspaceTabState.self, from: data)
 
         XCTAssertEqual(decoded.id, "t1")
         XCTAssertEqual(decoded.name, "Claude")
@@ -115,7 +115,7 @@ final class SessionStateTests: XCTestCase {
     }
 
     func testProjectTabStateCodexRoundtrip() throws {
-        let tab = ProjectTabState(
+        let tab = WorkspaceTabState(
             id: "t-codex",
             name: "Codex",
             kind: .codex,
@@ -125,7 +125,7 @@ final class SessionStateTests: XCTestCase {
 
         let data = try JSONEncoder().encode(tab)
         let json = try JSONSerialization.jsonObject(with: data) as? [String: Any]
-        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: data)
+        let decoded = try JSONDecoder().decode(WorkspaceTabState.self, from: data)
 
         XCTAssertEqual(json?["kind"] as? String, "codex")
         XCTAssertEqual(json?["isClaude"] as? Bool, false)
@@ -142,7 +142,7 @@ final class SessionStateTests: XCTestCase {
         {"id": "tab-codex", "name": "Codex", "kind": "codex", "isClaude": false, "sessionId": "codex-1"}
         """.data(using: .utf8)!
 
-        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: json)
+        let decoded = try JSONDecoder().decode(WorkspaceTabState.self, from: json)
 
         XCTAssertEqual(decoded.kind, .codex)
         XCTAssertFalse(decoded.isClaude)
@@ -154,7 +154,7 @@ final class SessionStateTests: XCTestCase {
         {"id": "tab-claude", "name": "Claude", "isClaude": true, "sessionId": "claude-1"}
         """.data(using: .utf8)!
 
-        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: json)
+        let decoded = try JSONDecoder().decode(WorkspaceTabState.self, from: json)
 
         XCTAssertEqual(decoded.kind, .claude)
         XCTAssertTrue(decoded.isClaude)
@@ -180,8 +180,8 @@ final class SessionStateTests: XCTestCase {
         // Create a state, encode to JSON, write to temp file, read back
         var state = DeckardState()
         state.selectedTabIndex = 5
-        state.projects = [
-            ProjectState(id: "p1", path: "/test", name: "test", selectedTabIndex: 0, tabs: [])
+        state.workspaces = [
+            WorkspaceState(id: "p1", path: "/test", name: "test", selectedTabIndex: 0, tabs: [])
         ]
 
         let encoder = JSONEncoder()
@@ -193,7 +193,7 @@ final class SessionStateTests: XCTestCase {
         let loaded = try JSONDecoder().decode(DeckardState.self, from: loadedData)
 
         XCTAssertEqual(loaded.selectedTabIndex, 5)
-        XCTAssertEqual(loaded.projects?.count, 1)
+        XCTAssertEqual(loaded.workspaces?.count, 1)
     }
 
     // MARK: - State with legacy fields
@@ -223,13 +223,13 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(state.selectedTabIndex, 0)
         XCTAssertNil(state.defaultWorkingDirectory)
         XCTAssertNil(state.tabs)
-        XCTAssertNil(state.projects)
+        XCTAssertNil(state.workspaces)
     }
 
     // MARK: - Symlink path restoration
 
     func testProjectStatePathSurvivesRoundtripViaProjectItem() throws {
-        // Simulate: save state with canonical path, restore via ProjectItem
+        // Simulate: save state with canonical path, restore via WorkspaceItem
         let tempDir = NSTemporaryDirectory() + "deckard-state-\(UUID().uuidString)"
         let realDir = tempDir + "/real-project"
         let linkDir = tempDir + "/linked-project"
@@ -239,10 +239,10 @@ final class SessionStateTests: XCTestCase {
 
         // Save state using symlink path (as old Deckard would)
         var state = DeckardState()
-        state.projects = [
-            ProjectState(id: "p1", path: linkDir, name: "linked-project",
+        state.workspaces = [
+            WorkspaceState(id: "p1", path: linkDir, name: "linked-project",
                          selectedTabIndex: 0, tabs: [
-                ProjectTabState(id: "t1", name: "Claude", isClaude: true, sessionId: "sess-1")
+                WorkspaceTabState(id: "t1", name: "Claude", isClaude: true, sessionId: "sess-1")
             ])
         ]
 
@@ -250,23 +250,23 @@ final class SessionStateTests: XCTestCase {
         let data = try JSONEncoder().encode(state)
         let restored = try JSONDecoder().decode(DeckardState.self, from: data)
 
-        // Simulate restoreOrCreateInitial: ProjectItem resolves the path
-        let ps = restored.projects![0]
-        let project = ProjectItem(path: ps.path)
+        // Simulate restoreOrCreateInitial: WorkspaceItem resolves the path
+        let ps = restored.workspaces![0]
+        let project = WorkspaceItem(path: ps.path)
 
         // The resolved path should match the canonical path
         XCTAssertEqual(project.path, realDir,
-                       "ProjectItem should resolve symlink from old state.json")
+                       "WorkspaceItem should resolve symlink from old state.json")
 
         // Sidebar folder restoration resolves ps.path before comparison
         let resolvedPsPath = (ps.path as NSString).resolvingSymlinksInPath
         XCTAssertEqual(project.path, resolvedPsPath,
-                       "Resolved ps.path should match ProjectItem.path for sidebar folder mapping")
+                       "Resolved ps.path should match WorkspaceItem.path for sidebar folder mapping")
     }
 
     func testProjectStateSavedWithCanonicalPath() throws {
         // When captureState() saves a project that was opened via symlink,
-        // the path should be canonical (because ProjectItem.init resolves)
+        // the path should be canonical (because WorkspaceItem.init resolves)
         let tempDir = NSTemporaryDirectory() + "deckard-state-\(UUID().uuidString)"
         let realDir = tempDir + "/real-project"
         let linkDir = tempDir + "/linked-project"
@@ -274,9 +274,9 @@ final class SessionStateTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
 
-        let project = ProjectItem(path: linkDir)
+        let project = WorkspaceItem(path: linkDir)
         // Simulate what captureState() does
-        let saved = ProjectState(
+        let saved = WorkspaceState(
             id: project.id.uuidString,
             path: project.path,
             name: project.name,
@@ -285,7 +285,7 @@ final class SessionStateTests: XCTestCase {
         )
 
         XCTAssertEqual(saved.path, realDir,
-                       "Saved ProjectState should contain canonical path, not symlink")
+                       "Saved WorkspaceState should contain canonical path, not symlink")
     }
 
     func testOldAndNewStatePathsMatchAfterResolution() throws {
@@ -298,21 +298,21 @@ final class SessionStateTests: XCTestCase {
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
 
         // Old state (saved with symlink path)
-        let oldProjectState = ProjectState(
+        let oldProjectState = WorkspaceState(
             id: "p1", path: linkDir, name: "linked-project",
             selectedTabIndex: 0, tabs: []
         )
 
-        // New ProjectItem (opened via symlink, but path is resolved)
-        let project = ProjectItem(path: linkDir)
+        // New WorkspaceItem (opened via symlink, but path is resolved)
+        let project = WorkspaceItem(path: linkDir)
 
         // restoreSidebarGroups resolves ps.path before comparison
         let resolvedOldPath = (oldProjectState.path as NSString).resolvingSymlinksInPath
         XCTAssertEqual(project.path, resolvedOldPath,
-                       "Migration: resolved old state path must match new ProjectItem.path")
+                       "Migration: resolved old state path must match new WorkspaceItem.path")
 
         // New state (saved after fix) already has canonical path
-        let newProjectState = ProjectState(
+        let newProjectState = WorkspaceState(
             id: "p2", path: project.path, name: project.name,
             selectedTabIndex: 0, tabs: []
         )

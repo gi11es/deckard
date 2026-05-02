@@ -82,7 +82,7 @@ class HookHandler {
 
         case "create-tab":
             if let dir = message.workingDirectory {
-                windowController?.openProject(path: dir)
+                windowController?.openWorkspace(path: dir)
             }
             reply(ControlResponse(ok: true))
 

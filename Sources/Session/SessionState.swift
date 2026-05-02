@@ -31,7 +31,7 @@ struct DeckardState: Codable {
     var masterSessionId: String?
 
     // v2: project-based
-    var projects: [ProjectState]?
+    var workspaces: [WorkspaceState]?
 
     // v3: sidebar groups (was "sidebarFolders" in v2-era state.json)
     var sidebarGroups: [SidebarGroupState]?
@@ -42,10 +42,11 @@ struct DeckardState: Codable {
     private enum CodingKeys: String, CodingKey {
         case version, selectedTabIndex, defaultWorkingDirectory
         case tabs, claudeTabCounter, terminalTabCounter, masterSessionId
-        case projects
+        case workspaces
         case sidebarGroups, sidebarOrder
-        // Legacy key — read on decode, never written.
-        case sidebarFolders
+        // Legacy keys — read on decode, never written.
+        case projects        // v2 name for workspaces
+        case sidebarFolders  // v2 name for sidebarGroups
     }
 
     init(from decoder: Decoder) throws {
@@ -57,7 +58,8 @@ struct DeckardState: Codable {
         claudeTabCounter = try c.decodeIfPresent(Int.self, forKey: .claudeTabCounter)
         terminalTabCounter = try c.decodeIfPresent(Int.self, forKey: .terminalTabCounter)
         masterSessionId = try c.decodeIfPresent(String.self, forKey: .masterSessionId)
-        projects = try c.decodeIfPresent([ProjectState].self, forKey: .projects)
+        workspaces = try c.decodeIfPresent([WorkspaceState].self, forKey: .workspaces)
+            ?? c.decodeIfPresent([WorkspaceState].self, forKey: .projects)
         sidebarGroups = try c.decodeIfPresent([SidebarGroupState].self, forKey: .sidebarGroups)
             ?? c.decodeIfPresent([SidebarGroupState].self, forKey: .sidebarFolders)
         sidebarOrder = try c.decodeIfPresent([SidebarOrderItem].self, forKey: .sidebarOrder)
@@ -72,7 +74,7 @@ struct DeckardState: Codable {
         try c.encodeIfPresent(claudeTabCounter, forKey: .claudeTabCounter)
         try c.encodeIfPresent(terminalTabCounter, forKey: .terminalTabCounter)
         try c.encodeIfPresent(masterSessionId, forKey: .masterSessionId)
-        try c.encodeIfPresent(projects, forKey: .projects)
+        try c.encodeIfPresent(workspaces, forKey: .workspaces)
         try c.encodeIfPresent(sidebarGroups, forKey: .sidebarGroups)
         try c.encodeIfPresent(sidebarOrder, forKey: .sidebarOrder)
     }
@@ -88,17 +90,17 @@ struct TabState: Codable {
     var workingDirectory: String?
 }
 
-struct ProjectState: Codable {
+struct WorkspaceState: Codable {
     var id: String
     var path: String
     var name: String
     var selectedTabIndex: Int
-    var tabs: [ProjectTabState]
+    var tabs: [WorkspaceTabState]
     var defaultArgs: String?
     var defaultCodexArgs: String?
 }
 
-struct ProjectTabState: Codable {
+struct WorkspaceTabState: Codable {
     var id: String
     var name: String
     var kind: TabKind
@@ -155,7 +157,39 @@ struct SidebarGroupState: Codable {
     var id: String
     var name: String
     var isCollapsed: Bool
-    var projectIds: [String]
+    var workspaceIds: [String]
+
+    init(id: String, name: String, isCollapsed: Bool, workspaceIds: [String]) {
+        self.id = id
+        self.name = name
+        self.isCollapsed = isCollapsed
+        self.workspaceIds = workspaceIds
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, isCollapsed
+        case workspaceIds
+        // Legacy key — read on decode, never written.
+        case projectIds
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        isCollapsed = try c.decode(Bool.self, forKey: .isCollapsed)
+        workspaceIds = try c.decodeIfPresent([String].self, forKey: .workspaceIds)
+            ?? c.decodeIfPresent([String].self, forKey: .projectIds)
+            ?? []
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(id, forKey: .id)
+        try c.encode(name, forKey: .name)
+        try c.encode(isCollapsed, forKey: .isCollapsed)
+        try c.encode(workspaceIds, forKey: .workspaceIds)
+    }
 }
 
 /// A tagged union for sidebar ordering — either a group or an ungrouped project.

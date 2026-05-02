@@ -66,10 +66,10 @@ final class WindowControllerLogicTests: XCTestCase {
         XCTAssertFalse(TabKind.terminal.isAgent)
     }
 
-    // MARK: - ProjectItem
+    // MARK: - WorkspaceItem
 
     func testProjectItemInit() {
-        let project = ProjectItem(path: "/Users/test/my-project")
+        let project = WorkspaceItem(path: "/Users/test/my-project")
         XCTAssertEqual(project.path, "/Users/test/my-project")
         XCTAssertEqual(project.name, "my-project")
         XCTAssertTrue(project.tabs.isEmpty)
@@ -77,11 +77,11 @@ final class WindowControllerLogicTests: XCTestCase {
     }
 
     func testProjectItemNameIsBasename() {
-        let project = ProjectItem(path: "/a/b/c/deep-folder")
+        let project = WorkspaceItem(path: "/a/b/c/deep-folder")
         XCTAssertEqual(project.name, "deep-folder")
     }
 
-    // MARK: - ProjectItem symlink resolution
+    // MARK: - WorkspaceItem symlink resolution
 
     func testProjectItemResolvesSymlinks() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-symlink-\(UUID().uuidString)"
@@ -91,8 +91,8 @@ final class WindowControllerLogicTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
 
-        let project = ProjectItem(path: linkDir)
-        XCTAssertEqual(project.path, realDir, "ProjectItem should resolve symlinks to canonical path")
+        let project = WorkspaceItem(path: linkDir)
+        XCTAssertEqual(project.path, realDir, "WorkspaceItem should resolve symlinks to canonical path")
         XCTAssertEqual(project.name, "real-project")
     }
 
@@ -103,7 +103,7 @@ final class WindowControllerLogicTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
 
         // A non-symlink path should be unchanged
-        let project = ProjectItem(path: realDir)
+        let project = WorkspaceItem(path: realDir)
         XCTAssertEqual(project.path, realDir)
     }
 
@@ -115,8 +115,8 @@ final class WindowControllerLogicTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
 
-        let fromSymlink = ProjectItem(path: linkDir)
-        let fromCanonical = ProjectItem(path: realDir)
+        let fromSymlink = WorkspaceItem(path: linkDir)
+        let fromCanonical = WorkspaceItem(path: realDir)
         XCTAssertEqual(fromSymlink.path, fromCanonical.path,
                        "ProjectItems opened via symlink and canonical path should have the same path")
     }
@@ -131,7 +131,7 @@ final class WindowControllerLogicTests: XCTestCase {
         try FileManager.default.createSymbolicLink(atPath: link1, withDestinationPath: realDir)
         try FileManager.default.createSymbolicLink(atPath: link2, withDestinationPath: link1)
 
-        let project = ProjectItem(path: link2)
+        let project = WorkspaceItem(path: link2)
         XCTAssertEqual(project.path, realDir, "Chained symlinks should fully resolve")
     }
 

@@ -509,10 +509,10 @@ final class ContextMonitorTests: XCTestCase {
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
 
-        // ProjectItem resolves symlinks; claudeProjectDirName should agree
-        let project = ProjectItem(path: linkDir)
+        // WorkspaceItem resolves symlinks; claudeProjectDirName should agree
+        let project = WorkspaceItem(path: linkDir)
         let encoded = project.path.claudeProjectDirName
         XCTAssertEqual(encoded, realDir.claudeProjectDirName,
-                       "ProjectItem.path and claudeProjectDirName should agree on canonical encoding")
+                       "WorkspaceItem.path and claudeProjectDirName should agree on canonical encoding")
     }
 }

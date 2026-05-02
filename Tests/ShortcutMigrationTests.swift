@@ -36,15 +36,26 @@ final class ShortcutMigrationTests: XCTestCase {
     }
 
     func testMigratesAllRenamedIdentifiers() {
-        defaults.set("v1", forKey: "KeyboardShortcuts_newSidebarFolder")
-        defaults.set("v2", forKey: "KeyboardShortcuts_moveOutOfFolder")
+        defaults.set("a", forKey: "KeyboardShortcuts_newSidebarFolder")
+        defaults.set("b", forKey: "KeyboardShortcuts_moveOutOfFolder")
+        defaults.set("c", forKey: "KeyboardShortcuts_openFolder")
+        defaults.set("d", forKey: "KeyboardShortcuts_closeFolder")
+        defaults.set("e", forKey: "KeyboardShortcuts_nextProject")
+        defaults.set("f", forKey: "KeyboardShortcuts_previousProject")
 
         DeckardShortcutMigration.migrate(defaults: defaults)
 
-        XCTAssertEqual(defaults.string(forKey: "KeyboardShortcuts_newGroup"), "v1")
-        XCTAssertEqual(defaults.string(forKey: "KeyboardShortcuts_moveOutOfGroup"), "v2")
-        XCTAssertNil(defaults.object(forKey: "KeyboardShortcuts_newSidebarFolder"))
-        XCTAssertNil(defaults.object(forKey: "KeyboardShortcuts_moveOutOfFolder"))
+        XCTAssertEqual(defaults.string(forKey: "KeyboardShortcuts_newGroup"), "a")
+        XCTAssertEqual(defaults.string(forKey: "KeyboardShortcuts_moveOutOfGroup"), "b")
+        XCTAssertEqual(defaults.string(forKey: "KeyboardShortcuts_openWorkspace"), "c")
+        XCTAssertEqual(defaults.string(forKey: "KeyboardShortcuts_closeWorkspace"), "d")
+        XCTAssertEqual(defaults.string(forKey: "KeyboardShortcuts_nextWorkspace"), "e")
+        XCTAssertEqual(defaults.string(forKey: "KeyboardShortcuts_previousWorkspace"), "f")
+        // All old keys removed
+        for old in ["newSidebarFolder", "moveOutOfFolder", "openFolder", "closeFolder", "nextProject", "previousProject"] {
+            XCTAssertNil(defaults.object(forKey: "KeyboardShortcuts_\(old)"),
+                         "Old key \(old) must be removed")
+        }
     }
 
     func testDoesNotRunTwice() {

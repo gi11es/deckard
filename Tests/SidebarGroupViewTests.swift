@@ -277,14 +277,14 @@ final class SidebarGroupViewTests: XCTestCase {
     func testGroupToggleBlocksCollapseWhenContainingSelectedProject() {
         let folder = SidebarGroup(name: "Active")
         let projectId = UUID()
-        folder.projectIds = [projectId]
+        folder.workspaceIds = [projectId]
         folder.isCollapsed = false
 
         // Simulate the guard logic from groupToggleClicked.
         folder.isCollapsed.toggle()
         // Guard: if collapsing a folder that contains the selected project, force expand.
         let selectedProjectId = projectId  // selected project is inside this folder
-        if folder.isCollapsed, folder.projectIds.contains(selectedProjectId) {
+        if folder.isCollapsed, folder.workspaceIds.contains(selectedProjectId) {
             folder.isCollapsed = false
         }
 
@@ -296,13 +296,13 @@ final class SidebarGroupViewTests: XCTestCase {
         let folder = SidebarGroup(name: "Other")
         let projectId = UUID()
         let otherProjectId = UUID()
-        folder.projectIds = [projectId]
+        folder.workspaceIds = [projectId]
         folder.isCollapsed = false
 
         folder.isCollapsed.toggle()
         // Guard: selected project is NOT in this folder.
         let selectedProjectId = otherProjectId
-        if folder.isCollapsed, folder.projectIds.contains(selectedProjectId) {
+        if folder.isCollapsed, folder.workspaceIds.contains(selectedProjectId) {
             folder.isCollapsed = false
         }
 

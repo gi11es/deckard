@@ -10,7 +10,7 @@ final class SidebarGroupTests: XCTestCase {
             id: "folder-1",
             name: "My Folder",
             isCollapsed: true,
-            projectIds: ["proj-a", "proj-b", "proj-c"]
+            workspaceIds: ["proj-a", "proj-b", "proj-c"]
         )
 
         let data = try JSONEncoder().encode(state)
@@ -19,7 +19,7 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertEqual(decoded.id, "folder-1")
         XCTAssertEqual(decoded.name, "My Folder")
         XCTAssertTrue(decoded.isCollapsed)
-        XCTAssertEqual(decoded.projectIds, ["proj-a", "proj-b", "proj-c"])
+        XCTAssertEqual(decoded.workspaceIds, ["proj-a", "proj-b", "proj-c"])
     }
 
     func testSidebarGroupStateEmptyProjectIds() throws {
@@ -27,7 +27,7 @@ final class SidebarGroupTests: XCTestCase {
             id: "folder-empty",
             name: "Empty Folder",
             isCollapsed: false,
-            projectIds: []
+            workspaceIds: []
         )
 
         let data = try JSONEncoder().encode(state)
@@ -36,7 +36,7 @@ final class SidebarGroupTests: XCTestCase {
         XCTAssertEqual(decoded.id, "folder-empty")
         XCTAssertEqual(decoded.name, "Empty Folder")
         XCTAssertFalse(decoded.isCollapsed)
-        XCTAssertEqual(decoded.projectIds, [])
+        XCTAssertEqual(decoded.workspaceIds, [])
     }
 
     // MARK: - SidebarOrderItem Codable roundtrips
@@ -105,19 +105,19 @@ final class SidebarGroupTests: XCTestCase {
     func testDeckardStateWithGroupsRoundtrip() throws {
         var state = DeckardState()
         state.sidebarGroups = [
-            SidebarGroupState(id: "f1", name: "Work", isCollapsed: false, projectIds: ["p1", "p2"]),
-            SidebarGroupState(id: "f2", name: "Personal", isCollapsed: true, projectIds: ["p3"]),
+            SidebarGroupState(id: "f1", name: "Work", isCollapsed: false, workspaceIds: ["p1", "p2"]),
+            SidebarGroupState(id: "f2", name: "Personal", isCollapsed: true, workspaceIds: ["p3"]),
         ]
         state.sidebarOrder = [
             .group("f1"),
             .project("p4"),
             .group("f2"),
         ]
-        state.projects = [
-            ProjectState(id: "p1", path: "/work/a", name: "a", selectedTabIndex: 0, tabs: []),
-            ProjectState(id: "p2", path: "/work/b", name: "b", selectedTabIndex: 0, tabs: []),
-            ProjectState(id: "p3", path: "/personal/c", name: "c", selectedTabIndex: 0, tabs: []),
-            ProjectState(id: "p4", path: "/other/d", name: "d", selectedTabIndex: 0, tabs: []),
+        state.workspaces = [
+            WorkspaceState(id: "p1", path: "/work/a", name: "a", selectedTabIndex: 0, tabs: []),
+            WorkspaceState(id: "p2", path: "/work/b", name: "b", selectedTabIndex: 0, tabs: []),
+            WorkspaceState(id: "p3", path: "/personal/c", name: "c", selectedTabIndex: 0, tabs: []),
+            WorkspaceState(id: "p4", path: "/other/d", name: "d", selectedTabIndex: 0, tabs: []),
         ]
 
         let data = try JSONEncoder().encode(state)
@@ -125,7 +125,7 @@ final class SidebarGroupTests: XCTestCase {
 
         XCTAssertEqual(decoded.sidebarGroups?.count, 2)
         XCTAssertEqual(decoded.sidebarGroups?[0].name, "Work")
-        XCTAssertEqual(decoded.sidebarGroups?[0].projectIds, ["p1", "p2"])
+        XCTAssertEqual(decoded.sidebarGroups?[0].workspaceIds, ["p1", "p2"])
         XCTAssertEqual(decoded.sidebarGroups?[1].name, "Personal")
         XCTAssertTrue(decoded.sidebarGroups?[1].isCollapsed == true)
         XCTAssertEqual(decoded.sidebarOrder?.count, 3)
@@ -151,8 +151,8 @@ final class SidebarGroupTests: XCTestCase {
     func testDeckardStateNilGroupsBackwardCompat() throws {
         // Simulate a v2 state without folder fields
         var state = DeckardState()
-        state.projects = [
-            ProjectState(id: "p1", path: "/test", name: "test", selectedTabIndex: 0, tabs: [])
+        state.workspaces = [
+            WorkspaceState(id: "p1", path: "/test", name: "test", selectedTabIndex: 0, tabs: [])
         ]
         // sidebarGroups and sidebarOrder deliberately left nil
 
@@ -161,13 +161,13 @@ final class SidebarGroupTests: XCTestCase {
 
         XCTAssertNil(decoded.sidebarGroups)
         XCTAssertNil(decoded.sidebarOrder)
-        XCTAssertEqual(decoded.projects?.count, 1)
+        XCTAssertEqual(decoded.workspaces?.count, 1)
     }
 
     func testDeckardStateMixedSidebarOrder() throws {
         var state = DeckardState()
         state.sidebarGroups = [
-            SidebarGroupState(id: "f1", name: "Folder", isCollapsed: false, projectIds: [])
+            SidebarGroupState(id: "f1", name: "Folder", isCollapsed: false, workspaceIds: [])
         ]
         state.sidebarOrder = [
             .project("p1"),
@@ -211,7 +211,7 @@ final class SidebarGroupTests: XCTestCase {
 
         XCTAssertEqual(folder.name, "Test Folder")
         XCTAssertFalse(folder.isCollapsed)
-        XCTAssertEqual(folder.projectIds, [])
+        XCTAssertEqual(folder.workspaceIds, [])
         XCTAssertNotEqual(folder.id, UUID()) // has a valid UUID
     }
 
@@ -221,18 +221,18 @@ final class SidebarGroupTests: XCTestCase {
         let id2 = UUID()
         let id3 = UUID()
 
-        folder.projectIds.append(id1)
-        folder.projectIds.append(id2)
-        folder.projectIds.append(id3)
-        XCTAssertEqual(folder.projectIds.count, 3)
-        XCTAssertEqual(folder.projectIds, [id1, id2, id3])
+        folder.workspaceIds.append(id1)
+        folder.workspaceIds.append(id2)
+        folder.workspaceIds.append(id3)
+        XCTAssertEqual(folder.workspaceIds.count, 3)
+        XCTAssertEqual(folder.workspaceIds, [id1, id2, id3])
 
-        folder.projectIds.removeAll { $0 == id2 }
-        XCTAssertEqual(folder.projectIds.count, 2)
-        XCTAssertEqual(folder.projectIds, [id1, id3])
+        folder.workspaceIds.removeAll { $0 == id2 }
+        XCTAssertEqual(folder.workspaceIds.count, 2)
+        XCTAssertEqual(folder.workspaceIds, [id1, id3])
 
-        folder.projectIds.removeAll()
-        XCTAssertEqual(folder.projectIds.count, 0)
+        folder.workspaceIds.removeAll()
+        XCTAssertEqual(folder.workspaceIds.count, 0)
     }
 
     func testSidebarGroupIsCollapsedToggle() {
@@ -250,12 +250,12 @@ final class SidebarGroupTests: XCTestCase {
         let id = UUID()
         let pid1 = UUID()
         let pid2 = UUID()
-        let folder = SidebarGroup(id: id, name: "Custom", isCollapsed: true, projectIds: [pid1, pid2])
+        let folder = SidebarGroup(id: id, name: "Custom", isCollapsed: true, workspaceIds: [pid1, pid2])
 
         XCTAssertEqual(folder.id, id)
         XCTAssertEqual(folder.name, "Custom")
         XCTAssertTrue(folder.isCollapsed)
-        XCTAssertEqual(folder.projectIds, [pid1, pid2])
+        XCTAssertEqual(folder.workspaceIds, [pid1, pid2])
     }
 
     // MARK: - SidebarItem enum
@@ -297,10 +297,10 @@ final class SidebarGroupTests: XCTestCase {
         }
     }
 
-    // MARK: - ProjectTabState with tmuxSessionName
+    // MARK: - WorkspaceTabState with tmuxSessionName
 
     func testProjectTabStateWithTmuxSessionName() throws {
-        let tab = ProjectTabState(
+        let tab = WorkspaceTabState(
             id: "tab-1",
             name: "Terminal",
             isClaude: false,
@@ -309,7 +309,7 @@ final class SidebarGroupTests: XCTestCase {
         )
 
         let data = try JSONEncoder().encode(tab)
-        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: data)
+        let decoded = try JSONDecoder().decode(WorkspaceTabState.self, from: data)
 
         XCTAssertEqual(decoded.id, "tab-1")
         XCTAssertEqual(decoded.name, "Terminal")
@@ -319,7 +319,7 @@ final class SidebarGroupTests: XCTestCase {
     }
 
     func testProjectTabStateWithNilTmuxSessionName() throws {
-        let tab = ProjectTabState(
+        let tab = WorkspaceTabState(
             id: "tab-2",
             name: "Claude",
             isClaude: true,
@@ -328,7 +328,7 @@ final class SidebarGroupTests: XCTestCase {
         )
 
         let data = try JSONEncoder().encode(tab)
-        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: data)
+        let decoded = try JSONDecoder().decode(WorkspaceTabState.self, from: data)
 
         XCTAssertEqual(decoded.id, "tab-2")
         XCTAssertEqual(decoded.name, "Claude")
@@ -343,7 +343,7 @@ final class SidebarGroupTests: XCTestCase {
         {"id": "tab-3", "name": "Terminal", "isClaude": false}
         """.data(using: .utf8)!
 
-        let decoded = try JSONDecoder().decode(ProjectTabState.self, from: json)
+        let decoded = try JSONDecoder().decode(WorkspaceTabState.self, from: json)
 
         XCTAssertEqual(decoded.id, "tab-3")
         XCTAssertEqual(decoded.name, "Terminal")
@@ -359,7 +359,7 @@ final class SidebarGroupTests: XCTestCase {
             id: "f-special",
             name: "Work / Personal (2024) & More \u{1F4C1}",
             isCollapsed: false,
-            projectIds: ["p1"]
+            workspaceIds: ["p1"]
         )
 
         let data = try JSONEncoder().encode(state)
@@ -374,15 +374,15 @@ final class SidebarGroupTests: XCTestCase {
             id: "f-large",
             name: "Large Folder",
             isCollapsed: false,
-            projectIds: ids
+            workspaceIds: ids
         )
 
         let data = try JSONEncoder().encode(state)
         let decoded = try JSONDecoder().decode(SidebarGroupState.self, from: data)
 
-        XCTAssertEqual(decoded.projectIds.count, 100)
-        XCTAssertEqual(decoded.projectIds.first, "proj-0")
-        XCTAssertEqual(decoded.projectIds.last, "proj-99")
+        XCTAssertEqual(decoded.workspaceIds.count, 100)
+        XCTAssertEqual(decoded.workspaceIds.first, "proj-0")
+        XCTAssertEqual(decoded.workspaceIds.last, "proj-99")
     }
 
     // MARK: - SidebarOrderItem array roundtrip
@@ -420,8 +420,9 @@ final class SidebarGroupTests: XCTestCase {
     // MARK: - Legacy v2 state.json migration
 
     func testLegacySidebarFoldersKeyDecodesAsGroups() throws {
-        // v2 state.json wrote sidebar groups under the key "sidebarFolders".
-        // The new decoder must accept that key and surface them as sidebarGroups.
+        // v2 state.json wrote sidebar groups under the outer key "sidebarFolders"
+        // and members under the inner key "projectIds". Both legacy keys must
+        // decode cleanly into the new sidebarGroups/workspaceIds shape.
         let json = """
         {
             "version": 2,
@@ -435,7 +436,59 @@ final class SidebarGroupTests: XCTestCase {
         let decoded = try JSONDecoder().decode(DeckardState.self, from: json)
         XCTAssertEqual(decoded.sidebarGroups?.count, 1)
         XCTAssertEqual(decoded.sidebarGroups?.first?.name, "Work")
-        XCTAssertEqual(decoded.sidebarGroups?.first?.projectIds, ["p1"])
+        XCTAssertEqual(decoded.sidebarGroups?.first?.workspaceIds, ["p1"])
+    }
+
+    func testLegacyProjectsKeyDecodesAsWorkspaces() throws {
+        // v2 state.json wrote workspaces under the outer key "projects".
+        let json = """
+        {
+            "version": 2,
+            "selectedTabIndex": 1,
+            "projects": [
+                {"id": "p1", "path": "/work/a", "name": "a", "selectedTabIndex": 0, "tabs": []},
+                {"id": "p2", "path": "/work/b", "name": "b", "selectedTabIndex": 0, "tabs": []}
+            ]
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(DeckardState.self, from: json)
+        XCTAssertEqual(decoded.workspaces?.count, 2)
+        XCTAssertEqual(decoded.workspaces?[0].name, "a")
+        XCTAssertEqual(decoded.workspaces?[1].path, "/work/b")
+    }
+
+    func testFullV2StateRoundtripsToV3OnEncode() throws {
+        // A complete v2 state.json — every legacy key combined — decodes cleanly
+        // and re-encodes using only the new keys. This is the actual upgrade path.
+        let v2json = """
+        {
+            "version": 2,
+            "selectedTabIndex": 0,
+            "projects": [
+                {"id": "p1", "path": "/a", "name": "a", "selectedTabIndex": 0, "tabs": []}
+            ],
+            "sidebarFolders": [
+                {"id": "f1", "name": "Work", "isCollapsed": false, "projectIds": ["p1"]}
+            ],
+            "sidebarOrder": [
+                {"type": "folder", "id": "f1"}
+            ]
+        }
+        """.data(using: .utf8)!
+
+        let decoded = try JSONDecoder().decode(DeckardState.self, from: v2json)
+        let reencoded = try JSONEncoder().encode(decoded)
+        let reencodedString = String(data: reencoded, encoding: .utf8) ?? ""
+
+        XCTAssertTrue(reencodedString.contains("\"workspaces\""))
+        XCTAssertTrue(reencodedString.contains("\"sidebarGroups\""))
+        XCTAssertTrue(reencodedString.contains("\"workspaceIds\""))
+        XCTAssertTrue(reencodedString.contains("\"group\""))
+        XCTAssertFalse(reencodedString.contains("\"projects\""))
+        XCTAssertFalse(reencodedString.contains("\"sidebarFolders\""))
+        XCTAssertFalse(reencodedString.contains("\"projectIds\""))
+        XCTAssertFalse(reencodedString.contains("\"type\":\"folder\""))
     }
 
     func testLegacyFolderDiscriminatorDecodesAsGroup() throws {
@@ -464,7 +517,7 @@ final class SidebarGroupTests: XCTestCase {
         // never the legacy ones — otherwise downgrade would silently work and obscure
         // when the migration happened.
         var state = DeckardState()
-        state.sidebarGroups = [SidebarGroupState(id: "f1", name: "g", isCollapsed: false, projectIds: [])]
+        state.sidebarGroups = [SidebarGroupState(id: "f1", name: "g", isCollapsed: false, workspaceIds: [])]
         state.sidebarOrder = [.group("f1")]
 
         let data = try JSONEncoder().encode(state)

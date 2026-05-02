@@ -7,31 +7,31 @@ extension DeckardWindowController {
 
     // MARK: - Sidebar Helpers
 
-    /// Build `sidebarOrder` from the flat projects array when no order exists yet (migration).
+    /// Build `sidebarOrder` from the flat workspaces array when no order exists yet (migration).
     func ensureSidebarOrder() {
-        guard sidebarOrder.isEmpty, !projects.isEmpty else { return }
-        sidebarOrder = projects.map { .project($0.id) }
+        guard sidebarOrder.isEmpty, !workspaces.isEmpty else { return }
+        sidebarOrder = workspaces.map { .project($0.id) }
     }
 
-    /// Remove a project from sidebarOrder and all folders' projectIds.
+    /// Remove a project from sidebarOrder and all folders' workspaceIds.
     func removeSidebarReference(projectId: UUID) {
         sidebarOrder.removeAll { item in
             if case .project(let id) = item, id == projectId { return true }
             return false
         }
         for folder in sidebarGroups {
-            folder.projectIds.removeAll { $0 == projectId }
+            folder.workspaceIds.removeAll { $0 == projectId }
         }
     }
 
-    /// Look up a ProjectItem by id.
-    func projectById(_ id: UUID) -> ProjectItem? {
-        projects.first { $0.id == id }
+    /// Look up a WorkspaceItem by id.
+    func workspaceById(_ id: UUID) -> WorkspaceItem? {
+        workspaces.first { $0.id == id }
     }
 
-    /// Returns the flat index into `projects` for a given project id, or -1.
-    func projectIndex(forId id: UUID) -> Int {
-        projects.firstIndex { $0.id == id } ?? -1
+    /// Returns the flat index into `workspaces` for a given project id, or -1.
+    func workspaceIndex(forId id: UUID) -> Int {
+        workspaces.firstIndex { $0.id == id } ?? -1
     }
 
     // MARK: - Sidebar Rebuild
@@ -67,7 +67,7 @@ extension DeckardWindowController {
         let cmdHeld = !revealMods.isEmpty && NSEvent.modifierFlags.contains(revealMods)
         var shortcutForProjectIndex: [Int: String] = [:]
         if cmdHeld {
-            for (pos, pi) in projectIndicesInSidebarOrder().prefix(10).enumerated() {
+            for (pos, pi) in workspaceIndicesInSidebarOrder().prefix(10).enumerated() {
                 shortcutForProjectIndex[pi] = "\((pos + 1) % 10)"
             }
         }
@@ -80,10 +80,10 @@ extension DeckardWindowController {
         for sidebarItem in sidebarOrder {
             switch sidebarItem {
             case .project(let projectId):
-                guard let project = projectById(projectId) else { continue }
-                let pi = projectIndex(forId: projectId)
+                guard let project = workspaceById(projectId) else { continue }
+                let pi = workspaceIndex(forId: projectId)
                 let row = VerticalTabRowView(title: project.name, bold: false, index: pi,
-                                     target: self, action: #selector(projectRowClicked(_:)))
+                                     target: self, action: #selector(workspaceRowClicked(_:)))
                 row.shortcutBadge = shortcutForProjectIndex[pi]
                 row.badgeInfos = project.tabs.filter { $0.badgeState != .none }.map { tab in
                     (state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id])
@@ -101,7 +101,7 @@ extension DeckardWindowController {
                 }
                 row.onContextMenu = { [weak self] event in
                     guard let self = self else { return nil }
-                    return self.buildProjectContextMenu(for: project)
+                    return self.buildWorkspaceContextMenu(for: project)
                 }
                 sidebarStackView.addArrangedSubview(row)
                 row.leadingAnchor.constraint(equalTo: sidebarStackView.leadingAnchor).isActive = true
@@ -113,22 +113,22 @@ extension DeckardWindowController {
                 // Folder header
                 let folderView = SidebarGroupView(
                     folder: folder,
-                    projectCount: folder.projectIds.count
+                    projectCount: folder.workspaceIds.count
                 )
                 folderView.onToggle = { [weak self] fv in
                     self?.groupToggleClicked(fv)
                 }
                 folderView.onDrop = { [weak self] fv, fromIndex in
                     guard let self else { return }
-                    guard fromIndex >= 0, fromIndex < self.projects.count else { return }
-                    let project = self.projects[fromIndex]
-                    self.moveProjectIntoGroup(projectId: project.id, folder: fv.folder)
+                    guard fromIndex >= 0, fromIndex < self.workspaces.count else { return }
+                    let project = self.workspaces[fromIndex]
+                    self.moveWorkspaceIntoGroup(projectId: project.id, folder: fv.folder)
                 }
 
-                // Aggregate badge infos from all projects in the folder
+                // Aggregate badge infos from all workspaces in the folder
                 var aggregatedBadges: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?)] = []
-                for pid in folder.projectIds {
-                    if let project = projectById(pid) {
+                for pid in folder.workspaceIds {
+                    if let project = workspaceById(pid) {
                         for tab in project.tabs where tab.badgeState != .none {
                             aggregatedBadges.append((state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id]))
                         }
@@ -151,13 +151,13 @@ extension DeckardWindowController {
                 folderView.trailingAnchor.constraint(equalTo: sidebarStackView.trailingAnchor).isActive = true
                 rowIndex += 1
 
-                // Render projects inside the folder (if not collapsed)
+                // Render workspaces inside the folder (if not collapsed)
                 if !folder.isCollapsed {
-                    for projectId in folder.projectIds {
-                        guard let project = projectById(projectId) else { continue }
-                        let pi = projectIndex(forId: projectId)
+                    for projectId in folder.workspaceIds {
+                        guard let project = workspaceById(projectId) else { continue }
+                        let pi = workspaceIndex(forId: projectId)
                         let row = VerticalTabRowView(title: project.name, bold: false, index: pi,
-                                             target: self, action: #selector(projectRowClicked(_:)))
+                                             target: self, action: #selector(workspaceRowClicked(_:)))
                         row.indent = 16
                         row.shortcutBadge = shortcutForProjectIndex[pi]
                         row.badgeInfos = project.tabs.filter { $0.badgeState != .none }.map { tab in
@@ -176,7 +176,7 @@ extension DeckardWindowController {
                         }
                         row.onContextMenu = { [weak self] event in
                             guard let self = self else { return nil }
-                            return self.buildProjectContextMenu(for: project)
+                            return self.buildWorkspaceContextMenu(for: project)
                         }
                         sidebarStackView.addArrangedSubview(row)
                         row.leadingAnchor.constraint(equalTo: sidebarStackView.leadingAnchor).isActive = true
@@ -188,7 +188,7 @@ extension DeckardWindowController {
             }
         }
 
-        sidebarStackView.registerForDraggedTypes([deckardProjectDragType, deckardSidebarDragType, deckardGroupDragType])
+        sidebarStackView.registerForDraggedTypes([deckardWorkspaceDragType, deckardSidebarDragType, deckardGroupDragType])
         sidebarStackView.onReorder = { [weak self] from, to, forceTopLevel in
             self?.handleSidebarDragReorder(fromProjectIndex: from, toRow: to, forceTopLevel: forceTopLevel)
         }
@@ -199,11 +199,11 @@ extension DeckardWindowController {
             self?.handleGroupDragReorder(fromRow: fromRow, toRow: toRow)
         }
         sidebarDropZone.onDrop = { [weak self] fromIndex in
-            guard let self = self, fromIndex >= 0, fromIndex < self.projects.count else { return }
-            let project = self.projects[fromIndex]
+            guard let self = self, fromIndex >= 0, fromIndex < self.workspaces.count else { return }
+            let project = self.workspaces[fromIndex]
             // If the project was inside a folder, move it out first
-            if self.sidebarGroups.contains(where: { $0.projectIds.contains(project.id) }) {
-                self.moveProjectOutOfGroup(projectId: project.id)
+            if self.sidebarGroups.contains(where: { $0.workspaceIds.contains(project.id) }) {
+                self.moveWorkspaceOutOfGroup(projectId: project.id)
             }
             // Move the sidebarOrder item to the end
             self.sidebarOrder.removeAll { item in
@@ -211,7 +211,7 @@ extension DeckardWindowController {
                 return false
             }
             self.sidebarOrder.append(.project(project.id))
-            self.reorderProject(from: fromIndex, to: self.projects.count)
+            self.reorderWorkspace(from: fromIndex, to: self.workspaces.count)
         }
         sidebarDropZone.onGroupDrop = { [weak self] fromRow in
             guard let self else { return }
@@ -240,22 +240,22 @@ extension DeckardWindowController {
         updateSidebarSelection()
     }
 
-    func reorderProject(from fromIndex: Int, to toIndex: Int) {
+    func reorderWorkspace(from fromIndex: Int, to toIndex: Int) {
         guard fromIndex != toIndex,
-              fromIndex >= 0, fromIndex < projects.count,
-              toIndex >= 0, toIndex <= projects.count else { return }
+              fromIndex >= 0, fromIndex < workspaces.count,
+              toIndex >= 0, toIndex <= workspaces.count else { return }
 
-        let project = projects.remove(at: fromIndex)
+        let project = workspaces.remove(at: fromIndex)
         let insertAt = toIndex > fromIndex ? toIndex - 1 : toIndex
-        projects.insert(project, at: min(insertAt, projects.count))
+        workspaces.insert(project, at: min(insertAt, workspaces.count))
 
         // Update selected index
-        if selectedProjectIndex == fromIndex {
-            selectedProjectIndex = insertAt
-        } else if fromIndex < selectedProjectIndex && insertAt >= selectedProjectIndex {
-            selectedProjectIndex -= 1
-        } else if fromIndex > selectedProjectIndex && insertAt <= selectedProjectIndex {
-            selectedProjectIndex += 1
+        if selectedWorkspaceIndex == fromIndex {
+            selectedWorkspaceIndex = insertAt
+        } else if fromIndex < selectedWorkspaceIndex && insertAt >= selectedWorkspaceIndex {
+            selectedWorkspaceIndex -= 1
+        } else if fromIndex > selectedWorkspaceIndex && insertAt <= selectedWorkspaceIndex {
+            selectedWorkspaceIndex += 1
         }
 
         rebuildSidebar()
@@ -290,7 +290,7 @@ extension DeckardWindowController {
                     parentFolder: nil, childIndexInFolder: nil,
                     projectId: nil, groupId: folder.id))
                 if !folder.isCollapsed {
-                    for (ci, pid) in folder.projectIds.enumerated() {
+                    for (ci, pid) in folder.workspaceIds.enumerated() {
                         infos.append(SidebarRowInfo(
                             sidebarOrderIndex: orderIdx, isFolder: false,
                             parentFolder: folder, childIndexInFolder: ci,
@@ -305,16 +305,16 @@ extension DeckardWindowController {
     // MARK: - Sidebar Drag Handling
 
     /// Handle drag reorder in the sidebar.
-    /// `fromProjectIndex` is the flat projects array index (from the pasteboard).
+    /// `fromProjectIndex` is the flat workspaces array index (from the pasteboard).
     /// `toRow` is the stack view row index of the drop target.
     func handleSidebarDragReorder(fromProjectIndex: Int, toRow: Int, forceTopLevel: Bool = false) {
-        guard fromProjectIndex >= 0, fromProjectIndex < projects.count else { return }
-        let draggedProject = projects[fromProjectIndex]
+        guard fromProjectIndex >= 0, fromProjectIndex < workspaces.count else { return }
+        let draggedProject = workspaces[fromProjectIndex]
         let infos = sidebarRowInfos()
         guard toRow >= 0, toRow < infos.count else {
             // Drop past the end — move to top level at the end
-            let wasInFolder = sidebarGroups.contains { $0.projectIds.contains(draggedProject.id) }
-            if wasInFolder { moveProjectOutOfGroup(projectId: draggedProject.id) }
+            let wasInFolder = sidebarGroups.contains { $0.workspaceIds.contains(draggedProject.id) }
+            if wasInFolder { moveWorkspaceOutOfGroup(projectId: draggedProject.id) }
             sidebarOrder.removeAll { if case .project(let id) = $0, id == draggedProject.id { return true }; return false }
             sidebarOrder.append(.project(draggedProject.id))
             rebuildSidebar()
@@ -338,21 +338,21 @@ extension DeckardWindowController {
         } else if !forceTopLevel, toRow > 0, toRow - 1 < infos.count, let prevFolder = infos[toRow - 1].parentFolder {
             // The previous row is a folder child — we're inserting at the end of that folder
             effectiveFolder = prevFolder
-            effectiveChildIndex = prevFolder.projectIds.count
+            effectiveChildIndex = prevFolder.workspaceIds.count
         } else {
             effectiveFolder = nil
             effectiveChildIndex = nil
         }
 
         // Dropping between items inside the same folder → reorder within folder
-        let sourceFolder = sidebarGroups.first { $0.projectIds.contains(draggedProject.id) }
+        let sourceFolder = sidebarGroups.first { $0.workspaceIds.contains(draggedProject.id) }
         if let targetFolder = effectiveFolder, let sf = sourceFolder, sf.id == targetFolder.id {
             // Reorder within the same folder
-            guard let fromIdx = sf.projectIds.firstIndex(of: draggedProject.id),
+            guard let fromIdx = sf.workspaceIds.firstIndex(of: draggedProject.id),
                   let toIdx = effectiveChildIndex else { return }
-            sf.projectIds.remove(at: fromIdx)
-            let insertAt = toIdx > fromIdx ? min(toIdx - 1, sf.projectIds.count) : toIdx
-            sf.projectIds.insert(draggedProject.id, at: insertAt)
+            sf.workspaceIds.remove(at: fromIdx)
+            let insertAt = toIdx > fromIdx ? min(toIdx - 1, sf.workspaceIds.count) : toIdx
+            sf.workspaceIds.insert(draggedProject.id, at: insertAt)
             rebuildSidebar()
             saveState()
             return
@@ -362,15 +362,15 @@ extension DeckardWindowController {
         if let targetFolder = effectiveFolder {
             // Remove from source folder if needed
             if let sf = sourceFolder {
-                sf.projectIds.removeAll { $0 == draggedProject.id }
+                sf.workspaceIds.removeAll { $0 == draggedProject.id }
             } else {
                 // Remove from top-level sidebarOrder
                 sidebarOrder.removeAll { if case .project(let id) = $0, id == draggedProject.id { return true }; return false }
             }
             // Insert at position in target folder
-            let insertAt = toInfo.childIndexInFolder ?? targetFolder.projectIds.count
-            if !targetFolder.projectIds.contains(draggedProject.id) {
-                targetFolder.projectIds.insert(draggedProject.id, at: min(insertAt, targetFolder.projectIds.count))
+            let insertAt = toInfo.childIndexInFolder ?? targetFolder.workspaceIds.count
+            if !targetFolder.workspaceIds.contains(draggedProject.id) {
+                targetFolder.workspaceIds.insert(draggedProject.id, at: min(insertAt, targetFolder.workspaceIds.count))
             }
             rebuildSidebar()
             saveState()
@@ -379,7 +379,7 @@ extension DeckardWindowController {
 
         // Dropping at top level — reorder in sidebarOrder
         if let sf = sourceFolder {
-            sf.projectIds.removeAll { $0 == draggedProject.id }
+            sf.workspaceIds.removeAll { $0 == draggedProject.id }
             // Add as top-level project in sidebarOrder at the target position
             let targetOrderIdx = toInfo.sidebarOrderIndex
             // Remove existing top-level entry if any
@@ -398,10 +398,10 @@ extension DeckardWindowController {
             }
         }
 
-        // Also reorder in the flat projects array
+        // Also reorder in the flat workspaces array
         let fromPi = fromProjectIndex
-        if let pid = toInfo.projectId, let toPi = projects.firstIndex(where: { $0.id == pid }), fromPi != toPi {
-            reorderProject(from: fromPi, to: toPi)
+        if let pid = toInfo.projectId, let toPi = workspaces.firstIndex(where: { $0.id == pid }), fromPi != toPi {
+            reorderWorkspace(from: fromPi, to: toPi)
         } else {
             rebuildSidebar()
             saveState()
@@ -427,7 +427,7 @@ extension DeckardWindowController {
     }
 
     func deleteSidebarGroup(_ folder: SidebarGroup) {
-        // Move all projects inside the folder back to top level (ungrouped)
+        // Move all workspaces inside the folder back to top level (ungrouped)
         let orderIndex = sidebarOrder.firstIndex(where: {
             if case .group(let f) = $0, f.id == folder.id { return true }
             return false
@@ -437,7 +437,7 @@ extension DeckardWindowController {
         if let idx = orderIndex {
             sidebarOrder.remove(at: idx)
             var insertIdx = idx
-            for pid in folder.projectIds {
+            for pid in folder.workspaceIds {
                 sidebarOrder.insert(.project(pid), at: insertIdx)
                 insertIdx += 1
             }
@@ -448,32 +448,32 @@ extension DeckardWindowController {
         saveState()
     }
 
-    func moveProjectIntoGroup(projectId: UUID, folder: SidebarGroup) {
+    func moveWorkspaceIntoGroup(projectId: UUID, folder: SidebarGroup) {
         // Remove project from current location (top-level or another folder)
         sidebarOrder.removeAll { item in
             if case .project(let id) = item, id == projectId { return true }
             return false
         }
         for f in sidebarGroups where f.id != folder.id {
-            f.projectIds.removeAll { $0 == projectId }
+            f.workspaceIds.removeAll { $0 == projectId }
         }
 
         // Add to target folder
-        if !folder.projectIds.contains(projectId) {
-            folder.projectIds.append(projectId)
+        if !folder.workspaceIds.contains(projectId) {
+            folder.workspaceIds.append(projectId)
         }
 
-        // Auto-expand folder when adding projects
+        // Auto-expand folder when adding workspaces
         folder.isCollapsed = false
 
         rebuildSidebar()
         saveState()
     }
 
-    func moveProjectOutOfGroup(projectId: UUID) {
+    func moveWorkspaceOutOfGroup(projectId: UUID) {
         // Find which folder contains this project
-        guard let folder = sidebarGroups.first(where: { $0.projectIds.contains(projectId) }) else { return }
-        folder.projectIds.removeAll { $0 == projectId }
+        guard let folder = sidebarGroups.first(where: { $0.workspaceIds.contains(projectId) }) else { return }
+        folder.workspaceIds.removeAll { $0 == projectId }
 
         // Insert as ungrouped project right after the folder in sidebarOrder
         if let folderIdx = sidebarOrder.firstIndex(where: {
@@ -494,13 +494,13 @@ extension DeckardWindowController {
         sender.folder.isCollapsed.toggle()
 
         // If collapsing a folder that contains the selected project, auto-expand it instead
-        if sender.folder.isCollapsed, let current = currentProject,
-           sender.folder.projectIds.contains(current.id) {
+        if sender.folder.isCollapsed, let current = currentWorkspace,
+           sender.folder.workspaceIds.contains(current.id) {
             sender.folder.isCollapsed = false
         }
 
         DiagnosticLog.shared.log("sidebar",
-            "groupToggle: \(sender.folder.name) was=\(wasCollapsed) now=\(sender.folder.isCollapsed) projects=\(sender.folder.projectIds.count)")
+            "groupToggle: \(sender.folder.name) was=\(wasCollapsed) now=\(sender.folder.isCollapsed) workspaces=\(sender.folder.workspaceIds.count)")
 
         rebuildSidebar()
         saveState()
@@ -575,7 +575,7 @@ extension DeckardWindowController {
 
     // MARK: - Project Context Menu
 
-    func buildProjectContextMenu(for project: ProjectItem) -> NSMenu {
+    func buildWorkspaceContextMenu(for project: WorkspaceItem) -> NSMenu {
         let menu = NSMenu()
 
         let exploreItem = NSMenuItem(title: "Explore Sessions", action: #selector(exploreSessionsMenuAction(_:)), keyEquivalent: "")
@@ -597,10 +597,10 @@ extension DeckardWindowController {
         menu.addItem(.separator())
 
         // Folder options
-        let isInFolder = sidebarGroups.contains { $0.projectIds.contains(project.id) }
+        let isInFolder = sidebarGroups.contains { $0.workspaceIds.contains(project.id) }
 
         if isInFolder {
-            let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveProjectOutOfGroupAction(_:)), keyEquivalent: "")
+            let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveWorkspaceOutOfGroupAction(_:)), keyEquivalent: "")
             moveOutItem.setShortcut(for: .moveOutOfGroup)
             moveOutItem.target = self
             moveOutItem.representedObject = project
@@ -609,7 +609,7 @@ extension DeckardWindowController {
             let moveToItem = NSMenuItem(title: "Move to Group", action: nil, keyEquivalent: "")
             let moveSubmenu = NSMenu()
             for folder in sidebarGroups {
-                let item = NSMenuItem(title: folder.name, action: #selector(moveProjectToGroupAction(_:)), keyEquivalent: "")
+                let item = NSMenuItem(title: folder.name, action: #selector(moveWorkspaceToGroupAction(_:)), keyEquivalent: "")
                 item.target = self
                 item.representedObject = MoveToGroupInfo(project: project, folder: folder)
                 moveSubmenu.addItem(item)
@@ -627,8 +627,8 @@ extension DeckardWindowController {
 
         menu.addItem(.separator())
 
-        let closeItem = NSMenuItem(title: "Close Workspace", action: #selector(closeProjectMenuAction(_:)), keyEquivalent: "")
-        closeItem.setShortcut(for: .closeFolder)
+        let closeItem = NSMenuItem(title: "Close Workspace", action: #selector(closeWorkspaceMenuAction(_:)), keyEquivalent: "")
+        closeItem.setShortcut(for: .closeWorkspace)
         closeItem.target = self
         closeItem.representedObject = project
         menu.addItem(closeItem)
@@ -637,36 +637,36 @@ extension DeckardWindowController {
     }
 
     class MoveToGroupInfo {
-        let project: ProjectItem
+        let project: WorkspaceItem
         let folder: SidebarGroup
-        init(project: ProjectItem, folder: SidebarGroup) {
+        init(project: WorkspaceItem, folder: SidebarGroup) {
             self.project = project
             self.folder = folder
         }
     }
 
-    @objc func moveProjectToGroupAction(_ sender: NSMenuItem) {
+    @objc func moveWorkspaceToGroupAction(_ sender: NSMenuItem) {
         guard let info = sender.representedObject as? MoveToGroupInfo else { return }
-        moveProjectIntoGroup(projectId: info.project.id, folder: info.folder)
+        moveWorkspaceIntoGroup(projectId: info.project.id, folder: info.folder)
     }
 
-    @objc func moveProjectOutOfGroupAction(_ sender: NSMenuItem) {
-        guard let project = sender.representedObject as? ProjectItem else { return }
-        moveProjectOutOfGroup(projectId: project.id)
+    @objc func moveWorkspaceOutOfGroupAction(_ sender: NSMenuItem) {
+        guard let project = sender.representedObject as? WorkspaceItem else { return }
+        moveWorkspaceOutOfGroup(projectId: project.id)
     }
 
     @objc func newGroupMenuAction() {
         createSidebarGroup()
     }
 
-    @objc func closeProjectMenuAction(_ sender: NSMenuItem) {
-        guard let project = sender.representedObject as? ProjectItem,
-              let pi = projects.firstIndex(where: { $0.id == project.id }) else { return }
+    @objc func closeWorkspaceMenuAction(_ sender: NSMenuItem) {
+        guard let project = sender.representedObject as? WorkspaceItem,
+              let pi = workspaces.firstIndex(where: { $0.id == project.id }) else { return }
         closeProject(at: pi)
     }
 
     @objc func exploreSessionsMenuAction(_ sender: NSMenuItem) {
-        guard let project = sender.representedObject as? ProjectItem else { return }
+        guard let project = sender.representedObject as? WorkspaceItem else { return }
 
         // If an explorer window already exists for this project, bring it to front
         let expectedTitle = "Sessions — \(project.name)"
@@ -688,7 +688,7 @@ extension DeckardWindowController {
             guard let self else { return }
             self.createTabInProject(project, kind: kind, name: tabName, sessionIdToResume: sessionId, forkSession: fork)
             project.selectedTabIndex = project.tabs.count - 1
-            if let idx = self.projects.firstIndex(where: { $0 === project }) {
+            if let idx = self.workspaces.firstIndex(where: { $0 === project }) {
                 self.selectProject(at: idx)
             }
             self.rebuildTabBar()
@@ -704,7 +704,7 @@ extension DeckardWindowController {
     }
 
     @objc func defaultArgsMenuAction(_ sender: NSMenuItem) {
-        guard let project = sender.representedObject as? ProjectItem,
+        guard let project = sender.representedObject as? WorkspaceItem,
               let window else { return }
 
         let alert = NSAlert()
@@ -726,7 +726,7 @@ extension DeckardWindowController {
     }
 
     @objc func defaultCodexArgsMenuAction(_ sender: NSMenuItem) {
-        guard let project = sender.representedObject as? ProjectItem,
+        guard let project = sender.representedObject as? WorkspaceItem,
               let window else { return }
 
         let alert = NSAlert()
@@ -753,7 +753,7 @@ extension DeckardWindowController {
     // MARK: - Sidebar Selection
 
     func updateSidebarSelection() {
-        guard let currentProjectId = currentProject?.id else {
+        guard let currentProjectId = currentWorkspace?.id else {
             for view in sidebarStackView.arrangedSubviews {
                 if let row = view as? VerticalTabRowView {
                     row.isSelected = false
@@ -763,10 +763,10 @@ extension DeckardWindowController {
         }
         for view in sidebarStackView.arrangedSubviews {
             if let row = view as? VerticalTabRowView {
-                row.isSelected = (row.index == selectedProjectIndex)
+                row.isSelected = (row.index == selectedWorkspaceIndex)
             } else if let fv = view as? SidebarGroupView {
                 // Highlight folder if it contains the selected project
-                fv.isContainingSelected = fv.folder.projectIds.contains(currentProjectId) && fv.folder.isCollapsed
+                fv.isContainingSelected = fv.folder.workspaceIds.contains(currentProjectId) && fv.folder.isCollapsed
             }
         }
     }
@@ -775,7 +775,7 @@ extension DeckardWindowController {
         AppDelegate.shared?.openProjectPicker()
     }
 
-    @objc func projectRowClicked(_ sender: VerticalTabRowView) {
+    @objc func workspaceRowClicked(_ sender: VerticalTabRowView) {
         selectProject(at: sender.index)
     }
 }

@@ -2,16 +2,16 @@ import AppKit
 import KeyboardShortcuts
 
 extension KeyboardShortcuts.Name {
-    static let openFolder = Self("openFolder", default: .init(.o, modifiers: .command))
+    static let openWorkspace = Self("openWorkspace", default: .init(.o, modifiers: .command))
     static let newClaudeTab = Self("newClaudeTab", default: .init(.t, modifiers: .command))
     static let newCodexTab = Self("newCodexTab", default: .init(.t, modifiers: [.command, .option]))
     static let newTerminalTab = Self("newTerminalTab", default: .init(.t, modifiers: [.command, .shift]))
     static let closeTab = Self("closeTab", default: .init(.w, modifiers: .command))
-    static let closeFolder = Self("closeFolder", default: .init(.w, modifiers: [.command, .shift]))
+    static let closeWorkspace = Self("closeWorkspace", default: .init(.w, modifiers: [.command, .shift]))
     static let nextTab = Self("nextTab", default: .init(.rightBracket, modifiers: [.command, .shift]))
     static let previousTab = Self("previousTab", default: .init(.leftBracket, modifiers: [.command, .shift]))
-    static let nextProject = Self("nextProject", default: .init(.rightBracket, modifiers: [.command, .option]))
-    static let previousProject = Self("previousProject", default: .init(.leftBracket, modifiers: [.command, .option]))
+    static let nextWorkspace = Self("nextWorkspace", default: .init(.rightBracket, modifiers: [.command, .option]))
+    static let previousWorkspace = Self("previousWorkspace", default: .init(.leftBracket, modifiers: [.command, .option]))
     static let toggleSidebar = Self("toggleSidebar", default: .init(.s, modifiers: [.command, .control]))
     static let exploreSessions = Self("exploreSessions", default: .init(.e, modifiers: [.command, .shift]))
     static let newGroup = Self("newGroup", default: .init(.n, modifiers: [.command, .option]))
@@ -36,16 +36,16 @@ struct ShortcutEntry {
 }
 
 let configurableShortcuts: [ShortcutEntry] = [
-    ShortcutEntry(name: .openFolder, label: "Open Workspace"),
+    ShortcutEntry(name: .openWorkspace, label: "Open Workspace"),
     ShortcutEntry(name: .newClaudeTab, label: "New Claude Tab"),
     ShortcutEntry(name: .newCodexTab, label: "New Codex Tab"),
     ShortcutEntry(name: .newTerminalTab, label: "New Terminal Tab"),
     ShortcutEntry(name: .closeTab, label: "Close Tab"),
-    ShortcutEntry(name: .closeFolder, label: "Close Workspace"),
+    ShortcutEntry(name: .closeWorkspace, label: "Close Workspace"),
     ShortcutEntry(name: .nextTab, label: "Next Tab"),
     ShortcutEntry(name: .previousTab, label: "Previous Tab"),
-    ShortcutEntry(name: .nextProject, label: "Next Workspace"),
-    ShortcutEntry(name: .previousProject, label: "Previous Workspace"),
+    ShortcutEntry(name: .nextWorkspace, label: "Next Workspace"),
+    ShortcutEntry(name: .previousWorkspace, label: "Previous Workspace"),
     ShortcutEntry(name: .toggleSidebar, label: "Toggle Sidebar"),
     ShortcutEntry(name: .exploreSessions, label: "Explore Sessions"),
     ShortcutEntry(name: .newGroup, label: "New Group"),
@@ -72,12 +72,17 @@ let tabShortcutNames: [KeyboardShortcuts.Name] = [
 /// flag so it only runs once. KeyboardShortcuts persists each override under
 /// `KeyboardShortcuts_<name>` (see KeyboardShortcuts.swift in the upstream).
 enum DeckardShortcutMigration {
-    static let migrationFlagKey = "shortcutsMigratedToGroupNames"
+    static let migrationFlagKey = "shortcutsMigratedToWorkspaceAndGroupNames"
 
-    /// Old identifier → new identifier renames for the folder→group commit.
+    /// Old identifier → new identifier renames covering both the folder→group
+    /// and project→workspace renames in the folder/project terminology refactor.
     static let renames: [(oldName: String, newName: String)] = [
         ("newSidebarFolder", "newGroup"),
         ("moveOutOfFolder", "moveOutOfGroup"),
+        ("openFolder", "openWorkspace"),
+        ("closeFolder", "closeWorkspace"),
+        ("nextProject", "nextWorkspace"),
+        ("previousProject", "previousWorkspace"),
     ]
 
     static func migrate(defaults: UserDefaults = .standard) {

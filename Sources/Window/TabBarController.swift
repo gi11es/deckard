@@ -31,7 +31,7 @@ extension DeckardWindowController {
         savedFirstResponder = window?.firstResponder
 
         tabBar.arrangedSubviews.forEach { $0.removeFromSuperview() }
-        guard let project = currentProject else { return }
+        guard let project = currentWorkspace else { return }
 
         for (i, tab) in project.tabs.enumerated() {
             let isSelected = (i == project.selectedTabIndex)
@@ -49,7 +49,7 @@ extension DeckardWindowController {
                 clickAction: #selector(tabBarClicked(_:))
             )
             tabView.onRename = { [weak self] newName in
-                guard let self = self, let project = self.currentProject,
+                guard let self = self, let project = self.currentWorkspace,
                       i < project.tabs.count else { return }
                 let tab = project.tabs[i]
                 tab.name = newName
@@ -60,7 +60,7 @@ extension DeckardWindowController {
                 self.saveState()
             }
             tabView.onClearName = { [weak self] in
-                guard let self = self, let project = self.currentProject,
+                guard let self = self, let project = self.currentWorkspace,
                       i < project.tabs.count else { return }
                 let tab = project.tabs[i]
                 let base = tab.kind.displayName
@@ -115,7 +115,7 @@ extension DeckardWindowController {
     }
 
     func reorderTab(from fromIndex: Int, to toIndex: Int) {
-        guard let project = currentProject else { return }
+        guard let project = currentWorkspace else { return }
         guard fromIndex != toIndex,
               fromIndex >= 0, fromIndex < project.tabs.count,
               toIndex >= 0, toIndex <= project.tabs.count else { return }
@@ -142,7 +142,7 @@ extension DeckardWindowController {
     }
 
     @objc func tabBarCloseClicked(_ sender: NSButton) {
-        guard let project = currentProject else { return }
+        guard let project = currentWorkspace else { return }
         let idx = sender.tag
         guard idx >= 0, idx < project.tabs.count else { return }
 

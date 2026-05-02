@@ -2,8 +2,8 @@ import AppKit
 import Fuse
 
 /// A Spotlight-style project picker that appears when creating a new Claude tab.
-/// Shows recent projects from ~/.claude/projects/, sorted by recency.
-class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate, NSWindowDelegate {
+/// Shows recent workspaces from ~/.claude/projects/, sorted by recency.
+class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTextFieldDelegate, NSWindowDelegate {
 
     typealias Completion = (String?) -> Void  // nil = cancelled, String = chosen path
 
@@ -92,7 +92,7 @@ class ProjectPicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NSTex
     }
 
     /// Show the picker centered on the given window.
-    /// `excludePaths` are already-open projects that should be hidden from the list.
+    /// `excludePaths` are already-open workspaces that should be hidden from the list.
     func show(relativeTo window: NSWindow?, completion: @escaping Completion) {
         self.completion = completion
 
