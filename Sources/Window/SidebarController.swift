@@ -13,7 +13,7 @@ extension DeckardWindowController {
         sidebarOrder = workspaces.map { .workspace($0.id) }
     }
 
-    /// Remove a workspace from sidebarOrder and all folders' workspaceIds.
+    /// Remove a workspace from sidebarOrder and all groups' workspaceIds.
     func removeSidebarReference(workspaceId: UUID) {
         sidebarOrder.removeAll { item in
             if case .workspace(let id) = item, id == workspaceId { return true }
@@ -65,10 +65,10 @@ extension DeckardWindowController {
         // Check current modifier state to pre-set shortcut indicators on new rows
         let revealMods = revealNumbersModifiers()
         let cmdHeld = !revealMods.isEmpty && NSEvent.modifierFlags.contains(revealMods)
-        var shortcutForProjectIndex: [Int: String] = [:]
+        var shortcutForWorkspaceIndex: [Int: String] = [:]
         if cmdHeld {
             for (pos, pi) in workspaceIndicesInSidebarOrder().prefix(10).enumerated() {
-                shortcutForProjectIndex[pi] = "\((pos + 1) % 10)"
+                shortcutForWorkspaceIndex[pi] = "\((pos + 1) % 10)"
             }
         }
 
@@ -84,7 +84,7 @@ extension DeckardWindowController {
                 let pi = workspaceIndex(forId: workspaceId)
                 let row = VerticalTabRowView(title: workspace.name, bold: false, index: pi,
                                      target: self, action: #selector(workspaceRowClicked(_:)))
-                row.shortcutBadge = shortcutForProjectIndex[pi]
+                row.shortcutBadge = shortcutForWorkspaceIndex[pi]
                 row.badgeInfos = workspace.tabs.filter { $0.badgeState != .none }.map { tab in
                     (state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id])
                 }
@@ -110,15 +110,15 @@ extension DeckardWindowController {
                 rowIndex += 1
 
             case .group(let group):
-                // Folder header
-                let folderView = SidebarGroupView(
+                // Group header
+                let groupView = SidebarGroupView(
                     group: group,
-                    projectCount: group.workspaceIds.count
+                    workspaceCount: group.workspaceIds.count
                 )
-                folderView.onToggle = { [weak self] fv in
+                groupView.onToggle = { [weak self] fv in
                     self?.groupToggleClicked(fv)
                 }
-                folderView.onDrop = { [weak self] fv, fromIndex in
+                groupView.onDrop = { [weak self] fv, fromIndex in
                     guard let self else { return }
                     guard fromIndex >= 0, fromIndex < self.workspaces.count else { return }
                     let workspace = self.workspaces[fromIndex]
@@ -134,21 +134,21 @@ extension DeckardWindowController {
                         }
                     }
                 }
-                folderView.badgeInfos = aggregatedBadges
+                groupView.badgeInfos = aggregatedBadges
 
-                folderView.onRename = { [weak self] newName in
+                groupView.onRename = { [weak self] newName in
                     guard let self = self else { return }
                     group.name = newName
                     self.saveState()
                 }
-                folderView.onContextMenu = { [weak self] event in
+                groupView.onContextMenu = { [weak self] event in
                     guard let self = self else { return nil }
                     return self.buildGroupContextMenu(for: group)
                 }
-                folderView.rowIndex = rowIndex
-                sidebarStackView.addArrangedSubview(folderView)
-                folderView.leadingAnchor.constraint(equalTo: sidebarStackView.leadingAnchor).isActive = true
-                folderView.trailingAnchor.constraint(equalTo: sidebarStackView.trailingAnchor).isActive = true
+                groupView.rowIndex = rowIndex
+                sidebarStackView.addArrangedSubview(groupView)
+                groupView.leadingAnchor.constraint(equalTo: sidebarStackView.leadingAnchor).isActive = true
+                groupView.trailingAnchor.constraint(equalTo: sidebarStackView.trailingAnchor).isActive = true
                 rowIndex += 1
 
                 // Render workspaces inside the group (if not collapsed)
@@ -159,7 +159,7 @@ extension DeckardWindowController {
                         let row = VerticalTabRowView(title: workspace.name, bold: false, index: pi,
                                              target: self, action: #selector(workspaceRowClicked(_:)))
                         row.indent = 16
-                        row.shortcutBadge = shortcutForProjectIndex[pi]
+                        row.shortcutBadge = shortcutForWorkspaceIndex[pi]
                         row.badgeInfos = workspace.tabs.filter { $0.badgeState != .none }.map { tab in
                             (state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id])
                         }
@@ -190,10 +190,10 @@ extension DeckardWindowController {
 
         sidebarStackView.registerForDraggedTypes([deckardWorkspaceDragType, deckardSidebarDragType, deckardGroupDragType])
         sidebarStackView.onReorder = { [weak self] from, to, forceTopLevel in
-            self?.handleSidebarDragReorder(fromProjectIndex: from, toRow: to, forceTopLevel: forceTopLevel)
+            self?.handleSidebarDragReorder(fromWorkspaceIndex: from, toRow: to, forceTopLevel: forceTopLevel)
         }
-        sidebarStackView.onDropOntoGroup = { [weak self] folderView, fromIndex in
-            folderView.onDrop?(folderView, fromIndex)
+        sidebarStackView.onDropOntoGroup = { [weak self] groupView, fromIndex in
+            groupView.onDrop?(groupView, fromIndex)
         }
         sidebarStackView.onGroupReorder = { [weak self] fromRow, toRow in
             self?.handleGroupDragReorder(fromRow: fromRow, toRow: toRow)
@@ -217,7 +217,7 @@ extension DeckardWindowController {
             guard let self else { return }
             // Move group to end of sidebarOrder
             let infos = self.sidebarRowInfos()
-            guard fromRow >= 0, fromRow < infos.count, infos[fromRow].isFolder,
+            guard fromRow >= 0, fromRow < infos.count, infos[fromRow].isGroup,
                   let groupId = infos[fromRow].groupId else { return }
             guard let orderIdx = self.sidebarOrder.firstIndex(where: {
                 if case .group(let f) = $0, f.id == groupId { return true }
@@ -265,12 +265,12 @@ extension DeckardWindowController {
     // MARK: - Sidebar Row Info
 
     /// Maps a sidebar stack view row index to a sidebarOrder-aware identifier.
-    /// Returns (sidebarOrderIndex, isFolder, isFolderChild, parentFolder, childIndex)
+    /// Returns (sidebarOrderIndex, isGroup, isGroupChild, parentGroup, childIndex)
     struct SidebarRowInfo {
         var sidebarOrderIndex: Int
-        var isFolder: Bool
-        var parentFolder: SidebarGroup?
-        var childIndexInFolder: Int?
+        var isGroup: Bool
+        var parentGroup: SidebarGroup?
+        var childIndexInGroup: Int?
         var workspaceId: UUID?
         var groupId: UUID?
     }
@@ -281,19 +281,19 @@ extension DeckardWindowController {
             switch item {
             case .workspace(let pid):
                 infos.append(SidebarRowInfo(
-                    sidebarOrderIndex: orderIdx, isFolder: false,
-                    parentFolder: nil, childIndexInFolder: nil,
+                    sidebarOrderIndex: orderIdx, isGroup: false,
+                    parentGroup: nil, childIndexInGroup: nil,
                     workspaceId: pid, groupId: nil))
             case .group(let group):
                 infos.append(SidebarRowInfo(
-                    sidebarOrderIndex: orderIdx, isFolder: true,
-                    parentFolder: nil, childIndexInFolder: nil,
+                    sidebarOrderIndex: orderIdx, isGroup: true,
+                    parentGroup: nil, childIndexInGroup: nil,
                     workspaceId: nil, groupId: group.id))
                 if !group.isCollapsed {
                     for (ci, pid) in group.workspaceIds.enumerated() {
                         infos.append(SidebarRowInfo(
-                            sidebarOrderIndex: orderIdx, isFolder: false,
-                            parentFolder: group, childIndexInFolder: ci,
+                            sidebarOrderIndex: orderIdx, isGroup: false,
+                            parentGroup: group, childIndexInGroup: ci,
                             workspaceId: pid, groupId: nil))
                     }
                 }
@@ -305,18 +305,18 @@ extension DeckardWindowController {
     // MARK: - Sidebar Drag Handling
 
     /// Handle drag reorder in the sidebar.
-    /// `fromProjectIndex` is the flat workspaces array index (from the pasteboard).
+    /// `fromWorkspaceIndex` is the flat workspaces array index (from the pasteboard).
     /// `toRow` is the stack view row index of the drop target.
-    func handleSidebarDragReorder(fromProjectIndex: Int, toRow: Int, forceTopLevel: Bool = false) {
-        guard fromProjectIndex >= 0, fromProjectIndex < workspaces.count else { return }
-        let draggedProject = workspaces[fromProjectIndex]
+    func handleSidebarDragReorder(fromWorkspaceIndex: Int, toRow: Int, forceTopLevel: Bool = false) {
+        guard fromWorkspaceIndex >= 0, fromWorkspaceIndex < workspaces.count else { return }
+        let draggedWorkspace = workspaces[fromWorkspaceIndex]
         let infos = sidebarRowInfos()
         guard toRow >= 0, toRow < infos.count else {
             // Drop past the end — move to top level at the end
-            let wasInFolder = sidebarGroups.contains { $0.workspaceIds.contains(draggedProject.id) }
-            if wasInFolder { moveWorkspaceOutOfGroup(workspaceId: draggedProject.id) }
-            sidebarOrder.removeAll { if case .workspace(let id) = $0, id == draggedProject.id { return true }; return false }
-            sidebarOrder.append(.workspace(draggedProject.id))
+            let wasInGroup = sidebarGroups.contains { $0.workspaceIds.contains(draggedWorkspace.id) }
+            if wasInGroup { moveWorkspaceOutOfGroup(workspaceId: draggedWorkspace.id) }
+            sidebarOrder.removeAll { if case .workspace(let id) = $0, id == draggedWorkspace.id { return true }; return false }
+            sidebarOrder.append(.workspace(draggedWorkspace.id))
             rebuildSidebar()
             saveState()
             return
@@ -330,47 +330,47 @@ extension DeckardWindowController {
 
         // Determine the target group: either the row itself is a group child,
         // or the row above is (dropping after the last child in a group).
-        let effectiveFolder: SidebarGroup?
+        let effectiveGroup: SidebarGroup?
         let effectiveChildIndex: Int?
-        if let pf = toInfo.parentFolder {
-            effectiveFolder = pf
-            effectiveChildIndex = toInfo.childIndexInFolder
-        } else if !forceTopLevel, toRow > 0, toRow - 1 < infos.count, let prevFolder = infos[toRow - 1].parentFolder {
+        if let pf = toInfo.parentGroup {
+            effectiveGroup = pf
+            effectiveChildIndex = toInfo.childIndexInGroup
+        } else if !forceTopLevel, toRow > 0, toRow - 1 < infos.count, let prevGroup = infos[toRow - 1].parentGroup {
             // The previous row is a group child — we're inserting at the end of that group
-            effectiveFolder = prevFolder
-            effectiveChildIndex = prevFolder.workspaceIds.count
+            effectiveGroup = prevGroup
+            effectiveChildIndex = prevGroup.workspaceIds.count
         } else {
-            effectiveFolder = nil
+            effectiveGroup = nil
             effectiveChildIndex = nil
         }
 
         // Dropping between items inside the same group → reorder within group
-        let sourceFolder = sidebarGroups.first { $0.workspaceIds.contains(draggedProject.id) }
-        if let targetFolder = effectiveFolder, let sf = sourceFolder, sf.id == targetFolder.id {
+        let sourceGroup = sidebarGroups.first { $0.workspaceIds.contains(draggedWorkspace.id) }
+        if let targetGroup = effectiveGroup, let sf = sourceGroup, sf.id == targetGroup.id {
             // Reorder within the same group
-            guard let fromIdx = sf.workspaceIds.firstIndex(of: draggedProject.id),
+            guard let fromIdx = sf.workspaceIds.firstIndex(of: draggedWorkspace.id),
                   let toIdx = effectiveChildIndex else { return }
             sf.workspaceIds.remove(at: fromIdx)
             let insertAt = toIdx > fromIdx ? min(toIdx - 1, sf.workspaceIds.count) : toIdx
-            sf.workspaceIds.insert(draggedProject.id, at: insertAt)
+            sf.workspaceIds.insert(draggedWorkspace.id, at: insertAt)
             rebuildSidebar()
             saveState()
             return
         }
 
         // Dropping between items inside a different group → move into that group at position
-        if let targetFolder = effectiveFolder {
+        if let targetGroup = effectiveGroup {
             // Remove from source group if needed
-            if let sf = sourceFolder {
-                sf.workspaceIds.removeAll { $0 == draggedProject.id }
+            if let sf = sourceGroup {
+                sf.workspaceIds.removeAll { $0 == draggedWorkspace.id }
             } else {
                 // Remove from top-level sidebarOrder
-                sidebarOrder.removeAll { if case .workspace(let id) = $0, id == draggedProject.id { return true }; return false }
+                sidebarOrder.removeAll { if case .workspace(let id) = $0, id == draggedWorkspace.id { return true }; return false }
             }
             // Insert at position in target group
-            let insertAt = toInfo.childIndexInFolder ?? targetFolder.workspaceIds.count
-            if !targetFolder.workspaceIds.contains(draggedProject.id) {
-                targetFolder.workspaceIds.insert(draggedProject.id, at: min(insertAt, targetFolder.workspaceIds.count))
+            let insertAt = toInfo.childIndexInGroup ?? targetGroup.workspaceIds.count
+            if !targetGroup.workspaceIds.contains(draggedWorkspace.id) {
+                targetGroup.workspaceIds.insert(draggedWorkspace.id, at: min(insertAt, targetGroup.workspaceIds.count))
             }
             rebuildSidebar()
             saveState()
@@ -378,17 +378,17 @@ extension DeckardWindowController {
         }
 
         // Dropping at top level — reorder in sidebarOrder
-        if let sf = sourceFolder {
-            sf.workspaceIds.removeAll { $0 == draggedProject.id }
+        if let sf = sourceGroup {
+            sf.workspaceIds.removeAll { $0 == draggedWorkspace.id }
             // Add as top-level workspace in sidebarOrder at the target position
             let targetOrderIdx = toInfo.sidebarOrderIndex
             // Remove existing top-level entry if any
-            sidebarOrder.removeAll { if case .workspace(let id) = $0, id == draggedProject.id { return true }; return false }
-            sidebarOrder.insert(.workspace(draggedProject.id), at: min(targetOrderIdx, sidebarOrder.count))
+            sidebarOrder.removeAll { if case .workspace(let id) = $0, id == draggedWorkspace.id { return true }; return false }
+            sidebarOrder.insert(.workspace(draggedWorkspace.id), at: min(targetOrderIdx, sidebarOrder.count))
         } else if let targetPid = toInfo.workspaceId {
             // Both are top-level — reorder sidebarOrder
             if let fromOrderIdx = sidebarOrder.firstIndex(where: {
-                if case .workspace(let id) = $0, id == draggedProject.id { return true }; return false
+                if case .workspace(let id) = $0, id == draggedWorkspace.id { return true }; return false
             }), let targetOrderIdx = sidebarOrder.firstIndex(where: {
                 if case .workspace(let id) = $0, id == targetPid { return true }; return false
             }) {
@@ -399,7 +399,7 @@ extension DeckardWindowController {
         }
 
         // Also reorder in the flat workspaces array
-        let fromPi = fromProjectIndex
+        let fromPi = fromWorkspaceIndex
         if let pid = toInfo.workspaceId, let toPi = workspaces.firstIndex(where: { $0.id == pid }), fromPi != toPi {
             reorderWorkspace(from: fromPi, to: toPi)
         } else {
@@ -421,8 +421,8 @@ extension DeckardWindowController {
         rebuildSidebar()
         saveState()
         // Start editing the name immediately
-        if let folderView = sidebarStackView.arrangedSubviews.compactMap({ $0 as? SidebarGroupView }).last {
-            folderView.startEditing()
+        if let groupView = sidebarStackView.arrangedSubviews.compactMap({ $0 as? SidebarGroupView }).last {
+            groupView.startEditing()
         }
     }
 
@@ -476,11 +476,11 @@ extension DeckardWindowController {
         group.workspaceIds.removeAll { $0 == workspaceId }
 
         // Insert as ungrouped workspace right after the group in sidebarOrder
-        if let folderIdx = sidebarOrder.firstIndex(where: {
+        if let groupIdx = sidebarOrder.firstIndex(where: {
             if case .group(let f) = $0, f.id == group.id { return true }
             return false
         }) {
-            sidebarOrder.insert(.workspace(workspaceId), at: folderIdx + 1)
+            sidebarOrder.insert(.workspace(workspaceId), at: groupIdx + 1)
         } else {
             sidebarOrder.append(.workspace(workspaceId))
         }
@@ -510,7 +510,7 @@ extension DeckardWindowController {
     /// `fromRow` is the row index of the dragged group, `toRow` is the drop target row.
     func handleGroupDragReorder(fromRow: Int, toRow: Int) {
         let infos = sidebarRowInfos()
-        guard fromRow >= 0, fromRow < infos.count, infos[fromRow].isFolder,
+        guard fromRow >= 0, fromRow < infos.count, infos[fromRow].isGroup,
               let groupId = infos[fromRow].groupId else { return }
 
         // Find the group's index in sidebarOrder
@@ -597,9 +597,9 @@ extension DeckardWindowController {
         menu.addItem(.separator())
 
         // Group options
-        let isInFolder = sidebarGroups.contains { $0.workspaceIds.contains(workspace.id) }
+        let isInGroup = sidebarGroups.contains { $0.workspaceIds.contains(workspace.id) }
 
-        if isInFolder {
+        if isInGroup {
             let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveWorkspaceOutOfGroupAction(_:)), keyEquivalent: "")
             moveOutItem.setShortcut(for: .moveOutOfGroup)
             moveOutItem.target = self
@@ -620,10 +620,10 @@ extension DeckardWindowController {
 
         menu.addItem(.separator())
 
-        let newFolderItem = NSMenuItem(title: "New Group", action: #selector(newGroupMenuAction), keyEquivalent: "")
-        newFolderItem.setShortcut(for: .newGroup)
-        newFolderItem.target = self
-        menu.addItem(newFolderItem)
+        let newGroupItem = NSMenuItem(title: "New Group", action: #selector(newGroupMenuAction), keyEquivalent: "")
+        newGroupItem.setShortcut(for: .newGroup)
+        newGroupItem.target = self
+        menu.addItem(newGroupItem)
 
         menu.addItem(.separator())
 
@@ -680,8 +680,8 @@ extension DeckardWindowController {
         }
 
         let explorer = SessionExplorerWindowController(
-            projectPath: workspace.path,
-            projectName: workspace.name
+            workspacePath: workspace.path,
+            workspaceName: workspace.name
         )
         explorer.openSessionIds = Set(workspace.tabs.compactMap { $0.sessionCacheKey })
         explorer.onSessionAction = { [weak self] kind, sessionId, fork, tabName in
@@ -753,7 +753,7 @@ extension DeckardWindowController {
     // MARK: - Sidebar Selection
 
     func updateSidebarSelection() {
-        guard let currentProjectId = currentWorkspace?.id else {
+        guard let currentWorkspaceId = currentWorkspace?.id else {
             for view in sidebarStackView.arrangedSubviews {
                 if let row = view as? VerticalTabRowView {
                     row.isSelected = false
@@ -766,7 +766,7 @@ extension DeckardWindowController {
                 row.isSelected = (row.index == selectedWorkspaceIndex)
             } else if let fv = view as? SidebarGroupView {
                 // Highlight group if it contains the selected workspace
-                fv.isContainingSelected = fv.group.workspaceIds.contains(currentProjectId) && fv.group.isCollapsed
+                fv.isContainingSelected = fv.group.workspaceIds.contains(currentWorkspaceId) && fv.group.isCollapsed
             }
         }
     }

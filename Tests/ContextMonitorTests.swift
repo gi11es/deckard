@@ -347,7 +347,7 @@ final class ContextMonitorTests: XCTestCase {
         let withUsage = assistantUsageLine(model: "claude-opus-4-6", input: 400_000, cacheRead: 100_000)
         try (withUsage + "\n").write(toFile: jsonlPath, atomically: true, encoding: .utf8)
 
-        let usage1 = monitor.getUsage(sessionId: sessionId, projectPath: tempDir)
+        let usage1 = monitor.getUsage(sessionId: sessionId, workspacePath: tempDir)
         XCTAssertNotNil(usage1)
         XCTAssertEqual(usage1?.inputTokens, 400_000)
 
@@ -356,7 +356,7 @@ final class ContextMonitorTests: XCTestCase {
         try noUsage.write(toFile: jsonlPath, atomically: true, encoding: .utf8)
 
         // Second call: file lacks usage → should return cached value
-        let usage2 = monitor.getUsage(sessionId: sessionId, projectPath: tempDir)
+        let usage2 = monitor.getUsage(sessionId: sessionId, workspacePath: tempDir)
         XCTAssertNotNil(usage2, "Should return cached value when file lacks usage")
         XCTAssertEqual(usage2?.inputTokens, 400_000)
     }
@@ -377,14 +377,14 @@ final class ContextMonitorTests: XCTestCase {
         let line1 = assistantUsageLine(model: "claude-opus-4-6", input: 100_000, cacheRead: 50_000)
         try (line1 + "\n").write(toFile: jsonlPath, atomically: true, encoding: .utf8)
 
-        let usage1 = monitor.getUsage(sessionId: sessionId, projectPath: tempDir)
+        let usage1 = monitor.getUsage(sessionId: sessionId, workspacePath: tempDir)
         XCTAssertEqual(usage1?.inputTokens, 100_000)
 
         // Second: larger usage
         let line2 = assistantUsageLine(model: "claude-opus-4-6", input: 300_000, cacheRead: 200_000)
         try (line1 + "\n" + line2 + "\n").write(toFile: jsonlPath, atomically: true, encoding: .utf8)
 
-        let usage2 = monitor.getUsage(sessionId: sessionId, projectPath: tempDir)
+        let usage2 = monitor.getUsage(sessionId: sessionId, workspacePath: tempDir)
         XCTAssertEqual(usage2?.inputTokens, 300_000, "Cache should update to newest usage")
     }
 
@@ -392,7 +392,7 @@ final class ContextMonitorTests: XCTestCase {
         let monitor = ContextMonitor()
         let usage = monitor.getUsage(
             sessionId: "never-seen-\(UUID().uuidString)",
-            projectPath: "/nonexistent/\(UUID().uuidString)")
+            workspacePath: "/nonexistent/\(UUID().uuidString)")
         XCTAssertNil(usage, "No cache for a session never queried before")
     }
 
@@ -426,7 +426,7 @@ final class ContextMonitorTests: XCTestCase {
 
     func testListSessionsNonexistentPath() {
         let sessions = ContextMonitor.shared.listSessions(
-            forProjectPath: "/nonexistent/path/\(UUID().uuidString)"
+            forWorkspacePath: "/nonexistent/path/\(UUID().uuidString)"
         )
         XCTAssertTrue(sessions.isEmpty)
     }
@@ -436,7 +436,7 @@ final class ContextMonitorTests: XCTestCase {
     func testGetUsageNonexistentSession() {
         let usage = ContextMonitor.shared.getUsage(
             sessionId: "nonexistent-\(UUID().uuidString)",
-            projectPath: "/nonexistent/path/\(UUID().uuidString)"
+            workspacePath: "/nonexistent/path/\(UUID().uuidString)"
         )
         XCTAssertNil(usage)
     }
@@ -461,8 +461,8 @@ final class ContextMonitorTests: XCTestCase {
 
     func testClaudeProjectDirNameResolvesSymlinks() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-dirname-\(UUID().uuidString)"
-        let realDir = tempDir + "/real-project"
-        let linkDir = tempDir + "/linked-project"
+        let realDir = tempDir + "/real-workspace"
+        let linkDir = tempDir + "/linked-workspace"
         try FileManager.default.createDirectory(atPath: realDir, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
@@ -472,8 +472,8 @@ final class ContextMonitorTests: XCTestCase {
     }
 
     func testClaudeProjectDirNameEncodesSlashes() {
-        let path = "/Users/test/my-project"
-        XCTAssertEqual(path.claudeProjectDirName, "-Users-test-my-project")
+        let path = "/Users/test/my-workspace"
+        XCTAssertEqual(path.claudeProjectDirName, "-Users-test-my-workspace")
         XCTAssertFalse(path.claudeProjectDirName.contains("/"))
     }
 
@@ -484,13 +484,13 @@ final class ContextMonitorTests: XCTestCase {
         XCTAssertEqual(path.claudeProjectDirName,
                        "-Volumes-Android-source-qcm8550-android13-0-ba01-r035")
 
-        let spaced = "/Users/test/My Project"
-        XCTAssertEqual(spaced.claudeProjectDirName, "-Users-test-My-Project")
+        let spaced = "/Users/test/My Workspace"
+        XCTAssertEqual(spaced.claudeProjectDirName, "-Users-test-My-Workspace")
     }
 
     func testClaudeProjectDirNameIdempotentOnCanonicalPath() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-dirname-\(UUID().uuidString)"
-        let realDir = tempDir + "/project"
+        let realDir = tempDir + "/workspace"
         try FileManager.default.createDirectory(atPath: realDir, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
 
@@ -501,17 +501,17 @@ final class ContextMonitorTests: XCTestCase {
                        "Double resolution should be idempotent")
     }
 
-    func testClaudeProjectDirNameConsistentWithProjectItem() throws {
+    func testClaudeProjectDirNameConsistentWithWorkspaceItem() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-dirname-\(UUID().uuidString)"
-        let realDir = tempDir + "/real-project"
-        let linkDir = tempDir + "/linked-project"
+        let realDir = tempDir + "/real-workspace"
+        let linkDir = tempDir + "/linked-workspace"
         try FileManager.default.createDirectory(atPath: realDir, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
 
         // WorkspaceItem resolves symlinks; claudeProjectDirName should agree
-        let project = WorkspaceItem(path: linkDir)
-        let encoded = project.path.claudeProjectDirName
+        let workspace = WorkspaceItem(path: linkDir)
+        let encoded = workspace.path.claudeProjectDirName
         XCTAssertEqual(encoded, realDir.claudeProjectDirName,
                        "WorkspaceItem.path and claudeProjectDirName should agree on canonical encoding")
     }

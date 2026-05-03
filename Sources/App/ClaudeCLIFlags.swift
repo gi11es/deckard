@@ -264,8 +264,8 @@ final class CodexCLIFlags {
     /// Flags Deckard manages internally — excluded from suggestions.
     static let blocklist: Set<String> = [
         "--help", "--version",
-        // Deckard launches Codex in the project directory already; suggesting
-        // --cd as a persistent default would make tabs ignore their project root.
+        // Deckard launches Codex in the workspace directory already; suggesting
+        // --cd as a persistent default would make tabs ignore their workspace root.
         "--cd",
     ]
 

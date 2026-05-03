@@ -86,13 +86,13 @@ final class ProcessMonitorTests: XCTestCase {
             surfaceId: uuid,
             isClaude: true,
             name: "Claude",
-            projectPath: "/Users/test/project"
+            workspacePath: "/Users/test/workspace"
         )
 
         XCTAssertEqual(tabInfo.surfaceId, uuid)
         XCTAssertTrue(tabInfo.isClaude)
         XCTAssertEqual(tabInfo.name, "Claude")
-        XCTAssertEqual(tabInfo.projectPath, "/Users/test/project")
+        XCTAssertEqual(tabInfo.workspacePath, "/Users/test/workspace")
     }
 
     func testCodexTabInfoConstruction() {
@@ -101,13 +101,13 @@ final class ProcessMonitorTests: XCTestCase {
             surfaceId: uuid,
             kind: .codex,
             name: "Codex",
-            projectPath: "/Users/test/project"
+            workspacePath: "/Users/test/workspace"
         )
 
         XCTAssertEqual(tabInfo.surfaceId, uuid)
         XCTAssertEqual(tabInfo.kind, .codex)
         XCTAssertFalse(tabInfo.isClaude)
         XCTAssertEqual(tabInfo.name, "Codex")
-        XCTAssertEqual(tabInfo.projectPath, "/Users/test/project")
+        XCTAssertEqual(tabInfo.workspacePath, "/Users/test/workspace")
     }
 }

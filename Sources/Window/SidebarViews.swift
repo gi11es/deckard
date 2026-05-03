@@ -26,7 +26,7 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
     private var dragStartPoint: NSPoint?
     private var leadingConstraint: NSLayoutConstraint?
 
-    /// Leading indent (used for workspaces inside folders).
+    /// Leading indent (used for workspaces inside groups).
     var indent: CGFloat = 0 {
         didSet { leadingConstraint?.constant = 8 + indent }
     }
@@ -317,7 +317,7 @@ class SidebarGroupView: NSView, NSTextFieldDelegate, NSDraggingSource {
         didSet { needsDisplay = true }
     }
 
-    init(group: SidebarGroup, projectCount: Int) {
+    init(group: SidebarGroup, workspaceCount: Int) {
         self.group = group
 
         disclosureImageView = NSImageView()
@@ -572,7 +572,7 @@ class SidebarDropZone: NSView {
 // MARK: - ReorderableStackView
 
 /// NSStackView subclass that accepts drops for reordering.
-/// Supports workspace drag (reorder/drop onto group) and group drag (reorder folders).
+/// Supports workspace drag (reorder/drop onto group) and group drag (reorder groups).
 class ReorderableStackView: NSStackView {
     var onReorder: ((Int, Int, Bool) -> Void)?
     var onDropOntoGroup: ((SidebarGroupView, Int) -> Void)?
@@ -602,7 +602,7 @@ class ReorderableStackView: NSStackView {
     /// Returns the SidebarGroupView at the drag location, if the cursor is
     /// within the center region of a group row. The top and bottom edges
     /// (6px each) are reserved for between-item line indicator drops.
-    private func folderView(at sender: NSDraggingInfo) -> SidebarGroupView? {
+    private func groupView(at sender: NSDraggingInfo) -> SidebarGroupView? {
         let location = convert(sender.draggingLocation, from: nil)
         let edgeInset: CGFloat = 6
         for view in arrangedSubviews {
@@ -616,7 +616,7 @@ class ReorderableStackView: NSStackView {
         return nil
     }
 
-    private func clearFolderHighlight() {
+    private func clearGroupHighlight() {
         if let prev = highlightedGroup {
             prev.isDropTarget = false
             highlightedGroup = nil
@@ -668,44 +668,44 @@ class ReorderableStackView: NSStackView {
         dropIndicator.isHidden = true
         currentDropIndex = -1
         currentDropForceFullWidth = false
-        clearFolderHighlight()
+        clearGroupHighlight()
     }
 
-    private func acceptsProjectDrag(_ sender: NSDraggingInfo) -> Bool {
+    private func acceptsWorkspaceDrag(_ sender: NSDraggingInfo) -> Bool {
         sender.draggingPasteboard.types?.contains(deckardWorkspaceDragType) == true
     }
 
-    private func acceptsFolderDrag(_ sender: NSDraggingInfo) -> Bool {
+    private func acceptsGroupDrag(_ sender: NSDraggingInfo) -> Bool {
         sender.draggingPasteboard.types?.contains(deckardGroupDragType) == true
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        if acceptsProjectDrag(sender) {
-            return updateProjectDrag(sender)
-        } else if acceptsFolderDrag(sender) {
-            return updateFolderDrag(sender)
+        if acceptsWorkspaceDrag(sender) {
+            return updateWorkspaceDrag(sender)
+        } else if acceptsGroupDrag(sender) {
+            return updateGroupDrag(sender)
         }
         return []
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
-        if acceptsProjectDrag(sender) {
-            return updateProjectDrag(sender)
-        } else if acceptsFolderDrag(sender) {
-            return updateFolderDrag(sender)
+        if acceptsWorkspaceDrag(sender) {
+            return updateWorkspaceDrag(sender)
+        } else if acceptsGroupDrag(sender) {
+            return updateGroupDrag(sender)
         }
         return []
     }
 
     /// Group drag: only show indicator between top-level items (not inside groups).
-    private func updateFolderDrag(_ sender: NSDraggingInfo) -> NSDragOperation {
+    private func updateGroupDrag(_ sender: NSDraggingInfo) -> NSDragOperation {
         let snapped = snapToTopLevel(for: sender)
         showIndicator(at: snapped, forceFullWidth: true)
         return .move
     }
 
     /// Snap drop position to the nearest top-level boundary.
-    /// Indented rows (inside folders) are skipped — the indicator jumps to
+    /// Indented rows (inside groups) are skipped — the indicator jumps to
     /// the group header above or the next top-level item below.
     private func snapToTopLevel(for sender: NSDraggingInfo) -> Int {
         let raw = dropIndex(for: sender)
@@ -740,19 +740,19 @@ class ReorderableStackView: NSStackView {
     }
 
     /// Common logic for workspace drag: highlight group or show line indicator.
-    private func updateProjectDrag(_ sender: NSDraggingInfo) -> NSDragOperation {
-        if let fv = folderView(at: sender) {
+    private func updateWorkspaceDrag(_ sender: NSDraggingInfo) -> NSDragOperation {
+        if let fv = groupView(at: sender) {
             // Hovering over a group row — highlight it, hide the line indicator
             dropIndicator.isHidden = true
             currentDropIndex = -1
             if highlightedGroup !== fv {
-                clearFolderHighlight()
+                clearGroupHighlight()
                 fv.isDropTarget = true
                 highlightedGroup = fv
             }
         } else {
             // Not over a group — show the line indicator
-            clearFolderHighlight()
+            clearGroupHighlight()
             let idx = dropIndex(for: sender)
             // At the boundary between the last child of an expanded group
             // and the next non-indented row, use cursor Y to disambiguate:
@@ -781,7 +781,7 @@ class ReorderableStackView: NSStackView {
     }
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
-        let wasOnFolder = highlightedGroup
+        let wasOnGroup = highlightedGroup
         let wasForceFullWidth = currentDropForceFullWidth
         hideIndicator()
 
@@ -789,7 +789,7 @@ class ReorderableStackView: NSStackView {
         if let fromStr = sender.draggingPasteboard.string(forType: deckardWorkspaceDragType),
            let fromIndex = Int(fromStr) {
             // If dropped on a highlighted group, route to group drop handler
-            if let fv = wasOnFolder {
+            if let fv = wasOnGroup {
                 onDropOntoGroup?(fv, fromIndex)
                 return true
             }

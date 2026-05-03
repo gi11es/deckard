@@ -16,19 +16,19 @@ class ProcessMonitor {
         let surfaceId: UUID
         let kind: TabKind
         let name: String
-        let projectPath: String
+        let workspacePath: String
 
         var isClaude: Bool { kind == .claude }
 
-        init(surfaceId: UUID, kind: TabKind, name: String, projectPath: String) {
+        init(surfaceId: UUID, kind: TabKind, name: String, workspacePath: String) {
             self.surfaceId = surfaceId
             self.kind = kind
             self.name = name
-            self.projectPath = projectPath
+            self.workspacePath = workspacePath
         }
 
-        init(surfaceId: UUID, isClaude: Bool, name: String, projectPath: String) {
-            self.init(surfaceId: surfaceId, kind: isClaude ? .claude : .terminal, name: name, projectPath: projectPath)
+        init(surfaceId: UUID, isClaude: Bool, name: String, workspacePath: String) {
+            self.init(surfaceId: surfaceId, kind: isClaude ? .claude : .terminal, name: name, workspacePath: workspacePath)
         }
     }
 
@@ -132,7 +132,7 @@ class ProcessMonitor {
             let lines = tabs.map { tab -> String in
                 let prefix = tab.kind.rawValue.prefix(1).uppercased()
                 let pid = cachedPids[tab.surfaceId].map { "login=\($0.login) shell=\($0.shell)" } ?? "?"
-                return "  \(prefix):\(tab.name)@\(tab.projectPath) → \(pid)"
+                return "  \(prefix):\(tab.name)@\(tab.workspacePath) → \(pid)"
             }
             DiagnosticLog.shared.log("processmon",
                 "PID mapping (\(cachedPids.count)/\(tabs.count) matched):\n" +
@@ -196,7 +196,7 @@ class ProcessMonitor {
             lastDiskBytes[key] = diskBytes
             let result = ActivityInfo(cpu: true)
             DiagnosticLog.shared.log("processmon",
-                "ACTIVE: project=\(tab.projectPath) tab=\"\(tab.name)\" " +
+                "ACTIVE: workspace=\(tab.workspacePath) tab=\"\(tab.name)\" " +
                 "shell=\(key) fg=\(fgPid) reason=fg_changed")
             return result
         }
@@ -217,7 +217,7 @@ class ProcessMonitor {
             if cpuActive { reasons.append("cpu=\(cpuDelta)ns") }
             if diskActive { reasons.append("disk=+\(diskDelta)B") }
             DiagnosticLog.shared.log("processmon",
-                "ACTIVE: project=\(tab.projectPath) tab=\"\(tab.name)\" " +
+                "ACTIVE: workspace=\(tab.workspacePath) tab=\"\(tab.name)\" " +
                 "shell=\(key) fg=\(fgPid) \(reasons.joined(separator: " "))")
         }
 

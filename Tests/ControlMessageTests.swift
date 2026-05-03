@@ -63,11 +63,11 @@ final class ControlMessageTests: XCTestCase {
 
     func testDecodeCreateTab() throws {
         let json = """
-        {"command": "create-tab", "workingDirectory": "/Users/test/project"}
+        {"command": "create-tab", "workingDirectory": "/Users/test/workspace"}
         """
         let msg = try JSONDecoder().decode(ControlMessage.self, from: json.data(using: .utf8)!)
         XCTAssertEqual(msg.command, "create-tab")
-        XCTAssertEqual(msg.workingDirectory, "/Users/test/project")
+        XCTAssertEqual(msg.workingDirectory, "/Users/test/workspace")
     }
 
     func testDecodeHookNotification() throws {
@@ -139,7 +139,7 @@ final class ControlMessageTests: XCTestCase {
     func testCodexTabInfoRoundtripIncludesKind() throws {
         let tab = TabInfo(
             id: "t-codex",
-            name: "Project/Codex",
+            name: "Workspace/Codex",
             isClaude: false,
             kind: "codex",
             isMaster: false,
@@ -154,7 +154,7 @@ final class ControlMessageTests: XCTestCase {
 
         XCTAssertEqual(json?["kind"] as? String, "codex")
         XCTAssertEqual(decoded.id, "t-codex")
-        XCTAssertEqual(decoded.name, "Project/Codex")
+        XCTAssertEqual(decoded.name, "Workspace/Codex")
         XCTAssertFalse(decoded.isClaude)
         XCTAssertEqual(decoded.kind, "codex")
         XCTAssertEqual(decoded.sessionId, "codex-session")

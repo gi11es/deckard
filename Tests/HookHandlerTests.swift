@@ -285,7 +285,7 @@ final class HookHandlerTests: XCTestCase {
 
     func testCreateTabReturnsOk() {
         var msg = ControlMessage(command: "create-tab")
-        msg.workingDirectory = "/Users/test/project"
+        msg.workingDirectory = "/Users/test/workspace"
 
         let expectation = expectation(description: "create-tab reply")
 

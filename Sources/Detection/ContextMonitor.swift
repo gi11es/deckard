@@ -93,9 +93,9 @@ class ContextMonitor {
         }
     }
 
-    /// Lists all Claude sessions for a project, sorted by most recent first.
-    func listSessions(forProjectPath projectPath: String) -> [SessionInfo] {
-        let encoded = projectPath.claudeProjectDirName
+    /// Lists all Claude sessions for a workspace, sorted by most recent first.
+    func listSessions(forWorkspacePath workspacePath: String) -> [SessionInfo] {
+        let encoded = workspacePath.claudeProjectDirName
         let dir = NSHomeDirectory() + "/.claude/projects/\(encoded)"
         let fm = FileManager.default
 
@@ -153,25 +153,25 @@ class ContextMonitor {
         return results
     }
 
-    /// Lists Claude and Codex sessions for a project, sorted by most recent first.
-    func listAllSessions(forProjectPath projectPath: String) -> [SessionInfo] {
-        (listSessions(forProjectPath: projectPath) + listCodexSessions(forProjectPath: projectPath))
+    /// Lists Claude and Codex sessions for a workspace, sorted by most recent first.
+    func listAllSessions(forWorkspacePath workspacePath: String) -> [SessionInfo] {
+        (listSessions(forWorkspacePath: workspacePath) + listCodexSessions(forWorkspacePath: workspacePath))
             .sorted { $0.modificationDate > $1.modificationDate }
     }
 
-    /// Lists Codex sessions for a project by scanning ~/.codex/sessions.
-    func listCodexSessions(forProjectPath projectPath: String) -> [SessionInfo] {
+    /// Lists Codex sessions for a workspace by scanning ~/.codex/sessions.
+    func listCodexSessions(forWorkspacePath workspacePath: String) -> [SessionInfo] {
         let root = codexSessionsRoot
         let fm = FileManager.default
         guard let enumerator = fm.enumerator(at: root, includingPropertiesForKeys: [.contentModificationDateKey], options: [.skipsHiddenFiles]) else {
             return []
         }
 
-        let resolvedProjectPath = (projectPath as NSString).resolvingSymlinksInPath
+        let resolvedWorkspacePath = (workspacePath as NSString).resolvingSymlinksInPath
         var results: [SessionInfo] = []
 
         for case let fileURL as URL in enumerator where fileURL.pathExtension == "jsonl" {
-            guard let info = parseCodexSessionInfo(fileURL: fileURL, projectPath: resolvedProjectPath) else { continue }
+            guard let info = parseCodexSessionInfo(fileURL: fileURL, workspacePath: resolvedWorkspacePath) else { continue }
             results.append(info)
         }
 
@@ -199,13 +199,13 @@ class ContextMonitor {
         return nil
     }
 
-    func codexSessionInfo(openedByProcessId processId: pid_t, projectPath: String) -> SessionInfo? {
+    func codexSessionInfo(openedByProcessId processId: pid_t, workspacePath: String) -> SessionInfo? {
         guard let fileURL = codexOpenRolloutFileURL(processId: processId) else {
             return nil
         }
 
-        let resolvedProjectPath = (projectPath as NSString).resolvingSymlinksInPath
-        return parseCodexSessionInfo(fileURL: fileURL, projectPath: resolvedProjectPath)
+        let resolvedWorkspacePath = (workspacePath as NSString).resolvingSymlinksInPath
+        return parseCodexSessionInfo(fileURL: fileURL, workspacePath: resolvedWorkspacePath)
     }
 
     private func codexOpenRolloutFileURL(processId: pid_t) -> URL? {
@@ -249,8 +249,8 @@ class ContextMonitor {
         }
     }
 
-    func latestCodexSession(forProjectPath projectPath: String, after date: Date, excluding excludedIds: Set<String> = []) -> SessionInfo? {
-        listCodexSessions(forProjectPath: projectPath)
+    func latestCodexSession(forWorkspacePath workspacePath: String, after date: Date, excluding excludedIds: Set<String> = []) -> SessionInfo? {
+        listCodexSessions(forWorkspacePath: workspacePath)
             .first { $0.modificationDate >= date && !excludedIds.contains($0.sessionId) }
     }
 
@@ -603,7 +603,7 @@ class ContextMonitor {
         return nil
     }
 
-    private func parseCodexSessionInfo(fileURL: URL, projectPath: String) -> SessionInfo? {
+    private func parseCodexSessionInfo(fileURL: URL, workspacePath: String) -> SessionInfo? {
         guard let data = try? Data(contentsOf: fileURL),
               let content = String(data: data, encoding: .utf8) else { return nil }
 
@@ -644,7 +644,7 @@ class ContextMonitor {
             }
         }
 
-        guard let sessionId, cwd == projectPath else { return nil }
+        guard let sessionId, cwd == workspacePath else { return nil }
 
         let attrs = try? FileManager.default.attributesOfItem(atPath: fileURL.path)
         let modDate = attrs?[.modificationDate] as? Date ?? metaTimestamp ?? Date.distantPast
@@ -757,12 +757,12 @@ class ContextMonitor {
 
     /// Parses a session JSONL file and returns an ordered list of user turns.
     /// Deduplicates by promptId — only the first occurrence with non-empty content is kept.
-    func parseTimeline(sessionId: String, projectPath: String, kind: TabKind = .claude) -> [TimelineEntry] {
+    func parseTimeline(sessionId: String, workspacePath: String, kind: TabKind = .claude) -> [TimelineEntry] {
         if kind == .codex {
-            return parseCodexTimeline(sessionId: sessionId, projectPath: projectPath)
+            return parseCodexTimeline(sessionId: sessionId, workspacePath: workspacePath)
         }
 
-        let encoded = projectPath.claudeProjectDirName
+        let encoded = workspacePath.claudeProjectDirName
         let jsonlPath = NSHomeDirectory() + "/.claude/projects/\(encoded)/\(sessionId).jsonl"
 
         guard let data = try? Data(contentsOf: URL(fileURLWithPath: jsonlPath)),
@@ -814,7 +814,7 @@ class ContextMonitor {
         return entries
     }
 
-    private func parseCodexTimeline(sessionId: String, projectPath: String) -> [TimelineEntry] {
+    private func parseCodexTimeline(sessionId: String, workspacePath: String) -> [TimelineEntry] {
         guard let fileURL = codexSessionFileURL(sessionId: sessionId),
               let data = try? Data(contentsOf: fileURL),
               let content = String(data: data, encoding: .utf8) else { return [] }
@@ -847,20 +847,20 @@ class ContextMonitor {
 
     /// Creates a truncated copy of a session JSONL, keeping everything up to (and including
     /// the full response for) the Nth unique user turn. Returns the new session ID.
-    func truncateSession(sessionId: String, projectPath: String, afterTurnIndex: Int, kind: TabKind = .claude) -> String? {
+    func truncateSession(sessionId: String, workspacePath: String, afterTurnIndex: Int, kind: TabKind = .claude) -> String? {
         switch kind {
         case .claude:
-            return truncateClaudeSession(sessionId: sessionId, projectPath: projectPath, afterTurnIndex: afterTurnIndex)
+            return truncateClaudeSession(sessionId: sessionId, workspacePath: workspacePath, afterTurnIndex: afterTurnIndex)
         case .codex:
-            return truncateCodexSession(sessionId: sessionId, projectPath: projectPath, afterTurnIndex: afterTurnIndex)
+            return truncateCodexSession(sessionId: sessionId, workspacePath: workspacePath, afterTurnIndex: afterTurnIndex)
         case .terminal:
             return nil
         }
     }
 
-    private func truncateClaudeSession(sessionId: String, projectPath: String, afterTurnIndex: Int) -> String? {
+    private func truncateClaudeSession(sessionId: String, workspacePath: String, afterTurnIndex: Int) -> String? {
 
-        let encoded = projectPath.claudeProjectDirName
+        let encoded = workspacePath.claudeProjectDirName
         let dir = NSHomeDirectory() + "/.claude/projects/\(encoded)"
         let jsonlPath = dir + "/\(sessionId).jsonl"
 
@@ -917,7 +917,7 @@ class ContextMonitor {
         }
     }
 
-    private func truncateCodexSession(sessionId: String, projectPath: String, afterTurnIndex: Int) -> String? {
+    private func truncateCodexSession(sessionId: String, workspacePath: String, afterTurnIndex: Int) -> String? {
         guard let sourceURL = codexSessionFileURL(sessionId: sessionId),
               let data = try? Data(contentsOf: sourceURL),
               let content = String(data: data, encoding: .utf8) else { return nil }
@@ -1139,8 +1139,8 @@ class ContextMonitor {
     /// Get context usage for a session by reading its JSONL file.
     /// Only reads the tail of the file to find the most recent usage entry.
     /// Falls back to a cached value when the tail doesn't contain a usage entry.
-    func getUsage(sessionId: String, projectPath: String) -> ContextUsage? {
-        let encoded = projectPath.claudeProjectDirName
+    func getUsage(sessionId: String, workspacePath: String) -> ContextUsage? {
+        let encoded = workspacePath.claudeProjectDirName
         let jsonlPath = NSHomeDirectory() + "/.claude/projects/\(encoded)/\(sessionId).jsonl"
 
         if let usage = getUsageFromFile(at: jsonlPath) {

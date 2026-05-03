@@ -388,7 +388,7 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
     // MARK: - NSTableViewDelegate
 
     func tableView(_ tableView: NSTableView, viewFor tableColumn: NSTableColumn?, row: Int) -> NSView? {
-        let id = NSUserInterfaceItemIdentifier("ProjectCell")
+        let id = NSUserInterfaceItemIdentifier("WorkspaceCell")
         let workspace = filteredWorkspaces[row]
 
         let cell: NSTableCellView
@@ -427,7 +427,7 @@ class WorkspacePicker: NSObject, NSTableViewDataSource, NSTableViewDelegate, NST
         confirm()
     }
 
-    // MARK: - Load Projects
+    // MARK: - Load Workspaces
 
     static func loadRecentWorkspaces() -> [(path: String, lastUsed: Date)] {
         let projectsDir = NSHomeDirectory() + "/.claude/projects"

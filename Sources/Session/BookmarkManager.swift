@@ -1,7 +1,7 @@
 import Foundation
 
 /// Manages session bookmarks persisted to ~/Library/Application Support/Deckard/session-bookmarks.json.
-/// Stores a set of bookmarked session IDs per project path.
+/// Stores a set of bookmarked session IDs per workspace path.
 class BookmarkManager {
     static let shared = BookmarkManager()
 
@@ -12,38 +12,38 @@ class BookmarkManager {
         return deckardDir.appendingPathComponent("session-bookmarks.json")
     }()
 
-    private var cache: [String: [String]]?  // projectKey -> [sessionId]
+    private var cache: [String: [String]]?  // workspaceKey -> [sessionId]
 
-    /// Returns all bookmarked session IDs for a project.
-    func bookmarkedSessionIds(forProjectPath projectPath: String) -> Set<String> {
-        bookmarkedSessionIds(forProjectPath: projectPath, kind: .claude)
+    /// Returns all bookmarked session IDs for a workspace.
+    func bookmarkedSessionIds(forWorkspacePath workspacePath: String) -> Set<String> {
+        bookmarkedSessionIds(forWorkspacePath: workspacePath, kind: .claude)
     }
 
-    func bookmarkedSessionIds(forProjectPath projectPath: String, kind: TabKind) -> Set<String> {
+    func bookmarkedSessionIds(forWorkspacePath workspacePath: String, kind: TabKind) -> Set<String> {
         let all = loadAll()
-        let key = projectKey(projectPath: projectPath, kind: kind)
+        let key = workspaceKey(workspacePath: workspacePath, kind: kind)
         return Set(all[key] ?? [])
     }
 
     /// Checks if a session is bookmarked.
-    func isBookmarked(projectPath: String, sessionId: String) -> Bool {
-        isBookmarked(projectPath: projectPath, sessionId: sessionId, kind: .claude)
+    func isBookmarked(workspacePath: String, sessionId: String) -> Bool {
+        isBookmarked(workspacePath: workspacePath, sessionId: sessionId, kind: .claude)
     }
 
-    func isBookmarked(projectPath: String, sessionId: String, kind: TabKind) -> Bool {
-        bookmarkedSessionIds(forProjectPath: projectPath, kind: kind).contains(sessionId)
+    func isBookmarked(workspacePath: String, sessionId: String, kind: TabKind) -> Bool {
+        bookmarkedSessionIds(forWorkspacePath: workspacePath, kind: kind).contains(sessionId)
     }
 
     /// Toggles the bookmark state for a session. Returns the new state.
     @discardableResult
-    func toggleBookmark(projectPath: String, sessionId: String) -> Bool {
-        toggleBookmark(projectPath: projectPath, sessionId: sessionId, kind: .claude)
+    func toggleBookmark(workspacePath: String, sessionId: String) -> Bool {
+        toggleBookmark(workspacePath: workspacePath, sessionId: sessionId, kind: .claude)
     }
 
     @discardableResult
-    func toggleBookmark(projectPath: String, sessionId: String, kind: TabKind) -> Bool {
+    func toggleBookmark(workspacePath: String, sessionId: String, kind: TabKind) -> Bool {
         var all = loadAll()
-        let key = projectKey(projectPath: projectPath, kind: kind)
+        let key = workspaceKey(workspacePath: workspacePath, kind: kind)
         var ids = all[key] ?? []
 
         if let idx = ids.firstIndex(of: sessionId) {
@@ -61,8 +61,8 @@ class BookmarkManager {
 
     // MARK: - Private
 
-    private func projectKey(projectPath: String, kind: TabKind) -> String {
-        let encoded = projectPath.claudeProjectDirName
+    private func workspaceKey(workspacePath: String, kind: TabKind) -> String {
+        let encoded = workspacePath.claudeProjectDirName
         return kind == .claude ? encoded : "\(kind.rawValue):\(encoded)"
     }
 

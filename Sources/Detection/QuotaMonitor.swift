@@ -114,7 +114,7 @@ class QuotaMonitor {
     /// Compute tokens-per-minute from the single most recently written session JSONL.
     /// Only considers the one file most recently modified (the active conversation),
     /// and only counts output_tokens with timestamps in the last 5 minutes.
-    func computeTokenRate(projectPaths: [String]) -> TokenRate? {
+    func computeTokenRate(workspacePaths: [String]) -> TokenRate? {
         let now = Date()
         let cutoff = now.addingTimeInterval(-300)  // 5 minutes ago
         let recentCutoff = now.addingTimeInterval(-120)  // 2 minutes ago (must be very recent)
@@ -123,12 +123,12 @@ class QuotaMonitor {
         let isoFormatter = ISO8601DateFormatter()
         isoFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
-        // Find the single most recently modified JSONL across all projects
+        // Find the single most recently modified JSONL across all workspaces
         var bestFile: String?
         var bestDate: Date = .distantPast
 
-        for projectPath in projectPaths {
-            let encoded = projectPath.claudeProjectDirName
+        for workspacePath in workspacePaths {
+            let encoded = workspacePath.claudeProjectDirName
             let dir = NSHomeDirectory() + "/.claude/projects/\(encoded)"
 
             guard let files = try? fm.contentsOfDirectory(atPath: dir) else { continue }

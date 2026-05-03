@@ -219,10 +219,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         closeItem.setShortcut(for: .closeTab)
         fileMenu.addItem(closeItem)
 
-        let newFolderItem = NSMenuItem(title: "New Group", action: #selector(createNewSidebarGroup), keyEquivalent: "")
-        newFolderItem.setShortcut(for: .newGroup)
-        newFolderItem.target = self
-        fileMenu.addItem(newFolderItem)
+        let newGroupItem = NSMenuItem(title: "New Group", action: #selector(createNewSidebarGroup), keyEquivalent: "")
+        newGroupItem.setShortcut(for: .newGroup)
+        newGroupItem.target = self
+        fileMenu.addItem(newGroupItem)
 
         let moveOutItem = NSMenuItem(title: "Move Out of Group", action: #selector(moveCurrentWorkspaceOutOfGroup), keyEquivalent: "")
         moveOutItem.setShortcut(for: .moveOutOfGroup)
@@ -233,9 +233,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         exploreSessionsItem.setShortcut(for: .exploreSessions)
         fileMenu.addItem(exploreSessionsItem)
 
-        let closeProjectItem = NSMenuItem(title: "Close Workspace", action: #selector(closeCurrentWorkspace), keyEquivalent: "")
-        closeProjectItem.setShortcut(for: .closeWorkspace)
-        fileMenu.addItem(closeProjectItem)
+        let closeWorkspaceItem = NSMenuItem(title: "Close Workspace", action: #selector(closeCurrentWorkspace), keyEquivalent: "")
+        closeWorkspaceItem.setShortcut(for: .closeWorkspace)
+        fileMenu.addItem(closeWorkspaceItem)
         fileMenu.addItem(.separator())
 
         let nextTabItem = NSMenuItem(title: "Next Tab", action: #selector(selectNextTab), keyEquivalent: "")
@@ -300,14 +300,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - Actions
 
-    private let projectPicker = WorkspacePicker()
+    private let workspacePicker = WorkspacePicker()
 
     func openWorkspacePicker() {
         openWorkspace()
     }
 
     @objc private func openWorkspace() {
-        projectPicker.show(relativeTo: windowController?.window) { [weak self] path in
+        workspacePicker.show(relativeTo: windowController?.window) { [weak self] path in
             guard let path = path else { return }
             self?.windowController?.openWorkspace(path: path)
         }

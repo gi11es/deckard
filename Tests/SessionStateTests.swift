@@ -9,12 +9,12 @@ final class SessionStateTests: XCTestCase {
         var state = DeckardState()
         state.version = 2
         state.selectedTabIndex = 3
-        state.defaultWorkingDirectory = "/Users/test/project"
+        state.defaultWorkingDirectory = "/Users/test/workspace"
         state.workspaces = [
             WorkspaceState(
                 id: "proj-1",
-                path: "/Users/test/project",
-                name: "project",
+                path: "/Users/test/workspace",
+                name: "workspace",
                 selectedTabIndex: 0,
                 tabs: [
                     WorkspaceTabState(id: "tab-1", name: "Claude", isClaude: true, sessionId: "sess-1"),
@@ -32,7 +32,7 @@ final class SessionStateTests: XCTestCase {
 
         XCTAssertEqual(decoded.version, 2)
         XCTAssertEqual(decoded.selectedTabIndex, 3)
-        XCTAssertEqual(decoded.defaultWorkingDirectory, "/Users/test/project")
+        XCTAssertEqual(decoded.defaultWorkingDirectory, "/Users/test/workspace")
         XCTAssertEqual(decoded.workspaces?.count, 1)
         XCTAssertEqual(decoded.workspaces?[0].tabs.count, 3)
         XCTAssertEqual(decoded.workspaces?[0].tabs[0].isClaude, true)
@@ -57,7 +57,7 @@ final class SessionStateTests: XCTestCase {
         XCTAssertNil(decoded.workspaces)
     }
 
-    func testMultipleProjectsRoundtrip() throws {
+    func testMultipleWorkspacesRoundtrip() throws {
         var state = DeckardState()
         state.workspaces = [
             WorkspaceState(id: "p1", path: "/path/a", name: "a", selectedTabIndex: 0, tabs: []),
@@ -228,11 +228,11 @@ final class SessionStateTests: XCTestCase {
 
     // MARK: - Symlink path restoration
 
-    func testProjectStatePathSurvivesRoundtripViaProjectItem() throws {
+    func testWorkspaceStatePathSurvivesRoundtripViaWorkspaceItem() throws {
         // Simulate: save state with canonical path, restore via WorkspaceItem
         let tempDir = NSTemporaryDirectory() + "deckard-state-\(UUID().uuidString)"
-        let realDir = tempDir + "/real-project"
-        let linkDir = tempDir + "/linked-project"
+        let realDir = tempDir + "/real-workspace"
+        let linkDir = tempDir + "/linked-workspace"
         try FileManager.default.createDirectory(atPath: realDir, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
@@ -240,7 +240,7 @@ final class SessionStateTests: XCTestCase {
         // Save state using symlink path (as old Deckard would)
         var state = DeckardState()
         state.workspaces = [
-            WorkspaceState(id: "p1", path: linkDir, name: "linked-project",
+            WorkspaceState(id: "p1", path: linkDir, name: "linked-workspace",
                          selectedTabIndex: 0, tabs: [
                 WorkspaceTabState(id: "t1", name: "Claude", isClaude: true, sessionId: "sess-1")
             ])
@@ -252,34 +252,34 @@ final class SessionStateTests: XCTestCase {
 
         // Simulate restoreOrCreateInitial: WorkspaceItem resolves the path
         let ps = restored.workspaces![0]
-        let project = WorkspaceItem(path: ps.path)
+        let workspace = WorkspaceItem(path: ps.path)
 
         // The resolved path should match the canonical path
-        XCTAssertEqual(project.path, realDir,
+        XCTAssertEqual(workspace.path, realDir,
                        "WorkspaceItem should resolve symlink from old state.json")
 
-        // Sidebar folder restoration resolves ps.path before comparison
+        // Sidebar group restoration resolves ps.path before comparison
         let resolvedPsPath = (ps.path as NSString).resolvingSymlinksInPath
-        XCTAssertEqual(project.path, resolvedPsPath,
-                       "Resolved ps.path should match WorkspaceItem.path for sidebar folder mapping")
+        XCTAssertEqual(workspace.path, resolvedPsPath,
+                       "Resolved ps.path should match WorkspaceItem.path for sidebar group mapping")
     }
 
-    func testProjectStateSavedWithCanonicalPath() throws {
-        // When captureState() saves a project that was opened via symlink,
+    func testWorkspaceStateSavedWithCanonicalPath() throws {
+        // When captureState() saves a workspace that was opened via symlink,
         // the path should be canonical (because WorkspaceItem.init resolves)
         let tempDir = NSTemporaryDirectory() + "deckard-state-\(UUID().uuidString)"
-        let realDir = tempDir + "/real-project"
-        let linkDir = tempDir + "/linked-project"
+        let realDir = tempDir + "/real-workspace"
+        let linkDir = tempDir + "/linked-workspace"
         try FileManager.default.createDirectory(atPath: realDir, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
 
-        let project = WorkspaceItem(path: linkDir)
+        let workspace = WorkspaceItem(path: linkDir)
         // Simulate what captureState() does
         let saved = WorkspaceState(
-            id: project.id.uuidString,
-            path: project.path,
-            name: project.name,
+            id: workspace.id.uuidString,
+            path: workspace.path,
+            name: workspace.name,
             selectedTabIndex: 0,
             tabs: []
         )
@@ -291,32 +291,32 @@ final class SessionStateTests: XCTestCase {
     func testOldAndNewStatePathsMatchAfterResolution() throws {
         // Simulate migration: old state has symlink path, new code resolves it
         let tempDir = NSTemporaryDirectory() + "deckard-state-\(UUID().uuidString)"
-        let realDir = tempDir + "/real-project"
-        let linkDir = tempDir + "/linked-project"
+        let realDir = tempDir + "/real-workspace"
+        let linkDir = tempDir + "/linked-workspace"
         try FileManager.default.createDirectory(atPath: realDir, withIntermediateDirectories: true)
         addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
         try FileManager.default.createSymbolicLink(atPath: linkDir, withDestinationPath: realDir)
 
         // Old state (saved with symlink path)
-        let oldProjectState = WorkspaceState(
-            id: "p1", path: linkDir, name: "linked-project",
+        let oldWorkspaceState = WorkspaceState(
+            id: "p1", path: linkDir, name: "linked-workspace",
             selectedTabIndex: 0, tabs: []
         )
 
         // New WorkspaceItem (opened via symlink, but path is resolved)
-        let project = WorkspaceItem(path: linkDir)
+        let workspace = WorkspaceItem(path: linkDir)
 
         // restoreSidebarGroups resolves ps.path before comparison
-        let resolvedOldPath = (oldProjectState.path as NSString).resolvingSymlinksInPath
-        XCTAssertEqual(project.path, resolvedOldPath,
+        let resolvedOldPath = (oldWorkspaceState.path as NSString).resolvingSymlinksInPath
+        XCTAssertEqual(workspace.path, resolvedOldPath,
                        "Migration: resolved old state path must match new WorkspaceItem.path")
 
         // New state (saved after fix) already has canonical path
-        let newProjectState = WorkspaceState(
-            id: "p2", path: project.path, name: project.name,
+        let newWorkspaceState = WorkspaceState(
+            id: "p2", path: workspace.path, name: workspace.name,
             selectedTabIndex: 0, tabs: []
         )
-        XCTAssertEqual(project.path, newProjectState.path,
+        XCTAssertEqual(workspace.path, newWorkspaceState.path,
                        "Post-fix: saved path is already canonical, direct comparison works")
     }
 }

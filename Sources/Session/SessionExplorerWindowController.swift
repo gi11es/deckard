@@ -1,17 +1,17 @@
 import AppKit
 
-/// Displays all Claude Code sessions for a project in a dedicated window.
+/// Displays all Claude Code sessions for a workspace in a dedicated window.
 /// Left pane: search + session list with star toggles. Right pane: conversation timeline.
 class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, NSSearchFieldDelegate {
 
-    private let projectPath: String
-    private let projectName: String
+    private let workspacePath: String
+    private let workspaceName: String
 
     /// Callback invoked when the user picks an action (resume/fork).
     /// Parameters: kind, sessionId, forkSession flag, tab name.
     var onSessionAction: ((TabKind, String, Bool, String?) -> Void)?
 
-    /// Session IDs currently open in the project's tabs.
+    /// Session IDs currently open in the workspace's tabs.
     var openSessionIds = Set<String>()
 
     // --- Data ---
@@ -38,9 +38,9 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         return f
     }()
 
-    init(projectPath: String, projectName: String) {
-        self.projectPath = projectPath
-        self.projectName = projectName
+    init(workspacePath: String, workspaceName: String) {
+        self.workspacePath = workspacePath
+        self.workspaceName = workspaceName
 
         let colors = ThemeManager.shared.currentColors
         let window = NSWindow(
@@ -49,7 +49,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
             backing: .buffered,
             defer: false
         )
-        window.title = "Sessions — \(projectName)"
+        window.title = "Sessions — \(workspaceName)"
         window.minSize = NSSize(width: 700, height: 500)
         window.backgroundColor = colors.background
         window.titlebarAppearsTransparent = true
@@ -169,17 +169,17 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
     // MARK: - Data Loading
 
     private func loadData() {
-        let rawSessions = ContextMonitor.shared.listAllSessions(forProjectPath: projectPath)
+        let rawSessions = ContextMonitor.shared.listAllSessions(forWorkspacePath: workspacePath)
         let savedNames = SessionManager.shared.loadSessionNames()
 
         allSessions = rawSessions.map { session in
             let cacheKey = SessionManager.sessionCacheKey(sessionId: session.sessionId, kind: session.kind)
             let name = savedNames[cacheKey]
-            let bookmarkedIds = BookmarkManager.shared.bookmarkedSessionIds(forProjectPath: projectPath, kind: session.kind)
+            let bookmarkedIds = BookmarkManager.shared.bookmarkedSessionIds(forWorkspacePath: workspacePath, kind: session.kind)
             return ExplorerSessionInfo(
                 agentKind: session.kind,
                 sessionId: session.sessionId,
-                filePath: session.filePath ?? URL(fileURLWithPath: NSHomeDirectory() + "/.claude/projects/\(projectPath.claudeProjectDirName)/\(session.sessionId).jsonl"),
+                filePath: session.filePath ?? URL(fileURLWithPath: NSHomeDirectory() + "/.claude/projects/\(workspacePath.claudeProjectDirName)/\(session.sessionId).jsonl"),
                 modificationDate: session.modificationDate,
                 messageCount: session.messageCount,
                 firstUserMessage: session.firstUserMessage,
@@ -253,7 +253,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         guard let session = allSessions.first(where: { $0.cacheKey == selectedSessionId || $0.sessionId == sessionId }),
               let newSessionId = ContextMonitor.shared.truncateSession(
             sessionId: sessionId,
-            projectPath: projectPath,
+            workspacePath: workspacePath,
             afterTurnIndex: turnIndex,
             kind: session.agentKind
         ) else { return }
@@ -268,7 +268,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         guard row < filteredSessions.count else { return }
         let session = filteredSessions[row]
         let sessionId = session.sessionId
-        let newState = BookmarkManager.shared.toggleBookmark(projectPath: projectPath, sessionId: sessionId, kind: session.agentKind)
+        let newState = BookmarkManager.shared.toggleBookmark(workspacePath: workspacePath, sessionId: sessionId, kind: session.agentKind)
         if let idx = allSessions.firstIndex(where: { $0.cacheKey == session.cacheKey }) {
             allSessions[idx].isBookmarked = newState
         }
@@ -304,7 +304,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
         guard let session = allSessions.first(where: { $0.cacheKey == cacheKey }) else { return }
         let sessionId = session.sessionId
 
-        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, projectPath: projectPath, kind: session.agentKind)
+        let entries = ContextMonitor.shared.parseTimeline(sessionId: sessionId, workspacePath: workspacePath, kind: session.agentKind)
 
         if let idx = allSessions.firstIndex(where: { $0.cacheKey == cacheKey }) {
             allSessions[idx].messageCount = entries.count

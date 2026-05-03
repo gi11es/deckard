@@ -138,7 +138,7 @@ extension DeckardWindowController {
     }
 
     @objc func tabBarClicked(_ sender: HorizontalTabView) {
-        selectTabInProject(at: sender.index)
+        selectTabInWorkspace(at: sender.index)
     }
 
     @objc func tabBarCloseClicked(_ sender: NSButton) {

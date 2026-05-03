@@ -95,7 +95,7 @@ final class QuotaMonitorTests: XCTestCase {
     // MARK: - Compute token rate with no files
 
     func testComputeTokenRateWithNonexistentPathReturnsNil() {
-        let rate = QuotaMonitor.shared.computeTokenRate(projectPaths: ["/nonexistent/path"])
+        let rate = QuotaMonitor.shared.computeTokenRate(workspacePaths: ["/nonexistent/path"])
         XCTAssertNil(rate)
     }
 }

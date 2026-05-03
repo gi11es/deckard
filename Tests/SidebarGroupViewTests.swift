@@ -12,9 +12,9 @@ final class SidebarGroupViewTests: XCTestCase {
         collapsed: Bool = false,
         origin: NSPoint = NSPoint(x: 0, y: 50)
     ) -> SidebarGroupView {
-        let group = SidebarGroup(name: "Test Folder")
+        let group = SidebarGroup(name: "Test Group")
         group.isCollapsed = collapsed
-        let view = SidebarGroupView(group: group, projectCount: 2)
+        let view = SidebarGroupView(group: group, workspaceCount: 2)
 
         // Embed in a parent so hitTest gets superview-relative points.
         let parent = NSView(frame: NSRect(x: 0, y: 0, width: 200, height: 200))
@@ -282,7 +282,7 @@ final class SidebarGroupViewTests: XCTestCase {
 
         // Simulate the guard logic from groupToggleClicked.
         group.isCollapsed.toggle()
-        // Guard: if collapsing a group that contains the selected project, force expand.
+        // Guard: if collapsing a group that contains the selected workspace, force expand.
         let selectedWorkspaceId = workspaceId  // selected workspace is inside this group
         if group.isCollapsed, group.workspaceIds.contains(selectedWorkspaceId) {
             group.isCollapsed = false
@@ -300,7 +300,7 @@ final class SidebarGroupViewTests: XCTestCase {
         group.isCollapsed = false
 
         group.isCollapsed.toggle()
-        // Guard: selected project is NOT in this group.
+        // Guard: selected workspace is NOT in this group.
         let selectedWorkspaceId = otherWorkspaceId
         if group.isCollapsed, group.workspaceIds.contains(selectedWorkspaceId) {
             group.isCollapsed = false

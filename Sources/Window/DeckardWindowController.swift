@@ -168,7 +168,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     var workspaces: [WorkspaceItem] = []
     var selectedWorkspaceIndex: Int = -1
 
-    // Sidebar folders
+    // Sidebar groups
     var sidebarGroups: [SidebarGroup] = []
     var sidebarOrder: [SidebarItem] = []
 
@@ -671,7 +671,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         } else if let next = nextVisibleWorkspaceIndex(near: index) {
             selectWorkspace(at: next, autoExpandGroup: false)
         } else {
-            // All remaining workspaces are inside collapsed folders — show empty state.
+            // All remaining workspaces are inside collapsed groups — show empty state.
             selectedWorkspaceIndex = -1
             currentTerminalView?.removeFromSuperview()
             currentTerminalView = nil
@@ -842,11 +842,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         tabCreationOrder.append(tab.id)
 
         if kind == .codex && (tab.sessionId == nil || forkSession) {
-            scheduleCodexSessionDiscovery(forSurfaceId: tab.id, projectPath: workspace.path)
+            scheduleCodexSessionDiscovery(forSurfaceId: tab.id, workspacePath: workspace.path)
         }
     }
 
-    private func scheduleCodexSessionDiscovery(forSurfaceId surfaceId: UUID, projectPath: String) {
+    private func scheduleCodexSessionDiscovery(forSurfaceId surfaceId: UUID, workspacePath: String) {
         for delay in [1.0, 3.0, 8.0] {
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self,
@@ -857,7 +857,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 guard let processId = ProcessMonitor.shared.shellPid(forSurface: surfaceId),
                       let session = ContextMonitor.shared.codexSessionInfo(
                         openedByProcessId: processId,
-                        projectPath: projectPath
+                        workspacePath: workspacePath
                 ) else { return }
 
                 self.updateSessionId(forSurfaceId: surfaceId.uuidString, sessionId: session.sessionId)
@@ -1029,7 +1029,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
-    func selectTabInProject(at tabIndex: Int) {
+    func selectTabInWorkspace(at tabIndex: Int) {
         guard let workspace = currentWorkspace else { return }
         guard tabIndex >= 0, tabIndex < workspace.tabs.count else { return }
         workspace.selectedTabIndex = tabIndex
@@ -1052,12 +1052,12 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func selectNextTab() {
         guard let workspace = currentWorkspace, !workspace.tabs.isEmpty else { return }
-        selectTabInProject(at: (workspace.selectedTabIndex + 1) % workspace.tabs.count)
+        selectTabInWorkspace(at: (workspace.selectedTabIndex + 1) % workspace.tabs.count)
     }
 
     func selectPrevTab() {
         guard let workspace = currentWorkspace, !workspace.tabs.isEmpty else { return }
-        selectTabInProject(at: (workspace.selectedTabIndex - 1 + workspace.tabs.count) % workspace.tabs.count)
+        selectTabInWorkspace(at: (workspace.selectedTabIndex - 1 + workspace.tabs.count) % workspace.tabs.count)
     }
 
     var currentWorkspace: WorkspaceItem? {
@@ -1147,11 +1147,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
         let tabName = tab.name
         let tabId = tab.id
-        let projectPath = workspace.path
+        let workspacePath = workspace.path
         let allPaths = workspaces.map { $0.path }
         DispatchQueue.global(qos: .utility).async {
-            let usage = ContextMonitor.shared.getUsage(sessionId: sessionId, projectPath: projectPath)
-            let rate = QuotaMonitor.shared.computeTokenRate(projectPaths: allPaths)
+            let usage = ContextMonitor.shared.getUsage(sessionId: sessionId, workspacePath: workspacePath)
+            let rate = QuotaMonitor.shared.computeTokenRate(workspacePaths: allPaths)
             DispatchQueue.main.async { [weak self] in
                 guard let self = self else { return }
                 // Only update if this tab is still the active one
@@ -1181,14 +1181,14 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let tabName = tab.name
         let tabId = tab.id
         let initialSessionId = tab.sessionId
-        let projectPath = workspace.path
+        let workspacePath = workspace.path
         DispatchQueue.global(qos: .utility).async {
             var sessionId = initialSessionId
             if sessionId == nil,
                let processId = ProcessMonitor.shared.shellPid(forSurface: tabId) {
                 sessionId = ContextMonitor.shared.codexSessionInfo(
                     openedByProcessId: processId,
-                    projectPath: projectPath
+                    workspacePath: workspacePath
                 )?.sessionId
             }
             let usage = ContextMonitor.shared.getCodexUsage(sessionId: sessionId)
@@ -1225,7 +1225,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private struct CodexBadgePollTarget {
         let surfaceId: UUID
-        let projectPath: String
+        let workspacePath: String
         let sessionId: String?
         let processId: pid_t?
     }
@@ -1246,11 +1246,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 for tab in workspace.tabs {
                     tabInfos.append(ProcessMonitor.TabInfo(
                         surfaceId: tab.id, kind: tab.kind,
-                        name: tab.name, projectPath: workspace.path))
+                        name: tab.name, workspacePath: workspace.path))
                     if tab.kind == .codex {
                         codexTargets.append(CodexBadgePollTarget(
                             surfaceId: tab.id,
-                            projectPath: workspace.path,
+                            workspacePath: workspace.path,
                             sessionId: tab.sessionId,
                             processId: ProcessMonitor.shared.shellPid(forSurface: tab.id)))
                     }
@@ -1278,7 +1278,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                let processId = target.processId,
                let session = ContextMonitor.shared.codexSessionInfo(
                     openedByProcessId: processId,
-                    projectPath: target.projectPath
+                    workspacePath: target.workspacePath
                ),
                !discoveredSessionIds.values.contains(session.sessionId) {
                 sessionId = session.sessionId
@@ -1468,7 +1468,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for (pi, workspace) in workspaces.enumerated() {
             if let ti = workspace.tabs.firstIndex(where: { $0.id == tabId }) {
                 selectWorkspace(at: pi)
-                selectTabInProject(at: ti)
+                selectTabInWorkspace(at: ti)
                 window?.makeKeyAndOrderFront(nil)
                 return
             }
@@ -1592,7 +1592,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             )
         }
 
-        // Persist sidebar folders
+        // Persist sidebar groups
         state.sidebarGroups = sidebarGroups.map { group in
             SidebarGroupState(
                 id: group.id.uuidString,
@@ -1621,7 +1621,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private func restoreOrCreateInitial() {
         guard let state = SessionManager.shared.load(),
-              let projectStates = state.workspaces, !projectStates.isEmpty else {
+              let workspaceStates = state.workspaces, !workspaceStates.isEmpty else {
             // Nothing to restore — start autosave immediately
             SessionManager.shared.startAutosave { [weak self] in
                 self?.captureState() ?? DeckardState()
@@ -1635,24 +1635,24 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // TCC prompt per protected group category (Documents, Desktop, etc.)
         // before mass-creating tabs.  Without this, each forkpty queues its
         // own TCC request and the user sees one dialog per tab.
-        let uniquePaths = Set(projectStates.map(\.path))
+        let uniquePaths = Set(workspaceStates.map(\.path))
         for path in uniquePaths {
             _ = FileManager.default.isReadableFile(atPath: path)
         }
 
-        let selectedIdx = min(max(state.selectedTabIndex, 0), projectStates.count - 1)
+        let selectedIdx = min(max(state.selectedTabIndex, 0), workspaceStates.count - 1)
         var codexRestoreCandidatesByPath: [String: [String]] = [:]
-        var usedCodexSessionIds = Set(projectStates.flatMap { workspace in
+        var usedCodexSessionIds = Set(workspaceStates.flatMap { workspace in
             workspace.tabs.compactMap { tab in
                 tab.kind == .codex ? tab.sessionId : nil
             }
         })
 
-        func recoverCodexSessionId(for projectPath: String, tabName: String) -> String? {
-            let resolvedPath = (projectPath as NSString).resolvingSymlinksInPath
+        func recoverCodexSessionId(for workspacePath: String, tabName: String) -> String? {
+            let resolvedPath = (workspacePath as NSString).resolvingSymlinksInPath
             if codexRestoreCandidatesByPath[resolvedPath] == nil {
                 codexRestoreCandidatesByPath[resolvedPath] = ContextMonitor.shared
-                    .listCodexSessions(forProjectPath: resolvedPath)
+                    .listCodexSessions(forWorkspacePath: resolvedPath)
                     .map(\.sessionId)
             }
 
@@ -1672,7 +1672,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // sees a working terminal right away. Collect remaining tabs for Phase 2.
         var pending: [(workspace: WorkspaceItem, tab: WorkspaceTabState, originalIndex: Int)] = []
 
-        for (i, ps) in projectStates.enumerated() {
+        for (i, ps) in workspaceStates.enumerated() {
             let workspace = WorkspaceItem(path: ps.path)
             workspace.name = ps.name
             workspace.defaultArgs = ps.defaultArgs
@@ -1703,7 +1703,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         // Keep isRestoring = true until Phase 2 finishes, so selectWorkspace
         // won't clamp selectedTabIndex before all tabs are inserted.
 
-        // Restore sidebar folders
+        // Restore sidebar groups
         restoreSidebarGroups(from: state)
 
         rebuildSidebar()
@@ -1717,20 +1717,20 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     private func restoreSidebarGroups(from state: DeckardState) {
         // During restore, WorkspaceItem gets a new UUID. Build a map from saved-id -> live WorkspaceItem.
-        // Match by index (workspaces are created in the same order as projectStates) rather than
+        // Match by index (workspaces are created in the same order as workspaceStates) rather than
         // by path, because multiple workspaces can share the same path (e.g. ~/Downloads).
-        guard let projectStates = state.workspaces else { return }
-        var savedIdToProject: [String: WorkspaceItem] = [:]
-        for (i, ps) in projectStates.enumerated() {
+        guard let workspaceStates = state.workspaces else { return }
+        var savedIdToWorkspace: [String: WorkspaceItem] = [:]
+        for (i, ps) in workspaceStates.enumerated() {
             guard i < workspaces.count else { continue }
-            savedIdToProject[ps.id] = workspaces[i]
+            savedIdToWorkspace[ps.id] = workspaces[i]
         }
 
-        // Restore folders
+        // Restore groups
         if let groupStates = state.sidebarGroups {
             for fs in groupStates {
                 guard let groupId = UUID(uuidString: fs.id) else { continue }
-                let resolvedIds = fs.workspaceIds.compactMap { savedIdToProject[$0]?.id }
+                let resolvedIds = fs.workspaceIds.compactMap { savedIdToWorkspace[$0]?.id }
                 let group = SidebarGroup(
                     id: groupId,
                     name: fs.name,
@@ -1751,7 +1751,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                     }
                     return nil
                 case .workspace(let idStr):
-                    if let workspace = savedIdToProject[idStr] {
+                    if let workspace = savedIdToWorkspace[idStr] {
                         return .workspace(workspace.id)
                     }
                     return nil
