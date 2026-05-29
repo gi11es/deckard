@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.22.0](https://github.com/gi11es/deckard/compare/v0.21.2...v0.22.0) (2026-05-29)
+
+
+### Features
+
+* add Codex tab and session support ([96d8b8d](https://github.com/gi11es/deckard/commit/96d8b8d4c43e9df9bc309a9bda3159ac69592f16))
+
+
+### Bug Fixes
+
+* forward Cmd+Delete and Option+Delete to PTY ([#92](https://github.com/gi11es/deckard/issues/92)) ([ac2a10c](https://github.com/gi11es/deckard/commit/ac2a10cd00b1441ee2ad9e1d7214e0ce62ad4be8))
+* prevent unsafe shortcut rebinding ([071b282](https://github.com/gi11es/deckard/commit/071b28262568e50fae55717e6512d5d55f2a7a71))
+* restore public.folder UTI in workspace picker mdfind query ([ebcb0ad](https://github.com/gi11es/deckard/commit/ebcb0ade0be1ed032f0d9df7c02d782abeb971bf))
+* start tmux panes with login shell ([1aaead1](https://github.com/gi11es/deckard/commit/1aaead1dfe2dbe3ffd51bdcc4b59e1a62c1e74fe))
+
 ## [0.21.2](https://github.com/gi11es/deckard/compare/v0.21.1...v0.21.2) (2026-04-26)
 
 
