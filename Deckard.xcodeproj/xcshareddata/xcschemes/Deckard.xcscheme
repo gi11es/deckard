@@ -15,7 +15,7 @@
             <BuildableReference
                BuildableIdentifier = "primary"
                BlueprintIdentifier = "A18E8FFD16387CEF6CAAEF2C"
-               BuildableName = "Deckard.app"
+               BuildableName = "Deckard Dev.app"
                BlueprintName = "Deckard"
                ReferencedContainer = "container:Deckard.xcodeproj">
             </BuildableReference>
@@ -56,7 +56,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A18E8FFD16387CEF6CAAEF2C"
-            BuildableName = "Deckard.app"
+            BuildableName = "Deckard Dev.app"
             BlueprintName = "Deckard"
             ReferencedContainer = "container:Deckard.xcodeproj">
          </BuildableReference>
@@ -73,7 +73,7 @@
          <BuildableReference
             BuildableIdentifier = "primary"
             BlueprintIdentifier = "A18E8FFD16387CEF6CAAEF2C"
-            BuildableName = "Deckard.app"
+            BuildableName = "Deckard Dev.app"
             BlueprintName = "Deckard"
             ReferencedContainer = "container:Deckard.xcodeproj">
          </BuildableReference>

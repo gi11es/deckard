@@ -22,6 +22,16 @@ class TabItem {
     var badgeState: BadgeState = .none
     /// Set during restore — suppresses completedUnseen until hook.session-start fires.
     var suppressUnseen: Bool = false
+    /// Deferred shell-start parameters. Set when the tab is created lazily
+    /// the process only spawns when the tab is first shown.
+    var pendingStart: PendingStart?
+
+    struct PendingStart {
+        let workingDirectory: String
+        let envVars: [String: String]
+        let initialInput: String?
+        let tmuxSession: String?
+    }
 
     var isClaude: Bool { kind == .claude }
     var isCodex: Bool { kind == .codex }
@@ -577,10 +587,14 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             workspace.name = snapshot.name
             workspace.defaultArgs = snapshot.defaultArgs
             workspace.defaultCodexArgs = snapshot.defaultCodexArgs
+            // When lazy restore is on, only the selected tab's process starts
+            // otherwise all tabs start eagerly.
+            let lazy = UserDefaults.standard.bool(forKey: "lazySessionRestore")
             for ts in snapshot.tabs {
                 createTabInWorkspace(workspace, kind: ts.kind, name: ts.name,
                                    sessionIdToResume: ts.kind.isAgent ? ts.sessionId : nil,
-                                   tmuxSessionToResume: ts.tmuxSessionName)
+                                   tmuxSessionToResume: ts.tmuxSessionName,
+                                   deferStart: lazy)
             }
             workspace.selectedTabIndex = min(snapshot.selectedTabIndex, workspace.tabs.count - 1)
         }
@@ -754,7 +768,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         createTabInWorkspace(workspace, kind: isClaude ? .claude : .terminal, name: name, sessionIdToResume: sessionIdToResume, forkSession: forkSession, tmuxSessionToResume: tmuxSessionToResume, extraArgs: extraArgs)
     }
 
-    func createTabInWorkspace(_ workspace: WorkspaceItem, kind: TabKind, name: String? = nil, sessionIdToResume: String? = nil, forkSession: Bool = false, tmuxSessionToResume: String? = nil, extraArgs: String? = nil) {
+    func createTabInWorkspace(_ workspace: WorkspaceItem, kind: TabKind, name: String? = nil, sessionIdToResume: String? = nil, forkSession: Bool = false, tmuxSessionToResume: String? = nil, extraArgs: String? = nil, deferStart: Bool = false) {
         let surface = TerminalSurface()
         let tabName: String
         if let name = name {
@@ -823,14 +837,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             initialInput = nil
         }
 
-        DiagnosticLog.shared.log("surface", "createTab: \(kind.rawValue) surfaceId=\(surface.surfaceId)")
-
-        surface.startShell(
-            workingDirectory: workspace.path,
-            envVars: envVars,
-            initialInput: initialInput,
-            tmuxSession: tmuxSessionToResume
-        )
+        DiagnosticLog.shared.log("surface", "createTab: \(kind.rawValue) surfaceId=\(surface.surfaceId) deferred=\(deferStart)")
 
         surface.onProcessExit = { [weak self] exitedSurface in
             DispatchQueue.main.async {
@@ -838,11 +845,74 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             }
         }
 
+        if deferStart {
+            tab.pendingStart = TabItem.PendingStart(
+                workingDirectory: workspace.path,
+                envVars: envVars,
+                initialInput: initialInput,
+                tmuxSession: tmuxSessionToResume
+            )
+
+            if kind == .terminal {
+                surface.tmuxSessionName = tmuxSessionToResume
+            }
+        } else {
+            surface.startShell(
+                workingDirectory: workspace.path,
+                envVars: envVars,
+                initialInput: initialInput,
+                tmuxSession: tmuxSessionToResume
+            )
+            if kind == .codex && (tab.sessionId == nil || forkSession) {
+                scheduleCodexSessionDiscovery(forSurfaceId: tab.id, workspacePath: workspace.path)
+            }
+        }
+
         workspace.tabs.append(tab)
         tabCreationOrder.append(tab.id)
+    }
 
-        if kind == .codex && (tab.sessionId == nil || forkSession) {
-            scheduleCodexSessionDiscovery(forSurfaceId: tab.id, workspacePath: workspace.path)
+    /// Start the shell for a lazily-created tab the first time it is shown.
+    /// - Parameter refreshSidebar: when true, schedules a sidebar rebuild so the
+    ///   tab's dot fills in. The eager bulk-start path passes
+    ///   false and rebuilds once at the end instead.
+    func startPendingShellIfNeeded(_ tab: TabItem, refreshSidebar: Bool = true) {
+        guard let pending = tab.pendingStart else { return }
+        tab.pendingStart = nil
+
+        DiagnosticLog.shared.log("surface",
+            "lazy start: \(tab.kind.rawValue) surfaceId=\(tab.surface.surfaceId) cwd=\(pending.workingDirectory)")
+
+        tab.surface.startShell(
+            workingDirectory: pending.workingDirectory,
+            envVars: pending.envVars,
+            initialInput: pending.initialInput,
+            tmuxSession: pending.tmuxSession
+        )
+
+        if tab.kind == .codex && tab.sessionId == nil {
+            scheduleCodexSessionDiscovery(forSurfaceId: tab.id, workspacePath: pending.workingDirectory)
+        }
+
+        // The tab is no longer pending — refresh the sidebar so its dot fills in
+        // (hollow → solid). Async to avoid re-entrancy when called mid-rebuild.
+        if refreshSidebar {
+            DispatchQueue.main.async { [weak self] in
+                self?.rebuildSidebar()
+            }
+        }
+    }
+
+    /// Eager-restore helper: start every still-pending tab one at a time with a
+    /// small delay, so a full session restore doesn't spawn N processes at once.
+    private func startPendingTabsProgressively(_ remaining: [TabItem]) {
+        guard let tab = remaining.first else {
+            rebuildSidebar()
+            return
+        }
+        startPendingShellIfNeeded(tab, refreshSidebar: false)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [weak self] in
+            self?.startPendingTabsProgressively(Array(remaining.dropFirst()))
         }
     }
 
@@ -1067,6 +1137,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     func showTab(_ tab: TabItem) {
         hideEmptyState()
+
+
+        startPendingShellIfNeeded(tab)
 
         let view = tab.surface.view
 
@@ -1694,40 +1767,29 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             return nil
         }
 
-        // Phase 1: Create the active workspace's active tab immediately so the user
-        // sees a working terminal right away. Collect remaining tabs for Phase 2.
-        var pending: [(workspace: WorkspaceItem, tab: WorkspaceTabState, originalIndex: Int)] = []
 
-        for (i, ps) in workspaceStates.enumerated() {
+        for ps in workspaceStates {
             let workspace = WorkspaceItem(path: ps.path)
             workspace.name = ps.name
             workspace.defaultArgs = ps.defaultArgs
             workspace.defaultCodexArgs = ps.defaultCodexArgs
 
-            let selTab = min(max(ps.selectedTabIndex, 0), max(ps.tabs.count - 1, 0))
-
-            for (t, ts) in ps.tabs.enumerated() {
+            for ts in ps.tabs {
                 var restoredTab = ts
                 if restoredTab.kind == .codex, restoredTab.sessionId == nil {
                     restoredTab.sessionId = recoverCodexSessionId(for: ps.path, tabName: restoredTab.name)
                 }
-
-                if i == selectedIdx && t == selTab {
-                    // Create the active tab's surface synchronously
-                    createTabInWorkspace(workspace, kind: restoredTab.kind, name: restoredTab.name,
-                                       sessionIdToResume: restoredTab.kind.isAgent ? restoredTab.sessionId : nil,
-                                       tmuxSessionToResume: restoredTab.tmuxSessionName)
-                } else {
-                    pending.append((workspace: workspace, tab: restoredTab, originalIndex: t))
-                }
+                createTabInWorkspace(workspace, kind: restoredTab.kind, name: restoredTab.name,
+                                   sessionIdToResume: restoredTab.kind.isAgent ? restoredTab.sessionId : nil,
+                                   tmuxSessionToResume: restoredTab.tmuxSessionName,
+                                   deferStart: true)
             }
 
-            workspace.selectedTabIndex = selTab
+            workspace.selectedTabIndex = min(max(ps.selectedTabIndex, 0), max(ps.tabs.count - 1, 0))
             workspaces.append(workspace)
         }
 
-        // Keep isRestoring = true until Phase 2 finishes, so selectWorkspace
-        // won't clamp selectedTabIndex before all tabs are inserted.
+        isRestoring = false
 
         // Restore sidebar groups
         restoreSidebarGroups(from: state)
@@ -1736,9 +1798,23 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         if selectedIdx >= 0 && selectedIdx < workspaces.count {
             selectWorkspace(at: selectedIdx)
         }
+        rebuildTabBar()
+        saveState()
 
-        // Phase 2: Create remaining surfaces progressively with small delays for UX.
-        createTabsProgressively(pending)
+        // Start autosave now that all tabs are restored.
+        SessionManager.shared.startAutosave { [weak self] in
+            self?.captureState() ?? DeckardState()
+        }
+
+        let lazy = UserDefaults.standard.bool(forKey: "lazySessionRestore")
+        DiagnosticLog.shared.log("restore",
+            "restored \(workspaces.count) workspaces, \(workspaces.reduce(0) { $0 + $1.tabs.count }) tabs (lazy=\(lazy))")
+
+
+        if !lazy {
+            let pendingTabs = workspaces.flatMap { $0.tabs.filter { $0.pendingStart != nil } }
+            startPendingTabsProgressively(pendingTabs)
+        }
     }
 
     private func restoreSidebarGroups(from state: DeckardState) {
@@ -1786,57 +1862,6 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         // If no saved order, ensureSidebarOrder() will build one from workspaces
-    }
-
-    private func createTabsProgressively(_ remaining: [(workspace: WorkspaceItem, tab: WorkspaceTabState, originalIndex: Int)]) {
-        guard let first = remaining.first else {
-            // All tabs created — rebuild UI to reflect the full state
-            isRestoring = false
-            rebuildSidebar()
-            rebuildTabBar()
-            saveState()
-
-            // Start autosave now that restore is complete — autosaving
-            // during progressive restore would lose tabs on crash.
-            SessionManager.shared.startAutosave { [weak self] in
-                self?.captureState() ?? DeckardState()
-            }
-
-            // Dump tab creation order -> PID mapping for diagnostics
-            let mapping = tabCreationOrder.enumerated().map { (i, id) -> String in
-                var label = "?"
-                for workspace in workspaces {
-                    if let tab = workspace.tabs.first(where: { $0.id == id }) {
-                        label = "\(tab.kind.rawValue.prefix(1).uppercased()):\(tab.name)@\(workspace.name)"
-                        break
-                    }
-                }
-                return "  [\(i)] \(label)"
-            }.joined(separator: "\n")
-            DiagnosticLog.shared.log("processmon", "tabCreationOrder after restore (\(tabCreationOrder.count) tabs):\n\(mapping)")
-
-            return
-        }
-
-        let ts = first.tab
-        let workspace = first.workspace
-        let insertAt = first.originalIndex
-
-        // Create the tab (appends to workspace.tabs)
-        createTabInWorkspace(workspace, kind: ts.kind, name: ts.name,
-                           sessionIdToResume: ts.kind.isAgent ? ts.sessionId : nil,
-                           tmuxSessionToResume: ts.tmuxSessionName)
-
-        // Move it from the end to its original position
-        if insertAt < workspace.tabs.count - 1 {
-            let tab = workspace.tabs.removeLast()
-            workspace.tabs.insert(tab, at: min(insertAt, workspace.tabs.count))
-        }
-
-        // Small delay between tab creations for smoother UX during restore.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) { [self] in
-            self.createTabsProgressively(Array(remaining.dropFirst()))
-        }
     }
 
     // MARK: - Theme

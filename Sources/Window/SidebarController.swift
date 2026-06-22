@@ -86,7 +86,7 @@ extension DeckardWindowController {
                                      target: self, action: #selector(workspaceRowClicked(_:)))
                 row.shortcutBadge = shortcutForWorkspaceIndex[pi]
                 row.badgeInfos = workspace.tabs.filter { $0.badgeState != .none }.map { tab in
-                    (state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id])
+                    (state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id], pending: tab.pendingStart != nil)
                 }
                 row.onRename = { [weak self] newName in
                     guard let self = self else { return }
@@ -126,11 +126,11 @@ extension DeckardWindowController {
                 }
 
                 // Aggregate badge infos from all workspaces in the group
-                var aggregatedBadges: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?)] = []
+                var aggregatedBadges: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?, pending: Bool)] = []
                 for pid in group.workspaceIds {
                     if let workspace = workspaceById(pid) {
                         for tab in workspace.tabs where tab.badgeState != .none {
-                            aggregatedBadges.append((state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id]))
+                            aggregatedBadges.append((state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id], pending: tab.pendingStart != nil))
                         }
                     }
                 }
@@ -161,7 +161,7 @@ extension DeckardWindowController {
                         row.indent = 16
                         row.shortcutBadge = shortcutForWorkspaceIndex[pi]
                         row.badgeInfos = workspace.tabs.filter { $0.badgeState != .none }.map { tab in
-                            (state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id])
+                            (state: tab.badgeState, name: tab.name, activity: self.terminalActivity[tab.id], pending: tab.pendingStart != nil)
                         }
                         row.onRename = { [weak self] newName in
                             guard let self = self else { return }

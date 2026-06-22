@@ -10,7 +10,8 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         didSet { needsDisplay = true }
     }
     /// Badge info for each Claude tab in this workspace, shown as right-aligned dots.
-    var badgeInfos: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?)] = [] {
+    /// `pending marks a not-yet-loaded (lazy) tab — drawn as a hollow outline dot.
+    var badgeInfos: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?, pending: Bool)] = [] {
         didSet { updateBadgeDots() }
     }
     var onRename: ((String) -> Void)?
@@ -112,10 +113,13 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         for info in badgeInfos where info.state != .none {
             let dot = BadgeShapeView(
                 shape: Self.shapeForBadge(info.state),
-                color: Self.colorForBadge(info.state)
+                color: Self.colorForBadge(info.state),
+                filled: !info.pending
             )
-            dot.toolTip = "\(info.name): \(Self.tooltipForBadge(info.state, activity: info.activity))"
-            if SettingsWindowController.isBadgeAnimated(info.state) {
+            let suffix = info.pending ? " (not loaded)" : ""
+            dot.toolTip = "\(info.name): \(Self.tooltipForBadge(info.state, activity: info.activity))\(suffix)"
+            // Pending tabs aren't actually running, so never pulse them.
+            if !info.pending && SettingsWindowController.isBadgeAnimated(info.state) {
                 Self.addPulseAnimation(to: dot)
             }
             badgeContainer.addArrangedSubview(dot)
@@ -308,7 +312,8 @@ class SidebarGroupView: NSView, NSTextFieldDelegate, NSDraggingSource {
     }
 
     /// Badge info aggregated from all workspaces in the group.
-    var badgeInfos: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?)] = [] {
+    /// `pending` marks a not-yet-loaded (lazy) tab — drawn as a hollow outline dot.
+    var badgeInfos: [(state: TabItem.BadgeState, name: String, activity: ProcessMonitor.ActivityInfo?, pending: Bool)] = [] {
         didSet { updateBadgeDots() }
     }
 
@@ -502,10 +507,12 @@ class SidebarGroupView: NSView, NSTextFieldDelegate, NSDraggingSource {
         for info in badgeInfos where info.state != .none {
             let dot = BadgeShapeView(
                 shape: VerticalTabRowView.shapeForBadge(info.state),
-                color: VerticalTabRowView.colorForBadge(info.state)
+                color: VerticalTabRowView.colorForBadge(info.state),
+                filled: !info.pending
             )
-            dot.toolTip = "\(info.name): \(VerticalTabRowView.tooltipForBadge(info.state, activity: info.activity))"
-            if SettingsWindowController.isBadgeAnimated(info.state) {
+            let suffix = info.pending ? " (not loaded)" : ""
+            dot.toolTip = "\(info.name): \(VerticalTabRowView.tooltipForBadge(info.state, activity: info.activity))\(suffix)"
+            if !info.pending && SettingsWindowController.isBadgeAnimated(info.state) {
                 VerticalTabRowView.addPulseAnimation(to: dot)
             }
             badgeContainer.addArrangedSubview(dot)
@@ -890,20 +897,23 @@ class BadgeShapeView: NSView {
 
     private var shape: TabItem.BadgeShape
     private var color: NSColor
+    /// When false, the dot is drawn as a stroked outline instead of filled, used to indicate a not-yet-loaded (lazy) session.
+    private var filled: Bool
     private var isPulseAnimationEnabled = false
     private var pulseTimer: Timer?
     private var pulseStartTime: TimeInterval = 0
 
-    init(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
+    init(shape: TabItem.BadgeShape, color: NSColor, filled: Bool = true, size: CGFloat = 7) {
         self.shape = shape
         self.color = color
+        self.filled = filled
         super.init(frame: NSRect(x: 0, y: 0, width: size, height: size))
         translatesAutoresizingMaskIntoConstraints = false
         NSLayoutConstraint.activate([
             widthAnchor.constraint(equalToConstant: size),
             heightAnchor.constraint(equalToConstant: size),
         ])
-        updateAppearance(shape: shape, color: color, size: size)
+        updateAppearance(shape: shape, color: color, filled: filled, size: size)
     }
 
     required init?(coder: NSCoder) { fatalError() }
@@ -932,18 +942,29 @@ class BadgeShapeView: NSView {
         }
     }
 
-    func updateAppearance(shape: TabItem.BadgeShape, color: NSColor, size: CGFloat = 7) {
+    func updateAppearance(shape: TabItem.BadgeShape, color: NSColor, filled: Bool = true, size: CGFloat = 7) {
         self.shape = shape
         self.color = color
+        self.filled = filled
         needsDisplay = true
     }
 
     override func draw(_ dirtyRect: NSRect) {
         guard let context = NSGraphicsContext.current?.cgContext else { return }
         context.saveGState()
-        context.addPath(Self.path(for: shape, in: bounds))
-        context.setFillColor(color.cgColor)
-        context.fillPath()
+        if filled {
+            context.addPath(Self.path(for: shape, in: bounds))
+            context.setFillColor(color.cgColor)
+            context.fillPath()
+        } else {
+            // Hollow outline inset by half the line width so the stroke isn't clipped.
+            let lineWidth: CGFloat = 1.25
+            let inset = bounds.insetBy(dx: lineWidth / 2, dy: lineWidth / 2)
+            context.addPath(Self.path(for: shape, in: inset))
+            context.setStrokeColor(color.cgColor)
+            context.setLineWidth(lineWidth)
+            context.strokePath()
+        }
         context.restoreGState()
     }
 
