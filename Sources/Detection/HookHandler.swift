@@ -15,9 +15,13 @@ class HookHandler {
                 windowController?.tabForSurfaceId(surfaceId)?.suppressUnseen = false
                 windowController?.updateBadge(forSurfaceId: surfaceId, state: .waitingForInput)
                 windowController?.revealClaudeTab(surfaceId: surfaceId)
-                // Capture the real session ID from Claude Code
+                // Capture the real session ID from Claude Code. The cwd lets
+                // the controller reject session-starts from nested claude
+                // processes that inherited DECKARD_SURFACE_ID.
                 if let sessionId = message.sessionId {
-                    windowController?.updateSessionId(forSurfaceId: surfaceId, sessionId: sessionId)
+                    windowController?.updateSessionId(
+                        forSurfaceId: surfaceId, sessionId: sessionId,
+                        cwd: message.workingDirectory)
                 }
             }
             forwardRateLimits(from: message)

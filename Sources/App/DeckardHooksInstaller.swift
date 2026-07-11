@@ -23,6 +23,11 @@ enum DeckardHooksInstaller {
         #           unreliable for resumed sessions but better than nothing if stdin is empty).
         if [ "$EVENT" = "session-start" ]; then
             SID=$(printf '%s' "$INPUT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('session_id',''))" 2>/dev/null)
+            # The session's cwd lets Deckard reject session ids from nested
+            # claude processes (they inherit DECKARD_SURFACE_ID but run in
+            # unrelated directories, e.g. temp checkouts).
+            SCWD=$(printf '%s' "$INPUT" | python3 -c "import json,sys; print(json.load(sys.stdin).get('cwd',''))" 2>/dev/null)
+            [ -z "$SCWD" ] && SCWD="$(pwd)"
             if [ -z "$SID" ]; then
                 PID=$$
                 CWD="$(pwd)"
@@ -40,6 +45,7 @@ enum DeckardHooksInstaller {
                 done
             fi
             [ -n "$SID" ] && EXTRA=",\\"sessionId\\":\\"$SID\\""
+            [ -n "$SCWD" ] && EXTRA="$EXTRA,\\"workingDirectory\\":\\"$SCWD\\""
         fi
 
         printf '{"command":"hook.%s","surfaceId":"%s"%s}\\n' "$EVENT" "$DECKARD_SURFACE_ID" "$EXTRA" \\

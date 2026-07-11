@@ -515,6 +515,30 @@ final class DeckardHooksInstallerTests: XCTestCase {
                        "Hook script should extract session_id from stdin JSON")
     }
 
+    func testHookScriptForwardsSessionCwd() throws {
+        let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
+        let hooksDir = tempDir + "hooks/"
+        try FileManager.default.createDirectory(atPath: hooksDir, withIntermediateDirectories: true)
+        addTeardownBlock { try? FileManager.default.removeItem(atPath: tempDir) }
+
+        let hookPath = hooksDir + "notify.sh"
+        let statusLinePath = hooksDir + "statusline.sh"
+        DeckardHooksInstaller.installHookScript(
+            hookScriptPath: hookPath,
+            statusLineScriptPath: statusLinePath
+        )
+
+        let content = try String(contentsOfFile: hookPath, encoding: .utf8)
+
+        // session-start must report the session's cwd so Deckard can reject
+        // session ids coming from nested claude processes (which inherit
+        // DECKARD_SURFACE_ID but run in unrelated directories).
+        XCTAssertTrue(content.contains("'cwd'"),
+                      "Hook script should extract cwd from stdin JSON")
+        XCTAssertTrue(content.contains("workingDirectory"),
+                      "Hook script should forward the cwd as workingDirectory")
+    }
+
     func testHookScriptFallsBackToPidWalking() throws {
         let tempDir = NSTemporaryDirectory() + "deckard-hooks-test-\(UUID().uuidString)/"
         let hooksDir = tempDir + "hooks/"
