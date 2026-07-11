@@ -111,6 +111,60 @@ final class ControlSocketTests: XCTestCase {
         cs.stop()
     }
 
+    // MARK: - Client disconnects before reply
+
+    /// A hook client (nc -w 1) that times out closes its end before Deckard
+    /// writes the reply. The reply write must not raise SIGPIPE and kill the
+    /// process — this exact scenario crashed a 35-hour session.
+    func testClientDisconnectBeforeReplyDoesNotKillProcess() throws {
+        let cs = makeSocket()
+        let received = expectation(description: "message received")
+        let deferredReply = Mutex<((ControlResponse) -> Void)?>(nil)
+
+        cs.onMessage = { _, reply in
+            // Hold the reply until after the client has disconnected.
+            deferredReply.withLock { $0 = reply }
+            received.fulfill()
+        }
+
+        cs.start()
+        spinRunLoop(0.3)
+
+        // Connect, send a message, and close immediately without reading the reply.
+        let sent = expectation(description: "sent and closed")
+        let path = cs.path
+        DispatchQueue.global().async {
+            let fd = socket(AF_UNIX, SOCK_STREAM, 0)
+            guard fd >= 0 else { return }
+            var addr = sockaddr_un()
+            addr.sun_family = sa_family_t(AF_UNIX)
+            self.withPath(path, into: &addr)
+            let connected = withUnsafePointer(to: &addr) { addrPtr in
+                addrPtr.withMemoryRebound(to: sockaddr.self, capacity: 1) { sockaddrPtr in
+                    connect(fd, sockaddrPtr, socklen_t(MemoryLayout<sockaddr_un>.size))
+                }
+            }
+            if connected == 0 {
+                "{\"command\":\"ping\"}\n".withCString { ptr in
+                    _ = write(fd, ptr, strlen(ptr))
+                }
+            }
+            close(fd)
+            sent.fulfill()
+        }
+
+        wait(for: [received, sent], timeout: 3)
+        // Let the close propagate, then reply into the dead socket.
+        spinRunLoop(0.2)
+        deferredReply.withLock { $0 }?(ControlResponse(ok: true, message: "pong"))
+        spinRunLoop(0.2)
+
+        // Reaching this line at all is the real assertion: without SIGPIPE
+        // protection the write above terminates the test process.
+        XCTAssertTrue(canConnect(to: cs.path), "socket should still be alive")
+        cs.stop()
+    }
+
     // MARK: - Recovery
 
     func testRestartAfterSocketFileRemoved() throws {

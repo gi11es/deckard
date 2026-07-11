@@ -182,6 +182,12 @@ class ControlSocket {
         }
         guard clientFd >= 0 else { return }
 
+        // Hook clients (nc -w 1) time out and close before we reply; the
+        // reply write must fail with EPIPE, not raise SIGPIPE.
+        var noSigpipe: Int32 = 1
+        _ = setsockopt(clientFd, SOL_SOCKET, SO_NOSIGPIPE,
+                       &noSigpipe, socklen_t(MemoryLayout<Int32>.size))
+
         // Read data from the client
         let source = DispatchSource.makeReadSource(fileDescriptor: clientFd, queue: socketQueue)
         source.setEventHandler { [weak self] in
