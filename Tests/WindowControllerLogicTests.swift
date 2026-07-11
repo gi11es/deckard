@@ -3,6 +3,68 @@ import AppKit
 import KeyboardShortcuts
 @testable import Deckard
 
+// MARK: - Session ownership (nested-claude hijack)
+
+/// Nested claude processes (spawned by a tab's session, inheriting
+/// DECKARD_SURFACE_ID) report session-start from their own cwd. Only a cwd
+/// inside the tab's workspace may update the tab's session id.
+final class SessionOwnershipTests: XCTestCase {
+
+    func testCwdBelongsToWorkspaceAcceptsExactPath() {
+        XCTAssertTrue(DeckardWindowController.cwdBelongsToWorkspace(
+            "/Users/x/proj", workspacePath: "/Users/x/proj"))
+    }
+
+    func testCwdBelongsToWorkspaceAcceptsSubdirectory() {
+        XCTAssertTrue(DeckardWindowController.cwdBelongsToWorkspace(
+            "/Users/x/proj/.claude/worktrees/fix-1", workspacePath: "/Users/x/proj"))
+    }
+
+    func testCwdBelongsToWorkspaceAcceptsNilOrEmptyCwd() {
+        XCTAssertTrue(DeckardWindowController.cwdBelongsToWorkspace(
+            nil, workspacePath: "/Users/x/proj"))
+        XCTAssertTrue(DeckardWindowController.cwdBelongsToWorkspace(
+            "", workspacePath: "/Users/x/proj"))
+    }
+
+    func testCwdBelongsToWorkspaceRejectsTempCheckout() {
+        XCTAssertFalse(DeckardWindowController.cwdBelongsToWorkspace(
+            "/private/var/folders/9z/T/reviewer-pr8112-7301",
+            workspacePath: "/Users/x/proj"))
+    }
+
+    func testCwdBelongsToWorkspaceRejectsSiblingWithCommonPrefix() {
+        XCTAssertFalse(DeckardWindowController.cwdBelongsToWorkspace(
+            "/Users/x/proj-other", workspacePath: "/Users/x/proj"))
+    }
+
+    func testCwdBelongsToWorkspaceRejectsParentDirectory() {
+        XCTAssertFalse(DeckardWindowController.cwdBelongsToWorkspace(
+            "/Users/x", workspacePath: "/Users/x/proj"))
+    }
+
+    func testCwdBelongsToWorkspaceResolvesSymlinks() throws {
+        // On macOS /tmp is a symlink to /private/tmp. Symlink resolution only
+        // applies to paths that exist — which cwd and workspace always do.
+        XCTAssertTrue(DeckardWindowController.cwdBelongsToWorkspace(
+            "/tmp", workspacePath: "/private/tmp"))
+        XCTAssertTrue(DeckardWindowController.cwdBelongsToWorkspace(
+            "/private/tmp", workspacePath: "/tmp"))
+
+        let sub = "deckard-ownership-test-\(UUID().uuidString)"
+        try FileManager.default.createDirectory(
+            atPath: "/tmp/\(sub)", withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(atPath: "/tmp/\(sub)") }
+        XCTAssertTrue(DeckardWindowController.cwdBelongsToWorkspace(
+            "/private/tmp/\(sub)", workspacePath: "/tmp"))
+    }
+
+    func testCwdBelongsToWorkspaceHandlesTrailingSlash() {
+        XCTAssertTrue(DeckardWindowController.cwdBelongsToWorkspace(
+            "/Users/x/proj/", workspacePath: "/Users/x/proj"))
+    }
+}
+
 final class WindowControllerLogicTests: XCTestCase {
 
     // MARK: - BadgeState raw values

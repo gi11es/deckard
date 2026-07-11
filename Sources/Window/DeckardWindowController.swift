@@ -1477,8 +1477,34 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
 
     // MARK: - Session ID / Badge
 
-    func updateSessionId(forSurfaceId surfaceIdStr: String, sessionId: String) {
+    /// Whether a session-start reported from `cwd` may claim a tab whose
+    /// workspace is at `workspacePath`. Nested claude processes (spawned by
+    /// the tab's own session — subagents, review harnesses) inherit
+    /// DECKARD_SURFACE_ID but run in unrelated directories; adopting their
+    /// session id breaks resume and context tracking for the tab.
+    static func cwdBelongsToWorkspace(_ cwd: String?, workspacePath: String) -> Bool {
+        guard let cwd, !cwd.isEmpty else { return true }
+        func components(_ path: String) -> [String] {
+            // NSString's variant resolves symlinks AND strips /private for
+            // /tmp, /var, /etc — URL.resolvingSymlinksInPath() does neither
+            // consistently, so /tmp and /private/tmp would not match.
+            URL(fileURLWithPath: (path as NSString).resolvingSymlinksInPath)
+                .standardizedFileURL.pathComponents
+        }
+        let cwdParts = components(cwd)
+        let workspaceParts = components(workspacePath)
+        return cwdParts.count >= workspaceParts.count
+            && Array(cwdParts.prefix(workspaceParts.count)) == workspaceParts
+    }
+
+    func updateSessionId(forSurfaceId surfaceIdStr: String, sessionId: String, cwd: String? = nil) {
         guard let tab = tabForSurfaceId(surfaceIdStr) else { return }
+        if let workspace = workspaces.first(where: { ws in ws.tabs.contains(where: { $0.id == tab.id }) }),
+           !Self.cwdBelongsToWorkspace(cwd, workspacePath: workspace.path) {
+            DiagnosticLog.shared.log("session",
+                "Ignoring session-start from nested claude: cwd=\(cwd ?? "") is outside workspace \(workspace.path), sessionId=\(sessionId)")
+            return
+        }
         guard tab.sessionId != sessionId else { return }
         tab.sessionId = sessionId
         SessionManager.shared.saveSessionName(sessionId: sessionId, kind: tab.kind, name: tab.name)
