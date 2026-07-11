@@ -1,0 +1,60 @@
+name: E2E
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to build and test (branch, tag, or SHA)'
+        required: true
+      expect_sigpipe_survive:
+        description: 'Expect the app to survive close-early clients (1 if the ref contains the SIGPIPE fix)'
+        required: false
+        default: '1'
+      expect_hijack_reject:
+        description: 'Expect foreign-cwd session-starts to be rejected (1 if the ref contains the hijack fix)'
+        required: false
+        default: '1'
+
+jobs:
+  e2e:
+    name: Sandboxed app E2E (${{ inputs.ref }})
+    runs-on: macos-15
+    steps:
+      - name: Check out target ref
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref }}
+
+      # The e2e driver lives on the dispatching branch, not necessarily on
+      # the target ref — fetch it separately so any ref can be tested.
+      - name: Check out e2e driver
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+          path: .e2e-harness
+
+      - name: Select Xcode 26
+        run: sudo xcode-select -s /Applications/Xcode_26.2.app
+
+      - name: Resolve SPM dependencies
+        run: xcodebuild -resolvePackageDependencies -project Deckard.xcodeproj
+
+      - name: Build Deckard
+        run: |
+          xcodebuild -project Deckard.xcodeproj \
+            -scheme Deckard \
+            -configuration Debug \
+            -destination 'platform=macOS' \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY=- CODE_SIGN_STYLE=Manual \
+            build
+
+      - name: Run sandboxed E2E
+        run: |
+          APP=$(find build/Build/Products/Debug -maxdepth 1 -name '*.app' | head -1)
+          BIN="$APP/Contents/MacOS/$(defaults read "$PWD/$APP/Contents/Info" CFBundleExecutable)"
+          echo "Testing binary: $BIN"
+          python3 .e2e-harness/scripts/e2e-sandbox.py "$BIN" \
+            "${{ inputs.ref }}" \
+            "${{ inputs.expect_sigpipe_survive }}" \
+            "${{ inputs.expect_hijack_reject }}"
