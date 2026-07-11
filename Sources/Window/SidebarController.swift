@@ -594,6 +594,11 @@ extension DeckardWindowController {
         defaultCodexArgsItem.representedObject = workspace
         menu.addItem(defaultCodexArgsItem)
 
+        let defaultGrokArgsItem = NSMenuItem(title: "Default Grok Arguments\u{2026}", action: #selector(defaultGrokArgsMenuAction(_:)), keyEquivalent: "")
+        defaultGrokArgsItem.target = self
+        defaultGrokArgsItem.representedObject = workspace
+        menu.addItem(defaultGrokArgsItem)
+
         menu.addItem(.separator())
 
         // Group options
@@ -746,6 +751,31 @@ extension DeckardWindowController {
             guard response == .alertFirstButtonReturn else { return }
             let value = field.stringValue.trimmingCharacters(in: .whitespaces)
             workspace.defaultCodexArgs = value.isEmpty ? nil : value
+            self?.saveState()
+        }
+    }
+
+    @objc func defaultGrokArgsMenuAction(_ sender: NSMenuItem) {
+        guard let workspace = sender.representedObject as? WorkspaceItem,
+              let window else { return }
+
+        let alert = NSAlert()
+        alert.messageText = "Default Grok Arguments for \(workspace.name)"
+        alert.informativeText = "These arguments will be used for new Grok tabs in this workspace, overriding global defaults. Leave empty to clear."
+        alert.addButton(withTitle: "Save")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = ClaudeArgsField(
+            frame: NSRect(x: 0, y: 0, width: 400, height: 60),
+            flagSource: .grok
+        )
+        field.stringValue = workspace.defaultGrokArgs ?? ""
+        alert.accessoryView = field
+
+        alert.beginSheetModal(for: window) { [weak self] response in
+            guard response == .alertFirstButtonReturn else { return }
+            let value = field.stringValue.trimmingCharacters(in: .whitespaces)
+            workspace.defaultGrokArgs = value.isEmpty ? nil : value
             self?.saveState()
         }
     }

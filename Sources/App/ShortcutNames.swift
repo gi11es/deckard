@@ -5,6 +5,7 @@ extension KeyboardShortcuts.Name {
     static let openWorkspace = Self("openWorkspace", default: .init(.o, modifiers: .command))
     static let newClaudeTab = Self("newClaudeTab", default: .init(.t, modifiers: .command))
     static let newCodexTab = Self("newCodexTab", default: .init(.t, modifiers: [.command, .option]))
+    static let newGrokTab = Self("newGrokTab", default: .init(.t, modifiers: [.command, .control]))
     static let newTerminalTab = Self("newTerminalTab", default: .init(.t, modifiers: [.command, .shift]))
     static let closeTab = Self("closeTab", default: .init(.w, modifiers: .command))
     static let closeWorkspace = Self("closeWorkspace", default: .init(.w, modifiers: [.command, .shift]))
@@ -39,6 +40,7 @@ let configurableShortcuts: [ShortcutEntry] = [
     ShortcutEntry(name: .openWorkspace, label: "Open Workspace"),
     ShortcutEntry(name: .newClaudeTab, label: "New Claude Tab"),
     ShortcutEntry(name: .newCodexTab, label: "New Codex Tab"),
+    ShortcutEntry(name: .newGrokTab, label: "New Grok Tab"),
     ShortcutEntry(name: .newTerminalTab, label: "New Terminal Tab"),
     ShortcutEntry(name: .closeTab, label: "Close Tab"),
     ShortcutEntry(name: .closeWorkspace, label: "Close Workspace"),

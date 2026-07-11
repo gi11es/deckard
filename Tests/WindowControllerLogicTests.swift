@@ -80,6 +80,10 @@ final class WindowControllerLogicTests: XCTestCase {
         XCTAssertEqual(TabItem.BadgeState.codexThinking.rawValue, "codexThinking")
         XCTAssertEqual(TabItem.BadgeState.codexError.rawValue, "codexError")
         XCTAssertEqual(TabItem.BadgeState.codexCompletedUnseen.rawValue, "codexCompletedUnseen")
+        XCTAssertEqual(TabItem.BadgeState.grokIdle.rawValue, "grokIdle")
+        XCTAssertEqual(TabItem.BadgeState.grokThinking.rawValue, "grokThinking")
+        XCTAssertEqual(TabItem.BadgeState.grokError.rawValue, "grokError")
+        XCTAssertEqual(TabItem.BadgeState.grokCompletedUnseen.rawValue, "grokCompletedUnseen")
         XCTAssertEqual(TabItem.BadgeState.terminalIdle.rawValue, "terminalIdle")
         XCTAssertEqual(TabItem.BadgeState.terminalActive.rawValue, "terminalActive")
         XCTAssertEqual(TabItem.BadgeState.terminalError.rawValue, "terminalError")
@@ -94,6 +98,8 @@ final class WindowControllerLogicTests: XCTestCase {
         XCTAssertEqual(TabItem.BadgeState(rawValue: "needsPermission"), .needsPermission)
         XCTAssertEqual(TabItem.BadgeState(rawValue: "codexThinking"), .codexThinking)
         XCTAssertEqual(TabItem.BadgeState(rawValue: "codexCompletedUnseen"), .codexCompletedUnseen)
+        XCTAssertEqual(TabItem.BadgeState(rawValue: "grokThinking"), .grokThinking)
+        XCTAssertEqual(TabItem.BadgeState(rawValue: "grokCompletedUnseen"), .grokCompletedUnseen)
         XCTAssertNil(TabItem.BadgeState(rawValue: "invalid"))
     }
 
@@ -104,14 +110,15 @@ final class WindowControllerLogicTests: XCTestCase {
             .none, .idle, .thinking, .waitingForInput,
             .needsPermission, .error,
             .codexIdle, .codexThinking, .codexError, .codexCompletedUnseen,
+            .grokIdle, .grokThinking, .grokError, .grokCompletedUnseen,
             .terminalIdle, .terminalActive, .terminalError,
             .completedUnseen, .terminalCompletedUnseen,
         ]
-        XCTAssertEqual(allCases.count, 15)
+        XCTAssertEqual(allCases.count, 19)
 
         // Verify all have distinct raw values
         let rawValues = Set(allCases.map(\.rawValue))
-        XCTAssertEqual(rawValues.count, 15)
+        XCTAssertEqual(rawValues.count, 19)
     }
 
     // MARK: - TabKind
@@ -119,13 +126,22 @@ final class WindowControllerLogicTests: XCTestCase {
     func testTabKindDisplayNames() {
         XCTAssertEqual(TabKind.claude.displayName, "Claude")
         XCTAssertEqual(TabKind.codex.displayName, "Codex")
+        XCTAssertEqual(TabKind.grok.displayName, "Grok")
         XCTAssertEqual(TabKind.terminal.displayName, "Terminal")
     }
 
     func testTabKindAgentClassification() {
         XCTAssertTrue(TabKind.claude.isAgent)
         XCTAssertTrue(TabKind.codex.isAgent)
+        XCTAssertTrue(TabKind.grok.isAgent)
         XCTAssertFalse(TabKind.terminal.isAgent)
+    }
+
+    func testTabKindForkAtPointSupport() {
+        XCTAssertTrue(TabKind.claude.supportsForkAtPoint)
+        XCTAssertTrue(TabKind.codex.supportsForkAtPoint)
+        XCTAssertFalse(TabKind.grok.supportsForkAtPoint)
+        XCTAssertFalse(TabKind.terminal.supportsForkAtPoint)
     }
 
     // MARK: - WorkspaceItem
@@ -219,6 +235,17 @@ final class WindowControllerLogicTests: XCTestCase {
         }
     }
 
+    func testDefaultTabConfigParsesGrokTabs() {
+        withUserDefaultsValue("defaultTabConfig", value: "claude, grok") {
+            let config = DefaultTabConfig.current
+
+            XCTAssertEqual(config.entries.count, 2)
+            XCTAssertEqual(config.entries[0].kind, .claude)
+            XCTAssertEqual(config.entries[1].kind, .grok)
+            XCTAssertEqual(config.entries[1].name, "Grok")
+        }
+    }
+
     // MARK: - Badge animation defaults
 
     func testCodexThinkingBadgeIsAnimatedByDefault() {
@@ -237,6 +264,25 @@ final class WindowControllerLogicTests: XCTestCase {
             XCTAssertFalse(SettingsWindowController.isBadgeAnimated(.codexIdle))
             XCTAssertFalse(SettingsWindowController.isBadgeAnimated(.codexError))
             XCTAssertFalse(SettingsWindowController.isBadgeAnimated(.codexCompletedUnseen))
+        }
+    }
+
+    func testGrokThinkingBadgeIsAnimatedByDefault() {
+        withUserDefaultsValue("badgeAnimate.grokThinking", value: nil) {
+            XCTAssertTrue(SettingsWindowController.isBadgeAnimated(.grokThinking))
+        }
+    }
+
+    func testGrokNonWorkingBadgesAreNotAnimatedByDefault() {
+        let keys = [
+            "badgeAnimate.grokIdle",
+            "badgeAnimate.grokError",
+            "badgeAnimate.grokCompletedUnseen",
+        ]
+        withRemovedUserDefaults(keys) {
+            XCTAssertFalse(SettingsWindowController.isBadgeAnimated(.grokIdle))
+            XCTAssertFalse(SettingsWindowController.isBadgeAnimated(.grokError))
+            XCTAssertFalse(SettingsWindowController.isBadgeAnimated(.grokCompletedUnseen))
         }
     }
 

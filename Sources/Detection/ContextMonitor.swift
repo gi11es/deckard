@@ -55,6 +55,16 @@ class ContextMonitor {
         let sparklineData: [Double]
     }
 
+    struct GrokActivityInfo {
+        let isBusy: Bool
+        let isError: Bool
+        let timestamp: Date?
+    }
+
+    struct GrokUsageInfo {
+        let context: ContextUsage?
+    }
+
     private let codexAppServerPollInterval: TimeInterval = 60
     private let codexAppServerCacheMaxAge: TimeInterval = 15 * 60
     private let codexAppServerTimeout: TimeInterval = 8
@@ -153,9 +163,11 @@ class ContextMonitor {
         return results
     }
 
-    /// Lists Claude and Codex sessions for a workspace, sorted by most recent first.
+    /// Lists Claude, Codex, and Grok sessions for a workspace, sorted by most recent first.
     func listAllSessions(forWorkspacePath workspacePath: String) -> [SessionInfo] {
-        (listSessions(forWorkspacePath: workspacePath) + listCodexSessions(forWorkspacePath: workspacePath))
+        (listSessions(forWorkspacePath: workspacePath)
+            + listCodexSessions(forWorkspacePath: workspacePath)
+            + listGrokSessions(forWorkspacePath: workspacePath))
             .sorted { $0.modificationDate > $1.modificationDate }
     }
 
@@ -755,11 +767,246 @@ class ContextMonitor {
             trimmed.hasPrefix("<user_instructions>")
     }
 
+    // MARK: - Grok
+
+    /// Grok stores sessions under one directory per percent-encoded working
+    /// directory: ~/.grok/sessions/<encoded-cwd>/<session-uuid>/, with a
+    /// summary.json, signals.json, and events.jsonl per session, plus a
+    /// prompt_history.jsonl shared by all sessions of that working directory.
+    private var grokSessionsRoot: URL {
+        URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".grok/sessions")
+    }
+
+    /// Lists Grok sessions for a workspace by scanning ~/.grok/sessions.
+    func listGrokSessions(forWorkspacePath workspacePath: String) -> [SessionInfo] {
+        guard let workspaceDir = grokWorkspaceDirURL(forWorkspacePath: workspacePath) else { return [] }
+
+        let prompts = grokPromptHistory(inWorkspaceDir: workspaceDir)
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: workspaceDir,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return [] }
+
+        var results: [SessionInfo] = []
+        for sessionDir in entries {
+            guard (try? sessionDir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+                  let info = parseGrokSessionInfo(sessionDir: sessionDir, prompts: prompts) else { continue }
+            results.append(info)
+        }
+
+        results.sort { $0.modificationDate > $1.modificationDate }
+        return results
+    }
+
+    /// Finds the ~/.grok/sessions/<encoded-cwd> directory whose percent-decoded
+    /// name matches the workspace path. Matching by decoding sidesteps having to
+    /// reproduce the CLI's exact percent-encoding alphabet.
+    private func grokWorkspaceDirURL(forWorkspacePath workspacePath: String) -> URL? {
+        let resolved = (workspacePath as NSString).resolvingSymlinksInPath
+        let fm = FileManager.default
+        guard let entries = try? fm.contentsOfDirectory(
+            at: grokSessionsRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return nil }
+
+        for dir in entries {
+            guard (try? dir.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+                  let decoded = dir.lastPathComponent.removingPercentEncoding else { continue }
+            if (decoded as NSString).resolvingSymlinksInPath == resolved {
+                return dir
+            }
+        }
+        return nil
+    }
+
+    /// Locates the session directory for a Grok session id across all workspaces.
+    func grokSessionDirURL(sessionId: String) -> URL? {
+        let fm = FileManager.default
+        guard let workspaceDirs = try? fm.contentsOfDirectory(
+            at: grokSessionsRoot,
+            includingPropertiesForKeys: [.isDirectoryKey],
+            options: [.skipsHiddenFiles]
+        ) else { return nil }
+
+        for workspaceDir in workspaceDirs {
+            let candidate = workspaceDir.appendingPathComponent(sessionId)
+            var isDir: ObjCBool = false
+            if fm.fileExists(atPath: candidate.path, isDirectory: &isDir), isDir.boolValue {
+                return candidate
+            }
+        }
+        return nil
+    }
+
+    func latestGrokSession(forWorkspacePath workspacePath: String, after date: Date, excluding excludedIds: Set<String> = []) -> SessionInfo? {
+        listGrokSessions(forWorkspacePath: workspacePath)
+            .first { $0.modificationDate >= date && !excludedIds.contains($0.sessionId) }
+    }
+
+    /// First prompt and prompt count per session id, from the shared
+    /// prompt_history.jsonl. Bash-mode prompts are skipped — they are shell
+    /// commands typed in the TUI, not agent turns.
+    private func grokPromptHistory(inWorkspaceDir workspaceDir: URL) -> [String: (first: String, count: Int)] {
+        let historyURL = workspaceDir.appendingPathComponent("prompt_history.jsonl")
+        guard let data = try? Data(contentsOf: historyURL),
+              let content = String(data: data, encoding: .utf8) else { return [:] }
+
+        var result: [String: (first: String, count: Int)] = [:]
+        for line in content.split(separator: "\n") {
+            guard let json = parseJSONObject(line),
+                  json["is_bash"] as? Bool != true,
+                  let sessionId = json["session_id"] as? String,
+                  let prompt = json["prompt"] as? String else { continue }
+            if var existing = result[sessionId] {
+                existing.count += 1
+                result[sessionId] = existing
+            } else {
+                let first = prompt.split(separator: "\n").first.map(String.init)?
+                    .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                result[sessionId] = (first: first, count: 1)
+            }
+        }
+        return result
+    }
+
+    private func parseGrokSessionInfo(sessionDir: URL, prompts: [String: (first: String, count: Int)]) -> SessionInfo? {
+        let summaryURL = sessionDir.appendingPathComponent("summary.json")
+        guard let data = try? Data(contentsOf: summaryURL),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else { return nil }
+
+        let info = json["info"] as? [String: Any]
+        guard let sessionId = info?["id"] as? String ?? (sessionDir.lastPathComponent.isEmpty ? nil : sessionDir.lastPathComponent) else {
+            return nil
+        }
+
+        let modDate = (json["updated_at"] as? String).flatMap { codexTimestampFormatter.date(from: $0) }
+            ?? (try? FileManager.default.attributesOfItem(atPath: summaryURL.path))?[.modificationDate] as? Date
+            ?? Date.distantPast
+
+        let prompt = prompts[sessionId]
+        var firstMessage = prompt?.first ?? ""
+        if firstMessage.isEmpty {
+            firstMessage = json["generated_title"] as? String
+                ?? json["session_summary"] as? String
+                ?? ""
+        }
+
+        return SessionInfo(
+            sessionId: sessionId,
+            modificationDate: modDate,
+            firstUserMessage: firstMessage,
+            messageCount: prompt?.count ?? 0,
+            kind: .grok,
+            filePath: sessionDir
+        )
+    }
+
+    func grokActivityInfo(sessionId: String) -> GrokActivityInfo? {
+        guard let sessionDir = grokSessionDirURL(sessionId: sessionId),
+              let content = tailContent(of: sessionDir.appendingPathComponent("events.jsonl"), maxBytes: 256 * 1024) else {
+            return nil
+        }
+        return parseGrokActivityInfo(from: content)
+    }
+
+    func parseGrokActivityInfo(from content: String) -> GrokActivityInfo? {
+        var latest: GrokActivityInfo?
+        for line in content.split(separator: "\n") {
+            guard let json = parseJSONObject(line),
+                  let type = json["type"] as? String else { continue }
+
+            let isBusy: Bool
+            let isError: Bool
+            switch type {
+            case "turn_started":
+                isBusy = true
+                isError = false
+            case "turn_ended":
+                isBusy = false
+                isError = json["outcome"] as? String == "error"
+            default:
+                continue
+            }
+
+            let timestamp = (json["ts"] as? String).flatMap { codexTimestampFormatter.date(from: $0) }
+            latest = GrokActivityInfo(isBusy: isBusy, isError: isError, timestamp: timestamp)
+        }
+        return latest
+    }
+
+    func getGrokUsage(sessionId: String?) -> GrokUsageInfo? {
+        guard let sessionId,
+              let sessionDir = grokSessionDirURL(sessionId: sessionId),
+              let data = try? Data(contentsOf: sessionDir.appendingPathComponent("signals.json")),
+              let content = String(data: data, encoding: .utf8) else { return nil }
+        return parseGrokUsage(from: content)
+    }
+
+    /// Parse context usage from a Grok signals.json payload.
+    func parseGrokUsage(from content: String) -> GrokUsageInfo? {
+        guard let data = content.data(using: .utf8),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let used = codexInt(json["contextTokensUsed"]),
+              let limit = codexInt(json["contextWindowTokens"]),
+              limit > 0, used > 0 else { return nil }
+
+        let model = json["primaryModelId"] as? String ?? ""
+        return GrokUsageInfo(context: ContextUsage(
+            model: model,
+            inputTokens: used,
+            cacheReadTokens: 0,
+            contextLimit: limit))
+    }
+
+    private func tailContent(of fileURL: URL, maxBytes: UInt64) -> String? {
+        guard let fh = FileHandle(forReadingAtPath: fileURL.path) else { return nil }
+        defer { try? fh.close() }
+
+        let fileSize = fh.seekToEndOfFile()
+        guard fileSize > 0 else { return nil }
+
+        let offset = fileSize > maxBytes ? fileSize - maxBytes : 0
+        fh.seek(toFileOffset: offset)
+        let data = fh.readData(ofLength: Int(fileSize - offset))
+        return String(data: data, encoding: .utf8)
+    }
+
+    private func parseGrokTimeline(sessionId: String, workspacePath: String) -> [TimelineEntry] {
+        guard let sessionDir = grokSessionDirURL(sessionId: sessionId) else { return [] }
+        let historyURL = sessionDir.deletingLastPathComponent().appendingPathComponent("prompt_history.jsonl")
+        guard let data = try? Data(contentsOf: historyURL),
+              let content = String(data: data, encoding: .utf8) else { return [] }
+
+        var entries: [TimelineEntry] = []
+        for line in content.split(separator: "\n") {
+            guard let json = parseJSONObject(line),
+                  json["session_id"] as? String == sessionId,
+                  json["is_bash"] as? Bool != true,
+                  let prompt = json["prompt"] as? String,
+                  !prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { continue }
+
+            let timestamp = (json["timestamp"] as? String).flatMap { codexTimestampFormatter.date(from: $0) }
+            entries.append(TimelineEntry(
+                index: entries.count,
+                promptId: "\(sessionId)-\(entries.count)",
+                message: prompt.trimmingCharacters(in: .whitespacesAndNewlines),
+                timestamp: timestamp
+            ))
+        }
+        return entries
+    }
+
     /// Parses a session JSONL file and returns an ordered list of user turns.
     /// Deduplicates by promptId — only the first occurrence with non-empty content is kept.
     func parseTimeline(sessionId: String, workspacePath: String, kind: TabKind = .claude) -> [TimelineEntry] {
         if kind == .codex {
             return parseCodexTimeline(sessionId: sessionId, workspacePath: workspacePath)
+        }
+        if kind == .grok {
+            return parseGrokTimeline(sessionId: sessionId, workspacePath: workspacePath)
         }
 
         let encoded = workspacePath.claudeProjectDirName
@@ -853,7 +1100,9 @@ class ContextMonitor {
             return truncateClaudeSession(sessionId: sessionId, workspacePath: workspacePath, afterTurnIndex: afterTurnIndex)
         case .codex:
             return truncateCodexSession(sessionId: sessionId, workspacePath: workspacePath, afterTurnIndex: afterTurnIndex)
-        case .terminal:
+        case .grok, .terminal:
+            // Grok sessions span several interdependent files (chat_history,
+            // updates, events); Deckard cannot safely truncate-and-fork them.
             return nil
         }
     }

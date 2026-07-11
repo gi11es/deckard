@@ -176,6 +176,90 @@ final class ContextMonitorTests: XCTestCase {
         XCTAssertEqual(activity?.isError, true)
     }
 
+    // MARK: - Grok activity parsing
+
+    func testParseGrokActivityInfoReportsStartedTurnBusy() {
+        let content = """
+        {"ts":"2026-07-10T15:01:02.100Z","type":"turn_started"}
+        {"ts":"2026-07-10T15:01:02.500Z","type":"first_token"}
+        """
+
+        let activity = ContextMonitor.shared.parseGrokActivityInfo(from: content)
+
+        XCTAssertEqual(activity?.isBusy, true)
+        XCTAssertEqual(activity?.isError, false)
+    }
+
+    func testParseGrokActivityInfoTreatsCompletedTurnAsIdle() {
+        let content = """
+        {"ts":"2026-07-10T15:01:02.100Z","type":"turn_started"}
+        {"ts":"2026-07-10T15:22:33.343Z","type":"turn_ended","outcome":"completed"}
+        """
+
+        let activity = ContextMonitor.shared.parseGrokActivityInfo(from: content)
+
+        XCTAssertEqual(activity?.isBusy, false)
+        XCTAssertEqual(activity?.isError, false)
+        XCTAssertNotNil(activity?.timestamp)
+    }
+
+    func testParseGrokActivityInfoTreatsCancelledTurnAsIdle() {
+        let content = """
+        {"ts":"2026-07-10T15:01:02.100Z","type":"turn_started"}
+        {"ts":"2026-07-10T15:02:00.000Z","type":"turn_ended","outcome":"cancelled"}
+        """
+
+        let activity = ContextMonitor.shared.parseGrokActivityInfo(from: content)
+
+        XCTAssertEqual(activity?.isBusy, false)
+        XCTAssertEqual(activity?.isError, false)
+    }
+
+    func testParseGrokActivityInfoTreatsErrorOutcomeAsError() {
+        let content = """
+        {"ts":"2026-07-10T15:01:02.100Z","type":"turn_started"}
+        {"ts":"2026-07-10T15:02:00.000Z","type":"turn_ended","outcome":"error"}
+        """
+
+        let activity = ContextMonitor.shared.parseGrokActivityInfo(from: content)
+
+        XCTAssertEqual(activity?.isBusy, false)
+        XCTAssertEqual(activity?.isError, true)
+    }
+
+    func testParseGrokActivityInfoIgnoresUnrelatedEvents() {
+        let content = """
+        {"ts":"2026-07-10T15:00:58.106Z","type":"mcp_config_resolved","servers":[]}
+        {"ts":"2026-07-10T15:00:59.000Z","type":"phase_changed","phase":"planning"}
+        """
+
+        XCTAssertNil(ContextMonitor.shared.parseGrokActivityInfo(from: content))
+    }
+
+    // MARK: - Grok usage parsing
+
+    func testParseGrokUsageReadsContextFromSignals() throws {
+        let content = """
+        {"turnCount":1,"contextWindowUsage":30,"contextTokensUsed":151838,"contextWindowTokens":500000,"primaryModelId":"grok-4.5"}
+        """
+
+        let usage = ContextMonitor.shared.parseGrokUsage(from: content)
+
+        XCTAssertEqual(usage?.context?.contextUsed, 151_838)
+        XCTAssertEqual(usage?.context?.contextLimit, 500_000)
+        XCTAssertEqual(usage?.context?.model, "grok-4.5")
+        XCTAssertEqual(try XCTUnwrap(usage?.context?.percentage), 30.3676, accuracy: 0.01)
+    }
+
+    func testParseGrokUsageRejectsEmptyOrZeroSignals() {
+        XCTAssertNil(ContextMonitor.shared.parseGrokUsage(from: "{}"))
+        XCTAssertNil(ContextMonitor.shared.parseGrokUsage(
+            from: #"{"contextTokensUsed":0,"contextWindowTokens":500000}"#))
+        XCTAssertNil(ContextMonitor.shared.parseGrokUsage(
+            from: #"{"contextTokensUsed":1000,"contextWindowTokens":0}"#))
+        XCTAssertNil(ContextMonitor.shared.parseGrokUsage(from: "not json"))
+    }
+
     func testParseCodexUsageReadsQuotaAndTokenRateButDoesNotReportContext() throws {
         let now = try XCTUnwrap(codexDate("2026-04-28T12:42:05.267Z"))
         let content = """

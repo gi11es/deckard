@@ -319,7 +319,7 @@ class SessionExplorerWindowController: NSWindowController, NSSplitViewDelegate, 
             entries: entries,
             options: .init(
                 resumeEnabled: !isOpen,
-                forkAtPointEnabled: updatedSession.agentKind.isAgent,
+                forkAtPointEnabled: updatedSession.agentKind.supportsForkAtPoint,
                 scrollToIndex: scrollToMessageIndex
             )
         )

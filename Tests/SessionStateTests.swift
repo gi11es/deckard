@@ -20,9 +20,11 @@ final class SessionStateTests: XCTestCase {
                     WorkspaceTabState(id: "tab-1", name: "Claude", isClaude: true, sessionId: "sess-1"),
                     WorkspaceTabState(id: "tab-2", name: "Codex", kind: .codex, sessionId: "codex-1"),
                     WorkspaceTabState(id: "tab-3", name: "Terminal", isClaude: false, sessionId: nil),
+                    WorkspaceTabState(id: "tab-4", name: "Grok", kind: .grok, sessionId: "grok-1"),
                 ],
                 defaultArgs: "--permission-mode acceptEdits",
-                defaultCodexArgs: "--ask-for-approval never --sandbox workspace-write"
+                defaultCodexArgs: "--ask-for-approval never --sandbox workspace-write",
+                defaultGrokArgs: "--reasoning-effort high"
             )
         ]
 
@@ -34,7 +36,7 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.selectedTabIndex, 3)
         XCTAssertEqual(decoded.defaultWorkingDirectory, "/Users/test/workspace")
         XCTAssertEqual(decoded.workspaces?.count, 1)
-        XCTAssertEqual(decoded.workspaces?[0].tabs.count, 3)
+        XCTAssertEqual(decoded.workspaces?[0].tabs.count, 4)
         XCTAssertEqual(decoded.workspaces?[0].tabs[0].isClaude, true)
         XCTAssertEqual(decoded.workspaces?[0].tabs[0].sessionId, "sess-1")
         XCTAssertEqual(decoded.workspaces?[0].tabs[1].kind, .codex)
@@ -42,8 +44,12 @@ final class SessionStateTests: XCTestCase {
         XCTAssertEqual(decoded.workspaces?[0].tabs[1].sessionId, "codex-1")
         XCTAssertEqual(decoded.workspaces?[0].tabs[2].kind, .terminal)
         XCTAssertNil(decoded.workspaces?[0].tabs[2].sessionId)
+        XCTAssertEqual(decoded.workspaces?[0].tabs[3].kind, .grok)
+        XCTAssertEqual(decoded.workspaces?[0].tabs[3].isClaude, false)
+        XCTAssertEqual(decoded.workspaces?[0].tabs[3].sessionId, "grok-1")
         XCTAssertEqual(decoded.workspaces?[0].defaultArgs, "--permission-mode acceptEdits")
         XCTAssertEqual(decoded.workspaces?[0].defaultCodexArgs, "--ask-for-approval never --sandbox workspace-write")
+        XCTAssertEqual(decoded.workspaces?[0].defaultGrokArgs, "--reasoning-effort high")
     }
 
     func testEmptyStateRoundtrip() throws {
@@ -164,6 +170,7 @@ final class SessionStateTests: XCTestCase {
     func testSessionCacheKeySeparatesCodexFromClaude() {
         XCTAssertEqual(SessionManager.sessionCacheKey(sessionId: "shared-id", kind: .claude), "shared-id")
         XCTAssertEqual(SessionManager.sessionCacheKey(sessionId: "shared-id", kind: .codex), "codex:shared-id")
+        XCTAssertEqual(SessionManager.sessionCacheKey(sessionId: "shared-id", kind: .grok), "grok:shared-id")
         XCTAssertEqual(SessionManager.sessionCacheKey(sessionId: "shared-id", kind: .terminal), "terminal:shared-id")
     }
 

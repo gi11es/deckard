@@ -249,3 +249,67 @@ final class CodexCLIFlagsTests: XCTestCase {
         XCTAssertFalse(longNames.contains("--version"))
     }
 }
+
+final class GrokCLIFlagsTests: XCTestCase {
+
+    private let sampleHelp = """
+    Options:
+          --always-approve
+              Auto-approve all tool executions
+      -c, --continue
+              Continue the most recent session for the current working directory
+          --cwd <CWD>
+              Working directory
+      -m, --model <MODEL>
+              Model ID to use
+          --output-format <OUTPUT_FORMAT>
+              Output format for headless mode [default: plain] [possible values: plain, json, streaming-json]
+          --permission-mode <MODE>
+              Permission mode [possible values: default, acceptEdits, auto, dontAsk, bypassPermissions, plan]
+      -r, --resume [<SESSION_ID>]
+              Resume a session by ID, or the most recent if omitted
+          --reasoning-effort <EFFORT>
+              Reasoning effort for reasoning models [aliases: --effort]
+          --fork-session
+              When resuming, create a new session ID instead of reusing the original
+      -h, --help
+              Print help
+    """
+
+    func testParsesGrokEnumerationFlags() {
+        let flags = GrokCLIFlags.parse(helpOutput: sampleHelp)
+
+        let permissionMode = flags.first { $0.longName == "--permission-mode" }
+        guard case .enumeration(let values) = permissionMode?.valueType else {
+            XCTFail("Expected permission-mode enum")
+            return
+        }
+        XCTAssertEqual(values, ["default", "acceptEdits", "auto", "dontAsk", "bypassPermissions", "plan"])
+    }
+
+    func testParsesGrokFreeTextAndBooleanFlags() {
+        let flags = GrokCLIFlags.parse(helpOutput: sampleHelp)
+
+        let model = flags.first { $0.longName == "--model" }
+        let alwaysApprove = flags.first { $0.longName == "--always-approve" }
+
+        XCTAssertEqual(model?.shortName, "-m")
+        XCTAssertEqual(model?.valueType, .freeText)
+        XCTAssertEqual(model?.valuePlaceholder, "<MODEL>")
+        XCTAssertEqual(alwaysApprove?.valueType, .boolean)
+    }
+
+    func testGrokBlocklistExcludesDeckardManagedFlags() {
+        let longNames = GrokCLIFlags.parse(helpOutput: sampleHelp).map(\.longName)
+
+        XCTAssertFalse(longNames.contains("--resume"))
+        XCTAssertFalse(longNames.contains("--continue"))
+        XCTAssertFalse(longNames.contains("--fork-session"))
+        XCTAssertFalse(longNames.contains("--cwd"))
+        XCTAssertFalse(longNames.contains("--output-format"))
+        XCTAssertFalse(longNames.contains("--help"))
+
+        XCTAssertTrue(longNames.contains("--model"))
+        XCTAssertTrue(longNames.contains("--reasoning-effort"))
+    }
+}

@@ -81,6 +81,9 @@ extension DeckardWindowController {
             tabView.onNewCodex = { [weak self] in
                 self?.addTabToCurrentWorkspace(kind: .codex)
             }
+            tabView.onNewGrok = { [weak self] in
+                self?.addTabToCurrentWorkspace(kind: .grok)
+            }
             tabView.onNewTerminal = { [weak self] in
                 self?.addTabToCurrentWorkspace(kind: .terminal)
             }
@@ -103,6 +106,7 @@ extension DeckardWindowController {
         let addButton = AddTabButton(
             claudeAction: { [weak self] in self?.addTabToCurrentWorkspace(kind: .claude) },
             codexAction: { [weak self] in self?.addTabToCurrentWorkspace(kind: .codex) },
+            grokAction: { [weak self] in self?.addTabToCurrentWorkspace(kind: .grok) },
             terminalAction: { [weak self] in self?.addTabToCurrentWorkspace(kind: .terminal) }
         )
         tabBar.addArrangedSubview(addButton)
