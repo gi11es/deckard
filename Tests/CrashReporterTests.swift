@@ -82,6 +82,20 @@ final class CrashReporterTests: XCTestCase {
         }
     }
 
+    // MARK: - SIGPIPE
+
+    func testInstallIgnoresSigpipe() {
+        CrashReporter.install()
+
+        // Read the current disposition without changing it.
+        var action = sigaction()
+        sigaction(SIGPIPE, nil, &action)
+        let handler = unsafeBitCast(action.__sigaction_u.__sa_handler, to: UInt.self)
+        let ignored = unsafeBitCast(SIG_IGN, to: UInt.self)
+        XCTAssertEqual(handler, ignored,
+                       "SIGPIPE must be ignored — a write to a closed hook socket would otherwise kill the app")
+    }
+
     // MARK: - Crash report directory creation
 
     func testCrashReportDirectoryExists() {

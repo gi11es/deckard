@@ -87,6 +87,11 @@ enum CrashReporter {
         for sig in caughtSignals {
             signal(sig, crashSignalHandler)
         }
+        // SIGPIPE's default action silently kills the process — no crash
+        // report, no chance to handle it. Any write to a peer-closed fd
+        // (control-socket replies to hook clients that timed out, PTY or
+        // child-process pipes) must return EPIPE instead.
+        signal(SIGPIPE, SIG_IGN)
     }
 }
 
