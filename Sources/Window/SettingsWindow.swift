@@ -974,9 +974,20 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         let grokTable = makeSectionTable("Grok", Self.grokBadgeEntries)
         let terminalTable = makeSectionTable("Terminal", Self.terminalBadgeEntries)
 
-        let hStack = NSStackView(views: [claudeTable, codexTable, grokTable, terminalTable])
-        hStack.orientation = .horizontal
-        hStack.alignment = .top
+        // Two rows of tables — four across would exceed the fixed pane width.
+        let topRow = NSStackView(views: [claudeTable, codexTable])
+        topRow.orientation = .horizontal
+        topRow.alignment = .top
+        topRow.spacing = 12
+
+        let bottomRow = NSStackView(views: [grokTable, terminalTable])
+        bottomRow.orientation = .horizontal
+        bottomRow.alignment = .top
+        bottomRow.spacing = 12
+
+        let hStack = NSStackView(views: [topRow, bottomRow])
+        hStack.orientation = .vertical
+        hStack.alignment = .leading
         hStack.spacing = 12
 
         // Wrap in a vertical stack with the reset button
