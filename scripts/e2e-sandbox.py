@@ -25,7 +25,7 @@ import sys
 import time
 import uuid
 
-APP, LABEL = sys.argv[1], sys.argv[2]
+APP, LABEL = os.path.abspath(sys.argv[1]), sys.argv[2]
 EXPECT_SURVIVE = sys.argv[3] == "1"
 EXPECT_REJECT = sys.argv[4] == "1"
 
