@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.22.1](https://github.com/gi11es/deckard/compare/v0.22.0...v0.22.1) (2026-07-11)
+
+
+### Bug Fixes
+
+* ignore SIGPIPE so writes to closed hook sockets cannot kill the app ([#94](https://github.com/gi11es/deckard/issues/94)) ([4cfcaa3](https://github.com/gi11es/deckard/commit/4cfcaa3e852f6a955f197f67e1cc7f7f3541dcef))
+* reject session-start from nested claude processes outside the workspace ([#95](https://github.com/gi11es/deckard/issues/95)) ([cc556ef](https://github.com/gi11es/deckard/commit/cc556ef4cd06c58b1f1d2978d8a5bef45cd0d3e7))
+
 ## [0.22.0](https://github.com/gi11es/deckard/compare/v0.21.2...v0.22.0) (2026-05-29)
 
 
