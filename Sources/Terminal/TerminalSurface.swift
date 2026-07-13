@@ -473,13 +473,19 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
                 guard let self else { return }
-                defer { self.terminalView.handlesPasteShortcuts = true }
+                // Always restore input handling and remove the window-wide key
+                // monitor, even if the pending input was consumed elsewhere —
+                // a leaked monitor silently swallows every keystroke for the
+                // window whenever this surface's view is attached.
+                defer {
+                    self.terminalView.handlesPasteShortcuts = true
+                    if let monitor = self.keyEventMonitor {
+                        NSEvent.removeMonitor(monitor)
+                        self.keyEventMonitor = nil
+                    }
+                }
                 guard let input = self.pendingInitialInput else { return }
                 self.pendingInitialInput = nil
-                if let monitor = self.keyEventMonitor {
-                    NSEvent.removeMonitor(monitor)
-                    self.keyEventMonitor = nil
-                }
                 self.sendInput(input)
             }
         }
