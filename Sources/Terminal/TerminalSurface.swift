@@ -503,9 +503,10 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             NSEvent.removeMonitor(monitor)
             keyEventMonitor = nil
         }
-        if let pid = terminalView.process?.shellPid, pid > 0 {
-            SpawnedProcessRegistry.shared.remove(pid: pid)
-        }
+        // Registry entry is NOT removed here: terminate() only expresses kill
+        // intent (SIGTERM), and agents can survive it. processTerminated
+        // removes the entry once the exit is confirmed; if the process
+        // outlives us instead, the next launch reaps it.
         terminalView.process?.terminate()
         killTmuxSession()
     }
@@ -514,9 +515,6 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     func detach() {
         guard !processExited else { return }
         processExited = true
-        if let pid = terminalView.process?.shellPid, pid > 0 {
-            SpawnedProcessRegistry.shared.remove(pid: pid)
-        }
         // Just kill the local process — tmux session survives
         terminalView.process?.terminate()
     }
