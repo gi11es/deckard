@@ -43,6 +43,7 @@ extension DeckardWindowController {
                 kind: tab.kind,
                 badgeState: tab.badgeState,
                 activity: terminalActivity[tab.id],
+                pending: tab.pendingStart != nil,
                 isSelected: isSelected,
                 index: i,
                 target: self,

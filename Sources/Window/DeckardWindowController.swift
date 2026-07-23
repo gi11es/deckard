@@ -31,6 +31,7 @@ class TabItem {
         let envVars: [String: String]
         let initialInput: String?
         let tmuxSession: String?
+        let forkSession: Bool
     }
 
     var isClaude: Bool { kind == .claude }
@@ -850,7 +851,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 workingDirectory: workspace.path,
                 envVars: envVars,
                 initialInput: initialInput,
-                tmuxSession: tmuxSessionToResume
+                tmuxSession: tmuxSessionToResume,
+                forkSession: forkSession
             )
 
             if kind == .terminal {
@@ -878,6 +880,14 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
     ///   false and rebuilds once at the end instead.
     func startPendingShellIfNeeded(_ tab: TabItem, refreshSidebar: Bool = true) {
         guard let pending = tab.pendingStart else { return }
+        // A tab closed before its deferred start ran must never spawn a process.
+        // The progressive-restore walk (and any queued caller) can still hold a
+        // reference after closeTabById/closeWorkspace removed it from its
+        // workspace, so bail if it's no longer present anywhere.
+        guard workspaces.contains(where: { $0.tabs.contains(where: { $0.id == tab.id }) }) else {
+            tab.pendingStart = nil
+            return
+        }
         tab.pendingStart = nil
 
         DiagnosticLog.shared.log("surface",
@@ -890,7 +900,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             tmuxSession: pending.tmuxSession
         )
 
-        if tab.kind == .codex && tab.sessionId == nil {
+        if tab.kind == .codex && (tab.sessionId == nil || pending.forkSession) {
             scheduleCodexSessionDiscovery(forSurfaceId: tab.id, workspacePath: pending.workingDirectory)
         }
 
@@ -1320,7 +1330,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                     tabInfos.append(ProcessMonitor.TabInfo(
                         surfaceId: tab.id, kind: tab.kind,
                         name: tab.name, workspacePath: workspace.path))
-                    if tab.kind == .codex {
+                    // Skip deferred codex tabs: their process was never spawned,
+                    // so a stale on-disk .jsonl must not drive the badge to
+                    // .codexThinking on a tab that isn't actually running.
+                    if tab.kind == .codex, tab.pendingStart == nil {
                         codexTargets.append(CodexBadgePollTarget(
                             surfaceId: tab.id,
                             workspacePath: workspace.path,
@@ -1465,6 +1478,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         for (pi, workspace) in workspaces.enumerated() {
             if let ti = workspace.tabs.firstIndex(where: { $0.id == surfaceId }) {
                 let tab = workspace.tabs[ti]
+
+                // A deferred tab closed before it ever started must not leave a
+                // pending start queued — the progressive-restore walk could
+                // otherwise reach it and spawn an orphaned process.
+                tab.pendingStart = nil
 
                 // Terminal tabs: restart shell instead of removing the tab.
                 // Reconnects to the tmux session if it still exists, otherwise
