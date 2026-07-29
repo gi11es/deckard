@@ -463,6 +463,9 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             }
         } else if clientPid > 0 {
             ProcessMonitor.shared.registerShellPid(clientPid, forSurface: surfaceId.uuidString)
+            // Track direct spawns so a crashed app instance's orphans can be
+            // reaped on next launch (tmux sessions survive by design).
+            SpawnedProcessRegistry.shared.record(pid: clientPid, surfaceId: surfaceId.uuidString)
         }
 
         DiagnosticLog.shared.log("surface",
@@ -528,6 +531,10 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             NSEvent.removeMonitor(monitor)
             keyEventMonitor = nil
         }
+        // Registry entry is NOT removed here: terminate() only expresses kill
+        // intent (SIGTERM), and agents can survive it. processTerminated
+        // removes the entry once the exit is confirmed; if the process
+        // outlives us instead, the next launch reaps it.
         terminalView.process?.terminate()
         killTmuxSession()
     }
@@ -713,6 +720,9 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
 
     func processTerminated(source: TerminalView, exitCode: Int32?) {
         processExited = true
+        if let pid = terminalView.process?.shellPid, pid > 0 {
+            SpawnedProcessRegistry.shared.remove(pid: pid)
+        }
         DiagnosticLog.shared.log("surface",
             "processTerminated: surfaceId=\(surfaceId) exitCode=\(exitCode ?? -1)")
         onProcessExit?(self)

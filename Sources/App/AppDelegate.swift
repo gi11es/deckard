@@ -86,6 +86,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             log.log("startup", "tmux not available")
         }
 
+        // Kill agent processes orphaned by a previous app instance BEFORE
+        // session restore resumes the same sessions — otherwise two live
+        // processes end up appending to one session file (#100).
+        let reaped = SpawnedProcessRegistry.shared.reapOrphans()
+        log.log("startup", "Reaped \(reaped.count) orphaned agent process(es)" +
+            (reaped.isEmpty ? "" : ": \(reaped.map(String.init).joined(separator: ", "))"))
+
         // Create and show the main window.
         log.log("startup", "Creating window controller...")
         windowController = DeckardWindowController()

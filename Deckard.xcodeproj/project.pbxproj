@@ -34,6 +34,7 @@
 		TM000001TM000001TM000001 /* ThemeManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = TM000002TM000002TM000002 /* ThemeManager.swift */; };
 		TC000001TC000001TC000001 /* TerminalColorScheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = TC000002TC000002TC000002 /* TerminalColorScheme.swift */; };
 		DD220001DD220001DD220001 /* ProcessMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD220002DD220002DD220002 /* ProcessMonitor.swift */; };
+		SP4W0001SP4W0001SP4W0001 /* SpawnedProcessRegistry.swift in Sources */ = {isa = PBXBuildFile; fileRef = SP4W0002SP4W0002SP4W0002 /* SpawnedProcessRegistry.swift */; };
 		DD330001DD330001DD330001 /* DiagnosticLog.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD330002DD330002DD330002 /* DiagnosticLog.swift */; };
 		DD440001DD440001DD440001 /* CrashReporter.swift in Sources */ = {isa = PBXBuildFile; fileRef = DD440002DD440002DD440002 /* CrashReporter.swift */; };
 		SC000001SC000001SC000001 /* SidebarController.swift in Sources */ = {isa = PBXBuildFile; fileRef = SC000002SC000002SC000002 /* SidebarController.swift */; };
@@ -48,6 +49,7 @@
 		AA160001AA160001AA160001 /* DiagnosticLogTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA160002AA160002AA160002 /* DiagnosticLogTests.swift */; };
 		AA170001AA170001AA170001 /* HookHandlerTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA170002AA170002AA170002 /* HookHandlerTests.swift */; };
 		AA180001AA180001AA180001 /* ProcessMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA180002AA180002AA180002 /* ProcessMonitorTests.swift */; };
+		SP4WT001SP4WT001SP4WT001 /* SpawnedProcessRegistryTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = SP4WT002SP4WT002SP4WT002 /* SpawnedProcessRegistryTests.swift */; };
 		AA190001AA190001AA190001 /* ContextMonitorTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA190002AA190002AA190002 /* ContextMonitorTests.swift */; };
 		AA1A0001AA1A0001AA1A0001 /* TerminalSurfaceTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A0002AA1A0002AA1A0002 /* TerminalSurfaceTests.swift */; };
 		AA1B0001AA1B0001AA1B0001 /* WindowControllerLogicTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1B0002AA1B0002AA1B0002 /* WindowControllerLogicTests.swift */; };
@@ -94,6 +96,7 @@
 		TM000002TM000002TM000002 /* ThemeManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ThemeManager.swift; sourceTree = "<group>"; };
 		TC000002TC000002TC000002 /* TerminalColorScheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalColorScheme.swift; sourceTree = "<group>"; };
 		DD220002DD220002DD220002 /* ProcessMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitor.swift; sourceTree = "<group>"; };
+		SP4W0002SP4W0002SP4W0002 /* SpawnedProcessRegistry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpawnedProcessRegistry.swift; sourceTree = "<group>"; };
 		DD330002DD330002DD330002 /* DiagnosticLog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLog.swift; sourceTree = "<group>"; };
 		DD440002DD440002DD440002 /* CrashReporter.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CrashReporter.swift; sourceTree = "<group>"; };
 		SC000002SC000002SC000002 /* SidebarController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SidebarController.swift; sourceTree = "<group>"; };
@@ -111,6 +114,7 @@
 		AA160002AA160002AA160002 /* DiagnosticLogTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DiagnosticLogTests.swift; sourceTree = "<group>"; };
 		AA170002AA170002AA170002 /* HookHandlerTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HookHandlerTests.swift; sourceTree = "<group>"; };
 		AA180002AA180002AA180002 /* ProcessMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProcessMonitorTests.swift; sourceTree = "<group>"; };
+		SP4WT002SP4WT002SP4WT002 /* SpawnedProcessRegistryTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpawnedProcessRegistryTests.swift; sourceTree = "<group>"; };
 		AA190002AA190002AA190002 /* ContextMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContextMonitorTests.swift; sourceTree = "<group>"; };
 		AA1A0002AA1A0002AA1A0002 /* TerminalSurfaceTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TerminalSurfaceTests.swift; sourceTree = "<group>"; };
 		AA1B0002AA1B0002AA1B0002 /* WindowControllerLogicTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowControllerLogicTests.swift; sourceTree = "<group>"; };
@@ -162,6 +166,7 @@
 				DD330002DD330002DD330002 /* DiagnosticLog.swift */,
 				4A2B375A023FEBCB272DCFD7 /* HookHandler.swift */,
 				DD220002DD220002DD220002 /* ProcessMonitor.swift */,
+				SP4W0002SP4W0002SP4W0002 /* SpawnedProcessRegistry.swift */,
 				QA200001QA200001QA200001 /* QuotaMonitor.swift */,
 			);
 			path = Detection;
@@ -280,6 +285,7 @@
 				FDAC0004FDAC0004FDAC0004 /* FullDiskAccessCheckerTests.swift */,
 				AA170002AA170002AA170002 /* HookHandlerTests.swift */,
 				AA180002AA180002AA180002 /* ProcessMonitorTests.swift */,
+				SP4WT002SP4WT002SP4WT002 /* SpawnedProcessRegistryTests.swift */,
 				QA200005QA200005QA200005 /* QuotaMonitorTests.swift */,
 				AA130002AA130002AA130002 /* SessionStateTests.swift */,
 				AA1F0002AA1F0002AA1F0002 /* SidebarGroupTests.swift */,
@@ -441,6 +447,7 @@
 				TM000001TM000001TM000001 /* ThemeManager.swift in Sources */,
 				TC000001TC000001TC000001 /* TerminalColorScheme.swift in Sources */,
 				DD220001DD220001DD220001 /* ProcessMonitor.swift in Sources */,
+				SP4W0001SP4W0001SP4W0001 /* SpawnedProcessRegistry.swift in Sources */,
 				DD330001DD330001DD330001 /* DiagnosticLog.swift in Sources */,
 				DD440001DD440001DD440001 /* CrashReporter.swift in Sources */,
 				QA200002QA200002QA200002 /* QuotaMonitor.swift in Sources */,
@@ -468,6 +475,7 @@
 				FDAC0003FDAC0003FDAC0003 /* FullDiskAccessCheckerTests.swift in Sources */,
 				AA170001AA170001AA170001 /* HookHandlerTests.swift in Sources */,
 				AA180001AA180001AA180001 /* ProcessMonitorTests.swift in Sources */,
+				SP4WT001SP4WT001SP4WT001 /* SpawnedProcessRegistryTests.swift in Sources */,
 				AA190001AA190001AA190001 /* ContextMonitorTests.swift in Sources */,
 				AA1A0001AA1A0001AA1A0001 /* TerminalSurfaceTests.swift in Sources */,
 				AA1B0001AA1B0001AA1B0001 /* WindowControllerLogicTests.swift in Sources */,
