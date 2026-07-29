@@ -341,6 +341,15 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
                                                name: .deckardScrollbackChanged, object: nil)
     }
 
+    deinit {
+        // Backstop for surfaces released without terminate(): a still-installed
+        // monitor would outlive the surface (its closure retains the view) and
+        // permanently swallow the window's keystrokes.
+        if let monitor = keyEventMonitor {
+            NSEvent.removeMonitor(monitor)
+        }
+    }
+
     /// Apply a color scheme to this terminal.
     func applyColorScheme(_ scheme: TerminalColorScheme) {
         scheme.apply(to: terminalView)
@@ -465,21 +474,39 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
         if let initialInput {
             pendingInitialInput = initialInput
             terminalView.handlesPasteShortcuts = false
+            // Overwriting keyEventMonitor would orphan the previous monitor
+            // inside AppKit — permanently swallowing every keystroke for the
+            // window — so remove any existing one first.
+            if let existing = keyEventMonitor {
+                NSEvent.removeMonitor(existing)
+                keyEventMonitor = nil
+            }
             let view = terminalView
-            keyEventMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
+            let monitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
                 // Swallow key events targeting our terminal view's window.
                 if event.window === view.window { return nil }
                 return event
             }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+            keyEventMonitor = monitor
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self, monitor] in
+                // If the surface was deallocated, deinit removes the monitor.
                 guard let self else { return }
-                defer { self.terminalView.handlesPasteShortcuts = true }
+                // Always restore input handling and remove the monitor this
+                // call installed on every exit path — but only if it is still
+                // the active one (terminate() or a later startShell may have
+                // removed or replaced it already; removing a monitor twice is
+                // not allowed).
+                defer {
+                    self.terminalView.handlesPasteShortcuts = true
+                    if let current = self.keyEventMonitor,
+                       let monitor,
+                       (current as AnyObject) === (monitor as AnyObject) {
+                        NSEvent.removeMonitor(current)
+                        self.keyEventMonitor = nil
+                    }
+                }
                 guard let input = self.pendingInitialInput else { return }
                 self.pendingInitialInput = nil
-                if let monitor = self.keyEventMonitor {
-                    NSEvent.removeMonitor(monitor)
-                    self.keyEventMonitor = nil
-                }
                 self.sendInput(input)
             }
         }
@@ -496,6 +523,7 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     func terminate() {
         guard !processExited else { return }
         processExited = true
+        pendingInitialInput = nil
         if let monitor = keyEventMonitor {
             NSEvent.removeMonitor(monitor)
             keyEventMonitor = nil
