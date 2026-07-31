@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.23.0](https://github.com/gi11es/deckard/compare/v0.22.1...v0.23.0) (2026-07-31)
+
+
+### Features
+
+* reap orphaned agent processes on launch ([#102](https://github.com/gi11es/deckard/issues/102)) ([8904def](https://github.com/gi11es/deckard/commit/8904defbe3e472ab693f76a1a40b62c359e9d05d))
+* surface pty I/O failures instead of freezing silently ([#105](https://github.com/gi11es/deckard/issues/105)) ([40fb608](https://github.com/gi11es/deckard/commit/40fb6082b048e0a35e923707a20ee0bf64c0ca79))
+
+
+### Bug Fixes
+
+* remove startup key monitor in defer so it can't leak ([#101](https://github.com/gi11es/deckard/issues/101)) ([93c1cdd](https://github.com/gi11es/deckard/commit/93c1cdd915025077df8231e66877e99304d9bb84))
+
 ## [0.22.1](https://github.com/gi11es/deckard/compare/v0.22.0...v0.22.1) (2026-07-11)
 
 
