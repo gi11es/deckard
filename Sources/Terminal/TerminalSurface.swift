@@ -275,6 +275,10 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
     var title: String = ""
     var pwd: String?
     var isAlive: Bool { !processExited }
+    /// Set when the pty I/O path broke (dropped input, or output reading
+    /// abandoned). The process may still be running, but this surface can no
+    /// longer be trusted to show or deliver anything — it needs a restart.
+    private(set) var ioFailure: String?
     var onProcessExit: ((TerminalSurface) -> Void)?
     /// The tmux session name, if this terminal is wrapped in tmux.
     var tmuxSessionName: String?
@@ -727,12 +731,42 @@ class TerminalSurface: NSObject, LocalProcessTerminalViewDelegate {
             "processTerminated: surfaceId=\(surfaceId) exitCode=\(exitCode ?? -1)")
         onProcessExit?(self)
     }
+
+    /// Input was dropped on the way to the agent. Keystrokes are lost, so say
+    /// so loudly — a silent write failure looks exactly like a frozen tab.
+    func writeFailed(source: LocalProcessTerminalView, errno: Int32) {
+        ioFailure = "write failed (errno \(errno))"
+        DiagnosticLog.shared.log("surface",
+            "writeFailed: surfaceId=\(surfaceId) errno=\(errno) — input was dropped")
+        notifyIOFailure()
+    }
+
+    /// Reading from the agent was abandoned: the terminal will never show
+    /// another byte from this process even though it keeps running. This is
+    /// the frozen-tab failure mode (#99) — it must never be silent again.
+    func readFailed(source: LocalProcessTerminalView, errno: Int32) {
+        ioFailure = "output stopped (errno \(errno))"
+        DiagnosticLog.shared.log("surface",
+            "readFailed: surfaceId=\(surfaceId) errno=\(errno) — terminal will not update again;" +
+            " restart the tab to recover")
+        notifyIOFailure()
+    }
+
+    private func notifyIOFailure() {
+        guard let ioFailure else { return }
+        NotificationCenter.default.post(
+            name: .deckardSurfaceIOFailure,
+            object: nil,
+            userInfo: ["surfaceId": surfaceId, "reason": ioFailure]
+        )
+    }
 }
 
 // MARK: - Notification Names
 
 extension Notification.Name {
     static let deckardSurfaceTitleChanged = Notification.Name("deckardSurfaceTitleChanged")
+    static let deckardSurfaceIOFailure = Notification.Name("deckardSurfaceIOFailure")
     static let deckardSurfaceClosed = Notification.Name("deckardSurfaceClosed")
     static let deckardNewTab = Notification.Name("deckardNewTab")
     static let deckardNewCodexTab = Notification.Name("deckardNewCodexTab")

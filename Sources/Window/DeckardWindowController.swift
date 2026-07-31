@@ -242,6 +242,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         NotificationCenter.default.addObserver(self, selector: #selector(themeDidChange(_:)), name: .deckardThemeChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(vibrancyDidChange), name: .deckardVibrancyChanged, object: nil)
         NotificationCenter.default.addObserver(self, selector: #selector(quotaDidChange), name: QuotaMonitor.quotaDidChange, object: nil)
+        NotificationCenter.default.addObserver(self, selector: #selector(surfaceIODidFail(_:)), name: .deckardSurfaceIOFailure, object: nil)
         // Show cached quota data immediately if available
         quotaDidChange()
 
@@ -1853,6 +1854,38 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         sidebarView.layer?.backgroundColor = enabled
             ? NSColor.clear.cgColor
             : colors.sidebarBackground.cgColor
+    }
+
+    /// A surface's pty I/O broke: input is being dropped, or its output will
+    /// never be read again. The process often keeps running, so without this
+    /// the tab just looks frozen with no explanation (#99). Flag it in the tab
+    /// bar so the state is visible and a restart is an obvious next step.
+    @objc private func surfaceIODidFail(_ note: Notification) {
+        DispatchQueue.main.async { [weak self] in
+            guard let self,
+                  let surfaceIdStr = note.userInfo?["surfaceId"] as? UUID
+                    ?? (note.userInfo?["surfaceId"] as? String).flatMap(UUID.init(uuidString:))
+            else { return }
+            let reason = note.userInfo?["reason"] as? String ?? "pty I/O failure"
+            for workspace in self.workspaces {
+                guard let tab = workspace.tabs.first(where: { $0.surface.surfaceId == surfaceIdStr })
+                else { continue }
+                let errorBadge: TabItem.BadgeState
+                switch tab.kind {
+                case .codex: errorBadge = .codexError
+                case .terminal: errorBadge = .terminalError
+                default: errorBadge = .error
+                }
+                if tab.badgeState != errorBadge {
+                    tab.badgeState = errorBadge
+                    self.rebuildSidebar()
+                    self.rebuildTabBar()
+                }
+                DiagnosticLog.shared.log("surface",
+                    "surfaceIOFailure: workspace=\(workspace.path) tab=\"\(tab.name)\" \(reason)")
+                return
+            }
+        }
     }
 
     @objc private func quotaDidChange() {
