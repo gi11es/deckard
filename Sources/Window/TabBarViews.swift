@@ -29,6 +29,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
     init(displayTitle: String, editableName: String, kind: TabKind = .terminal,
          badgeState: TabItem.BadgeState = .none,
          activity: ProcessMonitor.ActivityInfo? = nil,
+         pending: Bool = false,
          isSelected: Bool, index: Int,
          target: AnyObject, clickAction: Selector) {
         self.index = index
@@ -54,14 +55,16 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
         if badgeState != .none {
             let dot = BadgeShapeView(
                 shape: VerticalTabRowView.shapeForBadge(badgeState),
-                color: VerticalTabRowView.colorForBadge(badgeState)
+                color: VerticalTabRowView.colorForBadge(badgeState),
+                filled: !pending
             )
-            dot.toolTip = VerticalTabRowView.tooltipForBadge(badgeState, activity: activity)
+            let suffix = pending ? " (not loaded)" : ""
+            dot.toolTip = VerticalTabRowView.tooltipForBadge(badgeState, activity: activity) + suffix
             addSubview(dot)
             NSLayoutConstraint.activate([
                 dot.centerYAnchor.constraint(equalTo: centerYAnchor),
             ])
-            if SettingsWindowController.isBadgeAnimated(badgeState) {
+            if !pending && SettingsWindowController.isBadgeAnimated(badgeState) {
                 VerticalTabRowView.addPulseAnimation(to: dot)
             }
             badgeDot = dot

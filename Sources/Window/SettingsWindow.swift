@@ -156,6 +156,20 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         tabConfigHelp.textColor = .secondaryLabelColor
         grid.addRow(with: [NSGridCell.emptyContentView, tabConfigHelp])
 
+        let lazyLabel = NSTextField(labelWithString: "Startup:")
+        lazyLabel.alignment = .right
+
+        let lazyCheck = NSButton(checkboxWithTitle: "Restore sessions lazily",
+                                 target: self, action: #selector(lazyRestoreToggled(_:)))
+        lazyCheck.state = UserDefaults.standard.bool(forKey: "lazySessionRestore") ? .on : .off
+        grid.addRow(with: [lazyLabel, lazyCheck])
+
+        let lazyHelp = NSTextField(wrappingLabelWithString:
+            "Don't launch a session until its tab is first opened. Not-yet-loaded sessions show a hollow dot in the sidebar.")
+        lazyHelp.font = .systemFont(ofSize: 11)
+        lazyHelp.textColor = .secondaryLabelColor
+        grid.addRow(with: [NSGridCell.emptyContentView, lazyHelp])
+
         pane.addSubview(grid)
         NSLayoutConstraint.activate([
             grid.topAnchor.constraint(equalTo: pane.topAnchor, constant: 20),
@@ -293,6 +307,10 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
     @objc private func perSessionArgsToggled(_ sender: NSButton) {
         UserDefaults.standard.set(sender.state == .on, forKey: "promptForSessionArgs")
+    }
+
+    @objc private func lazyRestoreToggled(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: "lazySessionRestore")
     }
 
     @objc private func codexPerSessionArgsToggled(_ sender: NSButton) {
