@@ -770,6 +770,7 @@ extension Notification.Name {
     static let deckardSurfaceClosed = Notification.Name("deckardSurfaceClosed")
     static let deckardNewTab = Notification.Name("deckardNewTab")
     static let deckardNewCodexTab = Notification.Name("deckardNewCodexTab")
+    static let deckardNewGrokTab = Notification.Name("deckardNewGrokTab")
     static let deckardCloseTab = Notification.Name("deckardCloseTab")
     static let deckardFontChanged = Notification.Name("deckardFontChanged")
     static let deckardScrollbackChanged = Notification.Name("deckardScrollbackChanged")

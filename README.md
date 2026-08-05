@@ -1,6 +1,6 @@
 # Deckard
 
-A native macOS workspace for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://openai.com/codex), and classic terminal tabs. Deckard treats agent sessions as first-class tabs: Claude Code and Codex can both be created, resumed, forked, explored, bookmarked, and restored across app launches.
+A native macOS workspace for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://openai.com/codex), [Grok CLI](https://x.ai/), and classic terminal tabs. Deckard treats agent sessions as first-class tabs: Claude Code, Codex, and Grok can all be created, resumed, forked, explored, bookmarked, and restored across app launches.
 
 Run multiple agents side by side in a single window with project-aware tabs, session persistence, status badges, and usage telemetry when the underlying CLI exposes it. Built with Swift and AppKit. Terminal rendering is powered by [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm).
 
@@ -19,9 +19,9 @@ Run multiple agents side by side in a single window with project-aware tabs, ses
 
 ## Features
 
-### Claude, Codex, and Terminal Tabs
+### Claude, Codex, Grok, and Terminal Tabs
 
-Open Claude Code, Codex, and plain terminal tabs inside the same project workspace. Agent tabs launch the right CLI directly, while terminal tabs remain normal shells. Switch between tabs with Cmd+1-9 or drag tabs to reorder them.
+Open Claude Code, Codex, Grok, and plain terminal tabs inside the same project workspace. Agent tabs launch the right CLI directly, while terminal tabs remain normal shells. Switch between tabs with Cmd+1-9 or drag tabs to reorder them.
 
 <img src="docs/images/screenshot-tabs.webp?v=cdf54ee7" alt="Tab bar with agent and terminal tabs" width="600">
 
@@ -33,15 +33,15 @@ Each open directory gets its own persisted tab set. Group related projects into 
 
 ### Provider-Specific Status Badges
 
-Claude Code and Codex have separate badge states and customizable colors. Claude badges use Deckard's Claude hooks to show thinking, waiting, permission, error, and done-unvisited states. Codex badges are read from Codex rollout events and show idle, working, error, and done-unvisited states. Terminal tabs use their own process-activity badges.
+Claude Code, Codex, and Grok have separate badge states and customizable colors. Claude badges use Deckard's Claude hooks to show thinking, waiting, permission, error, and done-unvisited states. Codex badges are read from Codex rollout events and Grok badges from Grok session events; both show idle, working, error, and done-unvisited states. Terminal tabs use their own process-activity badges.
 
 <img src="docs/images/screenshot-status-indicators.webp?v=42af91f8" alt="Status indicator dots" width="250">
 
 ### Session Explorer
 
-Browse past Claude Code and Codex sessions with Cmd+Shift+E. The explorer lists both providers for the current project, lets you resume or fork any session, and supports bookmark stars and timeline views.
+Browse past Claude Code, Codex, and Grok sessions with Cmd+Shift+E. The explorer lists all providers for the current project, lets you resume or fork any session, and supports bookmark stars and timeline views.
 
-Fork-at-turn works for both agent providers. For Claude Code, Deckard truncates the Claude session JSONL and resumes with Claude's fork support. For Codex, Deckard creates a truncated Codex rollout file, registers it with Codex's local state database, and launches `codex fork` or `codex resume` as appropriate.
+Fork-at-turn works for Claude Code and Codex. For Claude Code, Deckard truncates the Claude session JSONL and resumes with Claude's fork support. For Codex, Deckard creates a truncated Codex rollout file, registers it with Codex's local state database, and launches `codex fork` or `codex resume` as appropriate. Grok sessions can be forked whole (via `grok --resume --fork-session`) but not from a specific turn, because Grok's multi-file session format cannot be truncated safely.
 
 <img src="docs/images/screenshot-session-explorer.webp?v=03aa1cca" alt="Session explorer window" width="600">
 
@@ -49,12 +49,12 @@ Fork-at-turn works for both agent providers. For Claude Code, Deckard truncates 
 
 Agent usage stats appear only on tabs where Deckard can read real provider data.
 
-| Metric | Claude Code tabs | Codex tabs | Terminal tabs |
-| --- | --- | --- | --- |
-| Context usage bar | Yes, from Claude session usage entries | No reliable local signal; hidden | No |
-| 5-hour quota | Yes, from Claude status-line hook data | Yes, from Codex app-server rate-limit data with rollout fallback | No |
-| 7-day quota | Yes, from Claude status-line hook data | Yes, from Codex app-server rate-limit data with rollout fallback | No |
-| Tokens per minute | Yes, from recent Claude output token usage | Yes, from recent Codex generated token usage | No |
+| Metric | Claude Code tabs | Codex tabs | Grok tabs | Terminal tabs |
+| --- | --- | --- | --- | --- |
+| Context usage bar | Yes, from Claude session usage entries | No reliable local signal; hidden | Yes, from Grok session signals data | No |
+| 5-hour quota | Yes, from Claude status-line hook data | Yes, from Codex app-server rate-limit data with rollout fallback | No local signal; hidden | No |
+| 7-day quota | Yes, from Claude status-line hook data | Yes, from Codex app-server rate-limit data with rollout fallback | No local signal; hidden | No |
+| Tokens per minute | Yes, from recent Claude output token usage | Yes, from recent Codex generated token usage | No local signal; hidden | No |
 
 Classic terminal tabs intentionally do not show agent context, quota, or token-rate panels.
 
@@ -68,10 +68,10 @@ Ships with 486 built-in themes in Ghostty format and loads custom themes from `~
 
 ### More
 
-- **Session persistence**: Claude Code sessions resume with `claude --resume`; Codex sessions resume with `codex resume`. Tab structure and working directories are preserved across restarts.
-- **Forking workflows**: Claude Code and Codex sessions can be forked from the explorer, including from a specific user turn.
-- **Bookmarks**: Claude Code and Codex sessions use separate bookmark caches so provider sessions with similar IDs do not collide.
-- **Customizable shortcuts**: All keyboard shortcuts are rebindable in Settings > Shortcuts, including new Claude, Codex, and terminal tab commands.
+- **Session persistence**: Claude Code sessions resume with `claude --resume`; Codex sessions resume with `codex resume`; Grok sessions resume with `grok --resume`. Tab structure and working directories are preserved across restarts.
+- **Forking workflows**: Claude Code, Codex, and Grok sessions can be forked from the explorer; Claude Code and Codex can also fork from a specific user turn.
+- **Bookmarks**: Claude Code, Codex, and Grok sessions use separate bookmark caches so provider sessions with similar IDs do not collide.
+- **Customizable shortcuts**: All keyboard shortcuts are rebindable in Settings > Shortcuts, including new Claude, Codex, Grok, and terminal tab commands.
 - **tmux integration**: When tmux is installed, classic terminal tabs are transparently wrapped in tmux sessions. Quit and relaunch Deckard to resume shell state, scrollback, running processes, and environment. tmux options are editable in Settings > Terminal.
 - **Drag and drop**: Drag files from Finder into any terminal surface. Paths are shell-escaped and inserted automatically.
 - **Auto-updates**: Built-in update checking via [Sparkle](https://sparkle-project.org/). New releases are delivered automatically.
@@ -79,19 +79,19 @@ Ships with 486 built-in themes in Ghostty format and loads custom themes from `~
 
 ## Agent Support Matrix
 
-| Workflow | Claude Code | Codex |
-| --- | --- | --- |
-| Create new agent tab | Yes | Yes |
-| Resume existing session | Yes | Yes |
-| Fork existing session | Yes | Yes |
-| Fork from a specific turn | Yes | Yes |
-| Session explorer listing | Yes | Yes |
-| Timeline and action view | Yes | Yes |
-| Bookmarks | Yes | Yes |
-| Provider-specific badges | Yes | Yes |
-| Context, quota, token rate | Yes | Quota via Codex app-server; token rate from `token_count` events when present |
+| Workflow | Claude Code | Codex | Grok |
+| --- | --- | --- | --- |
+| Create new agent tab | Yes | Yes | Yes |
+| Resume existing session | Yes | Yes | Yes |
+| Fork existing session | Yes | Yes | Yes |
+| Fork from a specific turn | Yes | Yes | No — Grok's multi-file session format cannot be truncated safely |
+| Session explorer listing | Yes | Yes | Yes |
+| Timeline and action view | Yes | Yes | Yes |
+| Bookmarks | Yes | Yes | Yes |
+| Provider-specific badges | Yes | Yes | Yes |
+| Context, quota, token rate | Yes | Quota via Codex app-server; token rate from `token_count` events when present | Context usage from session signals |
 
-Deckard aims for equal day-to-day workflows across Claude Code and Codex. Some telemetry is necessarily provider-specific because the CLIs expose different local data. When Deckard cannot read a metric reliably, it hides that metric instead of showing stale data from another tab or provider.
+Deckard aims for equal day-to-day workflows across Claude Code, Codex, and Grok. Some telemetry is necessarily provider-specific because the CLIs expose different local data. When Deckard cannot read a metric reliably, it hides that metric instead of showing stale data from another tab or provider.
 
 ## Install
 
@@ -108,9 +108,10 @@ brew install gi11es/tap/deckard
 - macOS 14.0 (Sonoma) or later
 - [Claude Code](https://docs.anthropic.com/en/docs/claude-code) CLI installed to use Claude tabs
 - [Codex CLI](https://openai.com/codex/get-started/) installed to use Codex tabs
+- [Grok CLI](https://x.ai/) installed to use Grok tabs
 - Xcode 16+ to build from source
 
-Deckard can be used with only Claude Code, only Codex, or both installed. Terminal tabs work without either agent CLI.
+Deckard can be used with any subset of the agent CLIs installed. Terminal tabs work without any agent CLI.
 
 ## Building
 
@@ -144,6 +145,14 @@ Deckard reads Codex rollout files under `~/.codex/sessions` and the local Codex 
 For Codex quota, Deckard keeps a local `codex app-server --listen stdio://` JSON-RPC connection open while needed and calls `account/rateLimits/read`, falling back to rollout `token_count` rate-limit events if the app-server data is unavailable.
 
 Deckard does not install Codex hooks. It launches the Codex CLI directly with `codex`, `codex resume`, or `codex fork`.
+
+**Grok**
+
+Deckard reads Grok session data under `~/.grok/sessions`, which stores one directory per working directory with per-session `summary.json`, `signals.json`, and `events.jsonl` files plus a shared `prompt_history.jsonl`. That provides project-scoped session discovery, resume, whole-session fork, timeline parsing, badges, and context usage.
+
+Because Grok does not hold its session files open, Deckard discovers a new tab's session id by watching for the newest session that appears for the workspace after the tab launches.
+
+Deckard does not install Grok hooks. It launches the Grok CLI directly with `grok` or `grok --resume [--fork-session]`.
 
 **Terminal**
 

@@ -310,6 +310,68 @@ final class CodexCLIFlags {
     }
 }
 
+/// Parses and caches CLI flags from `grok --help`.
+final class GrokCLIFlags {
+
+    static let shared = GrokCLIFlags()
+    private init() {}
+
+    /// Parsed flags. Empty until `load()` completes (or if grok is not installed).
+    private(set) var flags: [ClaudeFlag] = []
+
+    /// Flags Deckard manages internally — excluded from suggestions.
+    static let blocklist: Set<String> = [
+        "--help", "--version",
+        // Session management Deckard drives itself.
+        "--resume", "--continue", "--fork-session", "--session-id",
+        // Headless/single-turn modes that would break an interactive tab.
+        "--single", "--prompt-file", "--prompt-json", "--output-format",
+        "--json-schema", "--best-of-n", "--check",
+        // Deckard launches Grok in the workspace directory already.
+        "--cwd",
+    ]
+
+    /// Posted on the main thread when flags finish loading.
+    static let didLoadNotification = Notification.Name("GrokCLIFlagsDidLoad")
+
+    /// Run `grok --help` asynchronously and parse the output.
+    func load() {
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            guard let output = Self.runGrokHelp() else { return }
+            let parsed = Self.parse(helpOutput: output)
+            DispatchQueue.main.async {
+                self?.flags = parsed
+                NotificationCenter.default.post(name: Self.didLoadNotification, object: nil)
+            }
+        }
+    }
+
+    /// Parse `grok --help` output into structured flags.
+    static func parse(helpOutput: String) -> [ClaudeFlag] {
+        CLIHelpParser.parse(helpOutput: helpOutput, blocklist: blocklist)
+    }
+
+    private static func runGrokHelp() -> String? {
+        // Use a login shell so the user's full PATH is available.
+        let shell = ProcessInfo.processInfo.environment["SHELL"] ?? "/bin/zsh"
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: shell)
+        process.arguments = ["-l", "-c", "grok --help"]
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = Pipe()
+        do {
+            try process.run()
+            process.waitUntilExit()
+            guard process.terminationStatus == 0 else { return nil }
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            return String(data: data, encoding: .utf8)
+        } catch {
+            return nil
+        }
+    }
+}
+
 /// A single chip representing one CLI argument (flag + optional value).
 struct ArgsChip: Equatable {
     let flag: String     // e.g. "--permission-mode"

@@ -47,6 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         nc.addObserver(self, selector: #selector(handleTitleChanged(_:)), name: .deckardSurfaceTitleChanged, object: nil)
         nc.addObserver(self, selector: #selector(handleNewTab), name: .deckardNewTab, object: nil)
         nc.addObserver(self, selector: #selector(handleNewCodexTab), name: .deckardNewCodexTab, object: nil)
+        nc.addObserver(self, selector: #selector(handleNewGrokTab), name: .deckardNewGrokTab, object: nil)
         nc.addObserver(self, selector: #selector(handleCloseTab), name: .deckardCloseTab, object: nil)
 
         // Start the control socket for hook communication.
@@ -71,6 +72,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         ClaudeCLIFlags.shared.load()
         log.log("startup", "Loading Codex CLI flags...")
         CodexCLIFlags.shared.load()
+        log.log("startup", "Loading Grok CLI flags...")
+        GrokCLIFlags.shared.load()
 
         // Clean up orphaned tmux sessions from previous runs
         if TerminalSurface.tmuxAvailable {
@@ -170,6 +173,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         windowController?.addTabToCurrentWorkspace(kind: .codex)
     }
 
+    @objc private func handleNewGrokTab() {
+        windowController?.addTabToCurrentWorkspace(kind: .grok)
+    }
+
     @objc private func handleCloseTab() {
         windowController?.closeCurrentTab()
     }
@@ -215,6 +222,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let codexItem = NSMenuItem(title: "New Codex Tab", action: #selector(newCodexTab), keyEquivalent: "")
         codexItem.setShortcut(for: .newCodexTab)
         fileMenu.addItem(codexItem)
+
+        let grokItem = NSMenuItem(title: "New Grok Tab", action: #selector(newGrokTab), keyEquivalent: "")
+        grokItem.setShortcut(for: .newGrokTab)
+        fileMenu.addItem(grokItem)
 
         let termItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalTab), keyEquivalent: "")
         termItem.setShortcut(for: .newTerminalTab)
@@ -326,6 +337,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func newCodexTab() {
         windowController?.addTabToCurrentWorkspace(kind: .codex)
+    }
+
+    @objc private func newGrokTab() {
+        windowController?.addTabToCurrentWorkspace(kind: .grok)
     }
 
     @objc private func newTerminalTab() {

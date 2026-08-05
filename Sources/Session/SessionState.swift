@@ -3,17 +3,26 @@ import Foundation
 enum TabKind: String, Codable, CaseIterable {
     case claude
     case codex
+    case grok
     case terminal
 
     var displayName: String {
         switch self {
         case .claude: return "Claude"
         case .codex: return "Codex"
+        case .grok: return "Grok"
         case .terminal: return "Terminal"
         }
     }
 
     var isAgent: Bool {
+        self != .terminal
+    }
+
+    /// Whether Deckard can truncate this agent's session files to fork
+    /// from an earlier turn (Grok's multi-file session format can't be
+    /// truncated safely).
+    var supportsForkAtPoint: Bool {
         self == .claude || self == .codex
     }
 }
@@ -98,6 +107,7 @@ struct WorkspaceState: Codable {
     var tabs: [WorkspaceTabState]
     var defaultArgs: String?
     var defaultCodexArgs: String?
+    var defaultGrokArgs: String?
 }
 
 struct WorkspaceTabState: Codable {

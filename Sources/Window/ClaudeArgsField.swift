@@ -8,11 +8,13 @@ final class ClaudeArgsField: NSView {
     enum FlagSource {
         case claude
         case codex
+        case grok
 
         var flags: [ClaudeFlag] {
             switch self {
             case .claude: return ClaudeCLIFlags.shared.flags
             case .codex: return CodexCLIFlags.shared.flags
+            case .grok: return GrokCLIFlags.shared.flags
             }
         }
 
@@ -20,6 +22,7 @@ final class ClaudeArgsField: NSView {
             switch self {
             case .claude: return ClaudeCLIFlags.didLoadNotification
             case .codex: return CodexCLIFlags.didLoadNotification
+            case .grok: return GrokCLIFlags.didLoadNotification
             }
         }
     }

@@ -138,7 +138,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
         let tabConfigField = NSTextField()
         tabConfigField.stringValue = UserDefaults.standard.string(forKey: "defaultTabConfig") ?? "claude, terminal"
-        tabConfigField.placeholderString = "claude, codex, terminal"
+        tabConfigField.placeholderString = "claude, codex, grok, terminal"
         tabConfigField.font = .monospacedSystemFont(ofSize: 12, weight: .regular)
         objc_setAssociatedObject(tabConfigField, &settingsKeyAssoc, "defaultTabConfig", .OBJC_ASSOCIATION_RETAIN)
         tabConfigField.delegate = self
@@ -151,7 +151,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
         grid.addRow(with: [tabConfigLabel, tabConfigField])
 
-        let tabConfigHelp = NSTextField(labelWithString: "Comma-separated list: claude, codex, terminal")
+        let tabConfigHelp = NSTextField(labelWithString: "Comma-separated list: claude, codex, grok, terminal")
         tabConfigHelp.font = .systemFont(ofSize: 11)
         tabConfigHelp.textColor = .secondaryLabelColor
         grid.addRow(with: [NSGridCell.emptyContentView, tabConfigHelp])
@@ -211,6 +211,18 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
             checkboxHelp: "Show a dialog to set parameters when creating a new Codex tab.",
             checkboxDefaultsKey: "promptForCodexSessionArgs",
             checkboxAction: #selector(codexPerSessionArgsToggled(_:))
+        )))
+
+        stack.addArrangedSubview(makeAgentDefaultsSection(AgentDefaultsSection(
+            title: "Grok",
+            fieldLabel: "Default arguments:",
+            defaultsKey: "grokExtraArgs",
+            flagSource: .grok,
+            help: "Grok CLI arguments passed to every new Grok session, such as model, reasoning effort, and permission mode. Can be overridden per workspace.",
+            checkboxTitle: "Customize Grok arguments per session",
+            checkboxHelp: "Show a dialog to set arguments when creating a new Grok tab.",
+            checkboxDefaultsKey: "promptForGrokSessionArgs",
+            checkboxAction: #selector(grokPerSessionArgsToggled(_:))
         )))
 
         pane.addSubview(stack)
@@ -297,6 +309,10 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
     @objc private func codexPerSessionArgsToggled(_ sender: NSButton) {
         UserDefaults.standard.set(sender.state == .on, forKey: "promptForCodexSessionArgs")
+    }
+
+    @objc private func grokPerSessionArgsToggled(_ sender: NSButton) {
+        UserDefaults.standard.set(sender.state == .on, forKey: "promptForGrokSessionArgs")
     }
 
     @objc private func vibrancyToggled(_ sender: NSButton) {
@@ -802,6 +818,13 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         (.codexCompletedUnseen, "Done"),
     ]
 
+    private static let grokBadgeEntries: [(state: TabItem.BadgeState, label: String)] = [
+        (.grokIdle, "Idle"),
+        (.grokThinking, "Working"),
+        (.grokError, "Error"),
+        (.grokCompletedUnseen, "Done"),
+    ]
+
     private static let terminalBadgeEntries: [(state: TabItem.BadgeState, label: String)] = [
         (.terminalIdle, "Idle"),
         (.terminalActive, "Busy"),
@@ -810,7 +833,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
     ]
 
     /// Default animation settings per state.
-    static let defaultBadgeAnimated: Set<TabItem.BadgeState> = [.thinking, .codexThinking, .terminalActive]
+    static let defaultBadgeAnimated: Set<TabItem.BadgeState> = [.thinking, .codexThinking, .grokThinking, .terminalActive]
 
     static func isBadgeAnimated(_ state: TabItem.BadgeState) -> Bool {
         if let saved = UserDefaults.standard.object(forKey: "badgeAnimate.\(state.rawValue)") as? Bool {
@@ -948,11 +971,23 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
 
         let claudeTable = makeSectionTable("Claude", Self.claudeBadgeEntries)
         let codexTable = makeSectionTable("Codex", Self.codexBadgeEntries)
+        let grokTable = makeSectionTable("Grok", Self.grokBadgeEntries)
         let terminalTable = makeSectionTable("Terminal", Self.terminalBadgeEntries)
 
-        let hStack = NSStackView(views: [claudeTable, codexTable, terminalTable])
-        hStack.orientation = .horizontal
-        hStack.alignment = .top
+        // Two rows of tables — four across would exceed the fixed pane width.
+        let topRow = NSStackView(views: [claudeTable, codexTable])
+        topRow.orientation = .horizontal
+        topRow.alignment = .top
+        topRow.spacing = 12
+
+        let bottomRow = NSStackView(views: [grokTable, terminalTable])
+        bottomRow.orientation = .horizontal
+        bottomRow.alignment = .top
+        bottomRow.spacing = 12
+
+        let hStack = NSStackView(views: [topRow, bottomRow])
+        hStack.orientation = .vertical
+        hStack.alignment = .leading
         hStack.spacing = 12
 
         // Wrap in a vertical stack with the reset button
@@ -1040,7 +1075,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
     }
 
     @objc private func resetBadgeColors() {
-        for entry in Self.claudeBadgeEntries + Self.codexBadgeEntries + Self.terminalBadgeEntries {
+        for entry in Self.claudeBadgeEntries + Self.codexBadgeEntries + Self.grokBadgeEntries + Self.terminalBadgeEntries {
             UserDefaults.standard.removeObject(forKey: "badgeColor.\(entry.state.rawValue)")
             UserDefaults.standard.removeObject(forKey: "badgeAnimate.\(entry.state.rawValue)")
             UserDefaults.standard.removeObject(forKey: "badgeShape.\(entry.state.rawValue)")
@@ -1211,7 +1246,7 @@ class SettingsWindowController: NSWindowController, NSToolbarDelegate, NSTextFie
         versionLabel.textColor = .secondaryLabelColor
         stack.addArrangedSubview(versionLabel)
 
-        let descLabel = NSTextField(labelWithString: "Multi-session Claude Code and Codex terminal manager")
+        let descLabel = NSTextField(labelWithString: "Multi-session Claude Code, Codex, and Grok terminal manager")
         descLabel.font = .systemFont(ofSize: 12)
         descLabel.textColor = .tertiaryLabelColor
         stack.addArrangedSubview(descLabel)

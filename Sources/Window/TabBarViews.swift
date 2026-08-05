@@ -18,6 +18,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
     var onClose: (() -> Void)?
     var onNewClaude: (() -> Void)?
     var onNewCodex: (() -> Void)?
+    var onNewGrok: (() -> Void)?
     var onNewTerminal: (() -> Void)?
     private var rawName: String
 
@@ -190,6 +191,10 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
         codexItem.setShortcut(for: .newCodexTab)
         menu.addItem(codexItem)
 
+        let grokItem = NSMenuItem(title: "New Grok Tab", action: #selector(newGrokAction), keyEquivalent: "")
+        grokItem.setShortcut(for: .newGrokTab)
+        menu.addItem(grokItem)
+
         let termItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalAction), keyEquivalent: "")
         termItem.setShortcut(for: .newTerminalTab)
         menu.addItem(termItem)
@@ -205,6 +210,7 @@ class HorizontalTabView: NSView, NSTextFieldDelegate, NSDraggingSource {
 
     @objc private func newClaudeAction() { onNewClaude?() }
     @objc private func newCodexAction() { onNewCodex?() }
+    @objc private func newGrokAction() { onNewGrok?() }
     @objc private func newTerminalAction() { onNewTerminal?() }
     @objc private func closeTabAction() { onClose?() }
 

@@ -22,9 +22,14 @@ class TabItem {
     var badgeState: BadgeState = .none
     /// Set during restore — suppresses completedUnseen until hook.session-start fires.
     var suppressUnseen: Bool = false
+    /// Creation time — used to discover Grok session ids by matching sessions
+    /// that appeared after the tab launched (Grok holds no session file open,
+    /// so lsof-based discovery is not possible).
+    let createdAt = Date()
 
     var isClaude: Bool { kind == .claude }
     var isCodex: Bool { kind == .codex }
+    var isGrok: Bool { kind == .grok }
     var isTerminal: Bool { kind == .terminal }
     var isAgent: Bool { kind.isAgent }
 
@@ -44,6 +49,10 @@ class TabItem {
         case codexThinking
         case codexError
         case codexCompletedUnseen
+        case grokIdle
+        case grokThinking
+        case grokError
+        case grokCompletedUnseen
         case terminalIdle     // muted teal - terminal at prompt
         case terminalActive   // teal pulsing - terminal foreground process has activity
         case terminalError    // red - terminal process exited with error
@@ -89,6 +98,7 @@ class WorkspaceItem {
     var selectedTabIndex: Int = 0
     var defaultArgs: String?
     var defaultCodexArgs: String?
+    var defaultGrokArgs: String?
 
     init(path: String) {
         self.id = UUID()
@@ -139,6 +149,7 @@ struct DefaultTabConfig {
             switch trimmed {
             case "claude": return (kind: .claude, name: "Claude")
             case "codex": return (kind: .codex, name: "Codex")
+            case "grok": return (kind: .grok, name: "Grok")
             case "terminal": return (kind: .terminal, name: "Terminal")
             default: return nil
             }
@@ -578,6 +589,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             workspace.name = snapshot.name
             workspace.defaultArgs = snapshot.defaultArgs
             workspace.defaultCodexArgs = snapshot.defaultCodexArgs
+            workspace.defaultGrokArgs = snapshot.defaultGrokArgs
             for ts in snapshot.tabs {
                 createTabInWorkspace(workspace, kind: ts.kind, name: ts.name,
                                    sessionIdToResume: ts.kind.isAgent ? ts.sessionId : nil,
@@ -636,7 +648,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                                 tmuxSessionName: tab.surface.tmuxSessionName)
             },
             defaultArgs: workspace.defaultArgs,
-            defaultCodexArgs: workspace.defaultCodexArgs
+            defaultCodexArgs: workspace.defaultCodexArgs,
+            defaultGrokArgs: workspace.defaultGrokArgs
         )
         recentlyClosedWorkspaces.removeAll { $0.path == workspace.path }
         recentlyClosedWorkspaces.append(snapshot)
@@ -746,6 +759,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             return .idle
         case .codex:
             return .codexIdle
+        case .grok:
+            return .grokIdle
         case .terminal:
             return .terminalIdle
         }
@@ -820,6 +835,21 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 codexArgs = codexOptions
             }
             initialInput = "clear && exec codex\(codexArgs)\n"
+        } else if kind == .grok {
+            let resolvedArgs = extraArgs ?? workspace.defaultGrokArgs ?? UserDefaults.standard.string(forKey: "grokExtraArgs") ?? ""
+            let grokOptions = resolvedArgs.isEmpty ? "" : " \(resolvedArgs)"
+            var grokArgs = ""
+            if let sessionIdToResume {
+                if ContextMonitor.shared.grokSessionDirURL(sessionId: sessionIdToResume) != nil {
+                    let forkFlag = forkSession ? " --fork-session" : ""
+                    grokArgs = "\(grokOptions) --resume \(sessionIdToResume)\(forkFlag)"
+                } else {
+                    tab.sessionId = nil
+                }
+            } else {
+                grokArgs = grokOptions
+            }
+            initialInput = "clear && exec grok\(grokArgs)\n"
         } else {
             initialInput = nil
         }
@@ -912,6 +942,20 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 self.createTabInWorkspace(workspace, kind: .codex, extraArgs: args)
                 self.finalizeTabCreation(in: workspace)
             }
+        } else if kind == .grok && UserDefaults.standard.bool(forKey: "promptForGrokSessionArgs") {
+            promptForGrokArgs(for: workspace) { [weak self] args in
+                guard let self else { return }
+                guard let args else {
+                    self.isCreatingTab = false
+                    return
+                }
+                guard self.workspaces.contains(where: { $0 === workspace }) else {
+                    self.isCreatingTab = false
+                    return
+                }
+                self.createTabInWorkspace(workspace, kind: .grok, extraArgs: args)
+                self.finalizeTabCreation(in: workspace)
+            }
         } else {
             createTabInWorkspace(workspace, kind: kind)
             finalizeTabCreation(in: workspace)
@@ -983,6 +1027,34 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
+    private func promptForGrokArgs(for workspace: WorkspaceItem, completion: @escaping (String?) -> Void) {
+        let alert = NSAlert()
+        alert.messageText = "Grok Arguments"
+        alert.informativeText = "Arguments passed to this session:"
+        alert.addButton(withTitle: "Start")
+        alert.addButton(withTitle: "Cancel")
+
+        let field = ClaudeArgsField(
+            frame: NSRect(x: 0, y: 0, width: 400, height: 60),
+            flagSource: .grok
+        )
+        field.stringValue = workspace.defaultGrokArgs ?? UserDefaults.standard.string(forKey: "grokExtraArgs") ?? ""
+        alert.accessoryView = field
+
+        guard let window else {
+            completion(nil)
+            return
+        }
+
+        alert.beginSheetModal(for: window) { response in
+            if response == .alertFirstButtonReturn {
+                completion(field.stringValue)
+            } else {
+                completion(nil)
+            }
+        }
+    }
+
     func closeCurrentTab() {
         guard let workspace = currentWorkspace else { return }
         let idx = workspace.selectedTabIndex
@@ -1019,6 +1091,10 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             rebuildTabBar()
         case .codexCompletedUnseen:
             tab.badgeState = .codexIdle
+            rebuildSidebar()
+            rebuildTabBar()
+        case .grokCompletedUnseen:
+            tab.badgeState = .grokIdle
             rebuildSidebar()
             rebuildTabBar()
         case .terminalCompletedUnseen:
@@ -1132,6 +1208,11 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             contextTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
                 self?.updateCodexUsage(for: tab)
             }
+        case .grok:
+            updateGrokUsage(for: tab)
+            contextTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+                self?.updateGrokUsage(for: tab)
+            }
         case .terminal:
             quotaView.clear()
         }
@@ -1222,6 +1303,38 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
     }
 
+    private func updateGrokUsage(for tab: TabItem) {
+        guard currentWorkspace != nil else {
+            quotaView.clear()
+            return
+        }
+
+        let tabName = tab.name
+        let tabId = tab.id
+        let sessionId = tab.sessionId
+        DispatchQueue.global(qos: .utility).async {
+            let usage = ContextMonitor.shared.getGrokUsage(sessionId: sessionId)
+            DispatchQueue.main.async { [weak self] in
+                guard let self = self else { return }
+                guard let workspace = self.currentWorkspace,
+                      let activeTab = workspace.tabs[safe: workspace.selectedTabIndex],
+                      activeTab.id == tabId else {
+                    DiagnosticLog.shared.log("context",
+                        "updateGrokUsage: stale callback for \(tabName), ignoring")
+                    return
+                }
+
+                guard let usage else {
+                    self.quotaView.clear()
+                    return
+                }
+
+                self.quotaView.updateContext(usage: usage.context, tabName: tabName)
+                self.quotaView.update(snapshot: nil, tokenRate: nil, sparklineData: [])
+            }
+        }
+    }
+
     // MARK: - Process Monitor
 
     private struct CodexBadgePollTarget {
@@ -1236,6 +1349,18 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         let discoveredSessionIds: [UUID: String]
     }
 
+    private struct GrokBadgePollTarget {
+        let surfaceId: UUID
+        let workspacePath: String
+        let sessionId: String?
+        let createdAt: Date
+    }
+
+    private struct GrokBadgePollResult {
+        let states: [UUID: ContextMonitor.GrokActivityInfo]
+        let discoveredSessionIds: [UUID: String]
+    }
+
     private func startProcessMonitor() {
         processMonitorTimer = Timer.scheduledTimer(withTimeInterval: 1.0, repeats: true) { [weak self] _ in
             guard let self = self else { return }
@@ -1243,6 +1368,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             // is done via control socket registration, not sorted order.
             var tabInfos: [ProcessMonitor.TabInfo] = []
             var codexTargets: [CodexBadgePollTarget] = []
+            var grokTargets: [GrokBadgePollTarget] = []
+            var knownGrokSessionIds = Set<String>()
             for workspace in self.workspaces {
                 for tab in workspace.tabs {
                     tabInfos.append(ProcessMonitor.TabInfo(
@@ -1255,15 +1382,28 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                             sessionId: tab.sessionId,
                             processId: ProcessMonitor.shared.shellPid(forSurface: tab.id)))
                     }
+                    if tab.kind == .grok {
+                        grokTargets.append(GrokBadgePollTarget(
+                            surfaceId: tab.id,
+                            workspacePath: workspace.path,
+                            sessionId: tab.sessionId,
+                            createdAt: tab.createdAt))
+                        if let sessionId = tab.sessionId {
+                            knownGrokSessionIds.insert(sessionId)
+                        }
+                    }
                 }
             }
             DispatchQueue.global(qos: .utility).async {
                 let states = ProcessMonitor.shared.poll(tabs: tabInfos)
                 let codexResult = self.pollCodexBadgeStates(for: codexTargets)
+                let grokResult = self.pollGrokBadgeStates(for: grokTargets, knownSessionIds: knownGrokSessionIds)
                 DispatchQueue.main.async {
                     self.applyCodexSessionDiscoveries(codexResult.discoveredSessionIds)
+                    self.applyCodexSessionDiscoveries(grokResult.discoveredSessionIds)
                     self.applyTerminalBadgeStates(states)
                     self.applyCodexBadgeStates(codexResult.states)
+                    self.applyGrokBadgeStates(grokResult.states)
                 }
             }
         }
@@ -1292,6 +1432,69 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
         }
 
         return CodexBadgePollResult(states: states, discoveredSessionIds: discoveredSessionIds)
+    }
+
+    private func pollGrokBadgeStates(for targets: [GrokBadgePollTarget], knownSessionIds: Set<String>) -> GrokBadgePollResult {
+        var states: [UUID: ContextMonitor.GrokActivityInfo] = [:]
+        var discoveredSessionIds: [UUID: String] = [:]
+
+        for target in targets {
+            var sessionId = target.sessionId
+            if sessionId == nil {
+                // Grok holds no session file open, so discover by picking the
+                // newest session for the workspace that appeared after this tab
+                // launched and isn't claimed by another tab.
+                let excluded = knownSessionIds.union(discoveredSessionIds.values)
+                if let session = ContextMonitor.shared.latestGrokSession(
+                    forWorkspacePath: target.workspacePath,
+                    after: target.createdAt,
+                    excluding: excluded
+                ) {
+                    sessionId = session.sessionId
+                    discoveredSessionIds[target.surfaceId] = session.sessionId
+                }
+            }
+
+            guard let sessionId,
+                  let state = ContextMonitor.shared.grokActivityInfo(sessionId: sessionId) else { continue }
+            states[target.surfaceId] = state
+        }
+
+        return GrokBadgePollResult(states: states, discoveredSessionIds: discoveredSessionIds)
+    }
+
+    private func applyGrokBadgeStates(_ states: [UUID: ContextMonitor.GrokActivityInfo]) {
+        var changed = false
+        for workspace in workspaces {
+            for tab in workspace.tabs where tab.kind == .grok {
+                guard let state = states[tab.id] else { continue }
+
+                let newBadge: TabItem.BadgeState
+                if state.isBusy {
+                    newBadge = .grokThinking
+                } else if state.isError {
+                    newBadge = .grokError
+                } else if tab.badgeState == .grokThinking {
+                    let visible = isTabVisible(tab.id.uuidString)
+                    newBadge = visible ? .grokIdle : .grokCompletedUnseen
+                } else if tab.badgeState == .grokCompletedUnseen {
+                    newBadge = .grokCompletedUnseen
+                } else {
+                    newBadge = .grokIdle
+                }
+
+                if tab.badgeState != newBadge {
+                    DiagnosticLog.shared.log("badge",
+                        "grok badge: workspace=\(workspace.path) tab=\"\(tab.name)\" busy=\(state.isBusy) error=\(state.isError) -> \(newBadge)")
+                    tab.badgeState = newBadge
+                    changed = true
+                }
+            }
+        }
+        if changed {
+            rebuildSidebar()
+            rebuildTabBar()
+        }
     }
 
     private func applyCodexSessionDiscoveries(_ discoveredSessionIds: [UUID: String]) {
@@ -1615,7 +1818,8 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                     )
                 },
                 defaultArgs: workspace.defaultArgs,
-                defaultCodexArgs: workspace.defaultCodexArgs
+                defaultCodexArgs: workspace.defaultCodexArgs,
+                defaultGrokArgs: workspace.defaultGrokArgs
             )
         }
 
@@ -1695,6 +1899,33 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             return nil
         }
 
+        var grokRestoreCandidatesByPath: [String: [String]] = [:]
+        var usedGrokSessionIds = Set(workspaceStates.flatMap { workspace in
+            workspace.tabs.compactMap { tab in
+                tab.kind == .grok ? tab.sessionId : nil
+            }
+        })
+
+        func recoverGrokSessionId(for workspacePath: String, tabName: String) -> String? {
+            let resolvedPath = (workspacePath as NSString).resolvingSymlinksInPath
+            if grokRestoreCandidatesByPath[resolvedPath] == nil {
+                grokRestoreCandidatesByPath[resolvedPath] = ContextMonitor.shared
+                    .listGrokSessions(forWorkspacePath: resolvedPath)
+                    .map(\.sessionId)
+            }
+
+            while var candidates = grokRestoreCandidatesByPath[resolvedPath], !candidates.isEmpty {
+                let sessionId = candidates.removeFirst()
+                grokRestoreCandidatesByPath[resolvedPath] = candidates
+                guard usedGrokSessionIds.insert(sessionId).inserted else { continue }
+                DiagnosticLog.shared.log("restore",
+                    "recovered missing Grok session id for \(tabName)@\(resolvedPath): \(sessionId)")
+                return sessionId
+            }
+
+            return nil
+        }
+
         // Phase 1: Create the active workspace's active tab immediately so the user
         // sees a working terminal right away. Collect remaining tabs for Phase 2.
         var pending: [(workspace: WorkspaceItem, tab: WorkspaceTabState, originalIndex: Int)] = []
@@ -1704,6 +1935,7 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
             workspace.name = ps.name
             workspace.defaultArgs = ps.defaultArgs
             workspace.defaultCodexArgs = ps.defaultCodexArgs
+            workspace.defaultGrokArgs = ps.defaultGrokArgs
 
             let selTab = min(max(ps.selectedTabIndex, 0), max(ps.tabs.count - 1, 0))
 
@@ -1711,6 +1943,9 @@ class DeckardWindowController: NSWindowController, NSSplitViewDelegate {
                 var restoredTab = ts
                 if restoredTab.kind == .codex, restoredTab.sessionId == nil {
                     restoredTab.sessionId = recoverCodexSessionId(for: ps.path, tabName: restoredTab.name)
+                }
+                if restoredTab.kind == .grok, restoredTab.sessionId == nil {
+                    restoredTab.sessionId = recoverGrokSessionId(for: ps.path, tabName: restoredTab.name)
                 }
 
                 if i == selectedIdx && t == selTab {

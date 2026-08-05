@@ -147,6 +147,10 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         case .codexThinking: return "Codex working..."
         case .codexError: return "Codex error"
         case .codexCompletedUnseen: return "Codex done (unvisited)"
+        case .grokIdle: return "Grok idle"
+        case .grokThinking: return "Grok working..."
+        case .grokError: return "Grok error"
+        case .grokCompletedUnseen: return "Grok done (unvisited)"
         case .terminalIdle: return "Idle"
         case .terminalActive: return activity?.description ?? "Running"
         case .terminalError: return "Error"
@@ -165,6 +169,10 @@ class VerticalTabRowView: NSView, NSTextFieldDelegate, NSDraggingSource {
         .codexThinking: NSColor(red: 0.18, green: 0.76, blue: 0.48, alpha: 1.0),
         .codexError: .systemRed,
         .codexCompletedUnseen: NSColor(red: 0.10, green: 0.84, blue: 0.66, alpha: 1.0),
+        .grokIdle: NSColor(red: 0.32, green: 0.45, blue: 0.68, alpha: 1.0),
+        .grokThinking: NSColor(red: 0.30, green: 0.60, blue: 0.95, alpha: 1.0),
+        .grokError: .systemRed,
+        .grokCompletedUnseen: NSColor(red: 0.35, green: 0.75, blue: 1.0, alpha: 1.0),
         .terminalIdle: NSColor(red: 0.35, green: 0.55, blue: 0.54, alpha: 1.0),
         .terminalActive: NSColor(red: 0.45, green: 0.72, blue: 0.71, alpha: 1.0),
         .terminalError: NSColor(red: 0.85, green: 0.3, blue: 0.3, alpha: 1.0),
@@ -819,12 +827,14 @@ class AddTabButton: NSView {
     override var mouseDownCanMoveWindow: Bool { false }
     private let claudeAction: () -> Void
     private let codexAction: () -> Void
+    private let grokAction: () -> Void
     private let terminalAction: () -> Void
     private let label: NSTextField
 
-    init(claudeAction: @escaping () -> Void, codexAction: @escaping () -> Void, terminalAction: @escaping () -> Void) {
+    init(claudeAction: @escaping () -> Void, codexAction: @escaping () -> Void, grokAction: @escaping () -> Void, terminalAction: @escaping () -> Void) {
         self.claudeAction = claudeAction
         self.codexAction = codexAction
+        self.grokAction = grokAction
         self.terminalAction = terminalAction
         label = NSTextField(labelWithString: "  +")
         label.font = .systemFont(ofSize: 12, weight: .medium)
@@ -833,6 +843,7 @@ class AddTabButton: NSView {
         translatesAutoresizingMaskIntoConstraints = false
         toolTip = shortcutTooltip("New Claude tab", for: .newClaudeTab)
             + "\nOption-click: " + shortcutTooltip("new Codex", for: .newCodexTab)
+            + "\nOption+Shift-click: " + shortcutTooltip("new Grok", for: .newGrokTab)
             + "\nShift-click: " + shortcutTooltip("new Terminal", for: .newTerminalTab)
         label.translatesAutoresizingMaskIntoConstraints = false
         addSubview(label)
@@ -848,9 +859,12 @@ class AddTabButton: NSView {
     required init?(coder: NSCoder) { fatalError() }
 
     override func mouseDown(with event: NSEvent) {
-        if event.modifierFlags.contains(.option) {
+        let mods = event.modifierFlags
+        if mods.contains(.option) && mods.contains(.shift) {
+            grokAction()
+        } else if mods.contains(.option) {
             codexAction()
-        } else if event.modifierFlags.contains(.shift) {
+        } else if mods.contains(.shift) {
             terminalAction()
         } else {
             claudeAction()
@@ -869,6 +883,11 @@ class AddTabButton: NSView {
         codexItem.target = self
         menu.addItem(codexItem)
 
+        let grokItem = NSMenuItem(title: "New Grok Tab", action: #selector(newGrokAction), keyEquivalent: "")
+        grokItem.setShortcut(for: .newGrokTab)
+        grokItem.target = self
+        menu.addItem(grokItem)
+
         let terminalItem = NSMenuItem(title: "New Terminal Tab", action: #selector(newTerminalAction), keyEquivalent: "")
         terminalItem.setShortcut(for: .newTerminalTab)
         terminalItem.target = self
@@ -879,6 +898,7 @@ class AddTabButton: NSView {
 
     @objc private func newClaudeAction() { claudeAction() }
     @objc private func newCodexAction() { codexAction() }
+    @objc private func newGrokAction() { grokAction() }
     @objc private func newTerminalAction() { terminalAction() }
 }
 
