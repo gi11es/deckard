@@ -1,5 +1,8 @@
 # Deckard
 
+> [!NOTE]
+> Deckard is archived and is no longer maintained. Please use [Paseo](https://paseo.sh) instead.
+
 A native macOS workspace for [Claude Code](https://docs.anthropic.com/en/docs/claude-code), [OpenAI Codex](https://openai.com/codex), and classic terminal tabs. Deckard treats agent sessions as first-class tabs: Claude Code and Codex can both be created, resumed, forked, explored, bookmarked, and restored across app launches.
 
 Run multiple agents side by side in a single window with project-aware tabs, session persistence, status badges, and usage telemetry when the underlying CLI exposes it. Built with Swift and AppKit. Terminal rendering is powered by [SwiftTerm](https://github.com/migueldeicaza/SwiftTerm).
